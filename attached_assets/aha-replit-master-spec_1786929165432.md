@@ -1,3 +1,5 @@
+> **Archived bootstrap upload:** This file is retained for provenance only. The binding, current specification is [`docs/aha-replit-master-spec.md`](../docs/aha-replit-master-spec.md).
+
 # ITS AHA App — Replit Master Build Specification (v1.0)
 
 You are building a mobile-first PWA that lets a construction crew lead complete the company's daily Activity Hazard Analysis (AHA) on an iPad, collect 5–10 finger signatures, and produce a PDF that exactly matches the official ITS form (IS_F_222_EN.2203). The app UI is modern and touch-first; the PDF output is the fixed official company sheet.

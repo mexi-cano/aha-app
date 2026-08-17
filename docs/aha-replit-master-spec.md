@@ -1,4 +1,6 @@
-# ITS AHA App — Replit Master Build Specification (v1.0)
+# ITS AHA App — Replit Master Build Specification (v1.2)
+
+*v1.2 changelog: database moved to external Neon (Drizzle + @neondatabase/serverless); PDF library pinned to @cantoo/pdf-lib; full frontend stack pinned; §3 no-deduplication rule; gate-code auth detailed; §10 exclusions expanded (banned dependencies, supervisor notifications deferred). Supersedes v1.0/v1.1.*
 
 You are building a mobile-first PWA that lets a construction crew lead complete the company's daily Activity Hazard Analysis (AHA) on an iPad, collect 5–10 finger signatures, and produce a PDF that exactly matches the official ITS form (IS_F_222_EN.2203). The app UI is modern and touch-first; the PDF output is the fixed official company sheet.
 
@@ -10,10 +12,10 @@ You are building a mobile-first PWA that lets a construction crew lead complete 
 
 ## 1. Stack & architecture
 
-- **Frontend:** Vite + React, TypeScript, PWA (vite-plugin-pwa, Add-to-Home-Screen capable). Single-column mobile-first; iPad is primary device.
+- **Frontend:** Vite + React 19 + TypeScript 5, PWA via vite-plugin-pwa (Add-to-Home-Screen capable), Tailwind CSS 4 with the palette as CSS-variable tokens, react-router 7, signature_pad for signature capture. Single-column mobile-first; iPad is primary device. All dependencies pinned to exact versions; committed lockfile; no new dependencies without justification.
 - **Local-first storage:** IndexedDB (Dexie). Every meaningful change autosaves locally. The app must fully work offline: create/edit/sign/finalize/generate PDF with no network.
-- **PDF generation:** client-side with pdf-lib. See §7.
-- **Backend:** thin Express + Postgres (DATABASE_URL env var). Purpose: backup/sync of jobs, AHAs, and finished PDFs. No Replit-proprietary APIs; all config via env vars.
+- **PDF generation:** client-side with @cantoo/pdf-lib (maintained fork of pdf-lib, identical API). See §7.
+- **Backend:** thin Express 5 + external **Neon** serverless Postgres (DATABASE_URL env var — do NOT provision Replit's built-in database), accessed via Drizzle ORM + drizzle-kit migrations and the @neondatabase/serverless driver. Zod schemas shared client/server. Purpose: backup/sync of jobs, AHAs, and finished PDFs (stored as bytea). No Replit-proprietary APIs; all config via env vars.
 - **Auth:** single shared access code (a gate code, not a login). First launch shows a lock screen — "Enter your crew's access code" — verified server-side against a hashed env var (ACCESS_CODE_HASH); the device stores a token and never asks again unless the code rotates or the server returns 401 (which re-shows the lock screen without losing local data). Rate-limit auth attempts (e.g., 5/minute/IP). No user accounts, no roles, no sessions UI, no reset flows. Jobs/AHAs already carry a crew identifier, so multi-crew later is a codes→crew table — additive, no rework.
 - **Fonts:** Barlow (500/600/700), bundled locally in the repo — no font CDN (offline requirement). PDF uses Helvetica (built into pdf-lib), matching the template.
 - **Typography/palette:** ITS Blue #374B96 (primary), Deep ITS #2A3A78, periwinkle tints #EAEDF7 / #C6CDE8, background #F5F6F9, borders #D9DDE7, text #191D2B / secondary #59617A, attention orange #E8720C (warnings ONLY), confirmation green #1E8E3E (always paired with a ✓ glyph). Minimum touch target 48px; body text ≥16px, weight ≥500.
@@ -95,7 +97,7 @@ Overflow limits (graceful caps, no silent truncation): 10 signature slots, 15 ta
 
 ## 7. PDF engine — port `aha-clean-template.py`, do not redesign
 
-`aha-clean-template.py` (attached, ReportLab) is the literal layout spec: page geometry, every field coordinate, fonts/sizes, table structure, wheel placement, wedge angles, highlight geometry, signature grid. Port it 1:1 to a TypeScript module using pdf-lib (`/src/pdf/`). Embed `aha-energy-wheel-recolored.png` and the ITS logo as assets.
+`aha-clean-template.py` (attached, ReportLab) is the literal layout spec: page geometry, every field coordinate, fonts/sizes, table structure, wheel placement, wedge angles, highlight geometry, signature grid. Port it 1:1 to a TypeScript module using @cantoo/pdf-lib (`/src/pdf/`). Embed `aha-energy-wheel-recolored.png` and the ITS logo as assets.
 
 - Highlights (translucent yellow, alpha ≈0.38): per selected category → wheel wedge tint + rim ring-band over the category label + the category-name cell in the Energy table; Human Factors → center circle instead of a wedge. Per marked example → that example's bullet line in the table (already implemented in the attached template via its `line_rects` map — port it 1:1).
 - Signatures: captured strokes/PNGs placed in the sign-off grid cells with the worker's typed name in the name column (grid coordinates in the template).
@@ -119,7 +121,9 @@ After each phase: smoke-test on a physical iPad in Safari (signature canvas and 
 
 ## 10. Do NOT build (v1 exclusions)
 
-User accounts, roles, permissions, invites, password reset · admin dashboards, analytics, charts · multi-company/tenant anything · email composer or server-side email · approval/re-sign workflows · configurable form templates or form builder · sync-conflict resolution UI · worker PINs or QR codes · onboarding tutorials · AI-generated safety suggestions · any home screen that isn't essentially "Start today's AHA" · any change to the PDF layout · any rewording of §3 strings · supervisor notifications/reminders (e.g., "crew hasn't signed by 10 AM") — future roadmap, not v1.
+User accounts, roles, permissions, invites, password reset · admin dashboards, analytics, charts · multi-company/tenant anything · email composer or server-side email · approval/re-sign workflows · configurable form templates or form builder · sync-conflict resolution UI · worker PINs or QR codes · onboarding tutorials · AI-generated safety suggestions · any home screen that isn't essentially "Start today's AHA" · any change to the PDF layout · any rewording of §3 strings · supervisor notifications/reminders (e.g., "crew hasn't signed by 10 AM") — future roadmap, not v1 · application-state libraries (Redux/Zustand/MobX — Dexie liveQuery covers local AHA state) · auth frameworks (Passport/JWT/next-auth — auth is a code-hash compare with node:crypto) · ORM substitutions (no Prisma) · moment.js · CDN-loaded production assets · any new or upgraded dependency outside a dedicated, justified PR.
+
+**TanStack Query boundary:** the existing generated React Query client remains approved for remote API/server state only. It must never own or mirror local AHA editor state; Dexie is authoritative for that data.
 
 ## 11. Acceptance scenarios (all must pass)
 

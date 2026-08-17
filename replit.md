@@ -31,6 +31,7 @@ Mobile-first PWA for construction crews to complete their daily Activity Hazard 
 - Master product spec: `docs/aha-replit-master-spec.md` (canonical strings in §3 are verbatim-only; §10 lists v1 exclusions)
 - Codex project context and roadmap: `docs/aha-codex-handoff.md`
 - PR 0 verification record: `docs/pr-0-readiness-checklist.md`
+- PR 2 dependency-security and Replit recovery record: `docs/pr-2-dependency-security-checklist.md`
 - Agent guardrails: `AGENTS.md` (repo root)
 - Static assets: `assets/`
 
@@ -55,6 +56,7 @@ Mobile-first PWA for construction crews to complete their daily Activity Hazard 
 - Catalog pins are exact: when adding a dep that peers on react/vite/@types, keep catalog versions aligned or pnpm creates duplicate type instances and typecheck fails
 - `pnpm-workspace.yaml` has `minimumReleaseAge: 1440` — brand-new package releases (<1 day old) will fail to install; do not disable this
 - pnpm build scripts are controlled through `allowBuilds`; keep every approval explicit and justified
+- Replit currently supplies Node 24 and pnpm 10.26.1. Root `.npmrc` disables pnpm 10's automatic package-manager switching so it does not recursively try to install the repository-pinned pnpm 11.19.0; the Node 24 engine warnings in Replit are expected. Node 22 + pnpm 11.19.0 remains the repository policy toolchain
 - Never edit `.replit` or workflows; Vite config must keep `allowedHosts: true` and read `PORT`/`BASE_PATH` from env
 
 ## Pointers

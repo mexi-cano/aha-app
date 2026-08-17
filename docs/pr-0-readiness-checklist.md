@@ -45,9 +45,21 @@ PR 0 makes the Replit-created skeleton reproducible and gives Phase 1 a stable s
 - [x] CDN audit finds no production font or asset references.
 - [x] Confirm `.replit`, workflows, and `server.allowedHosts: true` remain unchanged.
 
-The repository contract remains pinned to Node 22. Replit's platform-managed `.replit` currently selects `nodejs-24`; the frozen install, typecheck, smoke test, and production builds also passed under Node 24.19.0 as a forward-compatibility check (with the expected engine warning).
+The repository contract remains pinned to Node 22. The frozen install, full monorepo typecheck, smoke/unit test suite, and production build all passed under Node 22.23.2 with pnpm 11.19.0. Replit's platform-managed `.replit` currently selects `nodejs-24`; the same suite also passed under Node 24.19.0 as a forward-compatibility check (with the expected engine warning).
 
-`pnpm audit --prod` reports no known vulnerabilities. The full development audit reports four high and one low advisory through existing transitive build/codegen tooling (Workbox/AJV, Orval, PostCSS/Vite, and esbuild). PR 0 does not mix in dependency upgrades; resolve those findings in a dedicated dependency-security PR.
+`pnpm audit --prod` reports no known vulnerabilities. The full development audit reports four high and one low advisory through existing transitive build/codegen tooling. None is reachable from an application request or other untrusted runtime input in the current repository workflows; the detailed assessment is below.
+
+### Development advisory register
+
+Owner: repository maintainer (Carlos Cano), with Codex implementation support. Deadline: merge a dedicated dependency-security PR before Phase 1 feature work begins and, in all cases, before any release. PR 0 does not mix dependency upgrades into repository-readiness work.
+
+| Advisory and locked version | Affected workspace dependency paths | Untrusted-input reachability |
+| --- | --- | --- |
+| `GHSA-g7r4-m6w7-qqqr` — `esbuild@0.27.3` (low) | `artifacts/api-server` directly and through `esbuild-plugin-pino`; `artifacts/client` through `@tailwindcss/vite`, `@vitejs/plugin-react`, `vite`, and `vite-plugin-pwa` Vite/tsx branches; `artifacts/mockup-sandbox` through `@tailwindcss/vite`, `@vitejs/plugin-react`, and `vite` Vite/tsx branches; `lib/api-spec` through Orval's `@orval/*` generator packages; `lib/db` through `drizzle-kit` and its tsx branch; `scripts` through `tsx` | Build, test, and code-generation tooling only. The advisory concerns the esbuild development server on Windows; this project runs on macOS/Replit Linux and does not expose that server as a production route. |
+| `GHSA-7p8r-x3mc-p8w7` — `fast-uri@3.1.4` (high) | `artifacts/client > vite-plugin-pwa > workbox-build > @apideck/better-ajv-errors > ajv`; `artifacts/client > vite-plugin-pwa > workbox-build > ajv`; `lib/api-spec > orval > @scalar/openapi-parser > {ajv, ajv-draft-04 > ajv, ajv-formats > ajv}` | Workbox validates repository-controlled PWA build inputs; Orval/Scalar parses the checked-in `lib/api-spec/openapi.yaml`. No application request reaches these code paths. |
+| `GHSA-rgw5-rvv9-x895` — `brace-expansion@5.0.8` (high) | `artifacts/client > vite-plugin-pwa > workbox-build > glob > minimatch`; `lib/api-spec > orval > @orval/{angular,axios,core,effect,fetch,hono,mcp,mock,query,solid-start,swr,zod} > typedoc > minimatch`; plus Orval's direct `typedoc`, `typedoc-plugin-coverage`, and `typedoc-plugin-markdown` TypeDoc branches | Workbox globbing and Orval/TypeDoc use repository-owned configuration and file patterns during build/codegen. No runtime or untrusted-request path exists. |
+| `GHSA-5p4m-2wfm-xmqj` — `js-yaml@4.3.0` (high) | `lib/api-spec > orval > js-yaml` | Orval parses the checked-in local OpenAPI document during code generation; the current workflow accepts no uploaded or runtime YAML. |
+| `GHSA-2v37-7h3g-55p8` — `nanoid@3.3.16` (high) | `artifacts/client` through `@tailwindcss/vite`, `@vitejs/plugin-react`, `vite`, and `vite-plugin-pwa`, each via `vite > postcss`; `artifacts/mockup-sandbox` through `@tailwindcss/vite`, `@vitejs/plugin-react`, and `vite`, each via `vite > postcss` | PostCSS processes checked-in CSS during Vite builds. No application request or other untrusted runtime input invokes this package. |
 
 ## Live Replit handoff check
 

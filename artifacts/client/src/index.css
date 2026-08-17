@@ -3,7 +3,7 @@
 @plugin "@tailwindcss/typography";
 
 @font-face {
-  font-family: 'Barlow';
+  font-family: Barlow;
   src: url('./assets/fonts/Barlow-Medium.ttf') format('truetype');
   font-style: normal;
   font-weight: 500;
@@ -11,7 +11,7 @@
 }
 
 @font-face {
-  font-family: 'Barlow';
+  font-family: Barlow;
   src: url('./assets/fonts/Barlow-SemiBold.ttf') format('truetype');
   font-style: normal;
   font-weight: 600;
@@ -19,7 +19,7 @@
 }
 
 @font-face {
-  font-family: 'Barlow';
+  font-family: Barlow;
   src: url('./assets/fonts/Barlow-Bold.ttf') format('truetype');
   font-style: normal;
   font-weight: 700;

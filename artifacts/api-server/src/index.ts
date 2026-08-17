@@ -1,20 +1,9 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { parsePort } from "./lib/port";
 
-const rawPort = process.env["PORT"];
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
-
-const port = Number(rawPort);
+const port = parsePort(process.env["PORT"]);
 const host = "0.0.0.0";
-
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
 
 app.listen(port, host, (err) => {
   if (err) {

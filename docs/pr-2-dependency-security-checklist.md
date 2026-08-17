@@ -28,7 +28,7 @@ resource exhaustion, not application, TLS, or Neon failures.
   for the policy toolchain.
 - [x] Retain all Node 22 and pnpm 11.19.0 declarations.
 - [x] Document Replit's expected Node 24 engine warning in `replit.md`.
-- [ ] In Replit, confirm Run no longer invokes `pnpm add pnpm@11.19.0` or emits
+- [x] In Replit, confirm Run no longer invokes `pnpm add pnpm@11.19.0` or emits
   `pthread_create`, CA-loading, or `SIGABRT` failures.
 
 ## Advisory closure
@@ -74,8 +74,17 @@ proved by the API production build, worker-artifact inspection, and a running
 - [x] `pnpm run typecheck`
 - [x] `pnpm test`
 - [x] `pnpm run build`
+- [x] Run the executable worker-artifact check below; all four required bundles
+  are non-empty and pass Node's syntax check.
+
+  ```sh
+  for worker_bundle in pino-worker.mjs pino-file.mjs pino-pretty.mjs thread-stream-worker.mjs; do
+    test -s "artifacts/api-server/dist/$worker_bundle" && node --check "artifacts/api-server/dist/$worker_bundle"
+  done
+  ```
+
 - [x] Start the built API; verify `GET /api/healthz` returns `{"status":"ok"}`
-  and Pino records the request.
+  and Pino's configured development transport loads and records the request.
 - [x] `pnpm audit` reports no known vulnerabilities.
 - [x] `pnpm audit --prod` reports no known vulnerabilities.
 - [x] Exact-pin, generated-code, scope, and whitespace audits pass.
@@ -93,13 +102,14 @@ sourcemap warning do not fail this matrix. Any new warning or error does.
 
 ## Live Replit acceptance
 
-- [ ] Pull the PR branch into Replit and let the frozen install complete.
-- [ ] Click **Run** and confirm both workflows remain running without package
+- [x] Pull the PR branch into Replit and let the frozen install complete.
+- [x] Click **Run** and confirm both workflows remain running without package
   manager recursion or resource-exhaustion errors.
-- [ ] Confirm the client preview loads.
-- [ ] Confirm `GET /api/healthz` returns `{"status":"ok"}`.
-- [ ] Confirm the system screen still reports server and external Neon database
+- [x] Confirm the client preview loads.
+- [x] Confirm `GET /api/healthz` returns `{"status":"ok"}`.
+- [x] Confirm the system screen still reports server and external Neon database
   connectivity using the existing `DATABASE_URL` secret.
 
-This final section requires the Replit workspace and secret store. PR 2 is not
-merge-ready until the repository maintainer records those results on the PR.
+The repository maintainer completed this live check in Replit on 2026-08-17
+under Node 24.12.0 and pnpm 10.26.1. The expected Node 22 engine warnings were
+present; package-manager recursion and resource-exhaustion errors were absent.

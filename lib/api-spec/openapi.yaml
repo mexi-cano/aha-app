@@ -24,6 +24,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /health:
+    get:
+      operationId: healthCheckDb
+      tags: [health]
+      summary: Health check with database connectivity
+      description: Returns server health and verifies database connectivity with `select 1`
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DbHealthStatus"
+        "500":
+          description: Database unreachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DbHealthStatus"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +52,14 @@ components:
           type: string
       required:
         - status
+    DbHealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+        database:
+          type: string
+      required:
+        - status
+        - database
 

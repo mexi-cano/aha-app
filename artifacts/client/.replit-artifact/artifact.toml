@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "AHA Client"
+description = "Skeleton client for the ITS AHA app — a mobile-first PWA for construction crew daily Activity Hazard Analysis. Currently a placeholder page that verifies the client, API server, and Neon database run together."
+version = "1.0.0"
+id = "artifacts/client"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20517
+
+[services.development]
+run = "pnpm --filter @workspace/client run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/client", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/client/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20517"
+BASE_PATH = "/"

@@ -1,0 +1,1 @@
+- [Exact-pin catalog duplicates](exact-pin-catalog.md) — pinning the pnpm catalog exact can fork @types/react & vite into duplicates; align catalog to already-resolved versions before install.

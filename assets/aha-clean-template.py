@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Clean vector recreation of the ITS AHA form (IS_F_222_EN.2203), US Letter.
-Generates: aha-clean-template.pdf (blank) and aha-clean-filled.pdf (sample data).
+Generates: aha-clean-template-blank.pdf and aha-clean-filled-sample.pdf.
 All geometry defined here in top-down coordinates; T(y) converts to PDF space.
 """
 import io, random
+from pathlib import Path
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.lib.utils import ImageReader
@@ -11,6 +12,7 @@ from reportlab.lib.utils import ImageReader
 PW, PH = 612.0, 792.0
 L, R = 45.0, 567.0
 MID = 306.0
+ASSET_DIR = Path(__file__).resolve().parent
 
 BAR = (0.28, 0.33, 0.30)
 BORDER = (0.55, 0.55, 0.55)
@@ -127,7 +129,7 @@ def draw_front(c, data=None):
     # title + logo
     c.setFillColorRGB(*BLACK); c.setFont("Helvetica-Bold", 19)
     c.drawString(L, T(58), "Activity Hazard Analysis")
-    logo = ImageReader("/mnt/user-data/uploads/its-logo.png")
+    logo = ImageReader(str(ASSET_DIR / "its-logo.png"))
     c.drawImage(logo, R - 128, T(70), width=128, height=64, mask='auto')
     # header block
     y0 = 88.0
@@ -221,7 +223,14 @@ def draw_back(c, data=None):
     hline(c, L, R, 60, 0.9)
     # wheel image
     WX, WY, WS = 45.0, 80.0, 190.0
-    c.drawImage(ImageReader("/home/claude/wheel.png"), WX, T(WY + WS), width=WS, height=WS, mask=None)
+    c.drawImage(
+        ImageReader(str(ASSET_DIR / "aha-energy-wheel-recolored.png")),
+        WX,
+        T(WY + WS),
+        width=WS,
+        height=WS,
+        mask=None,
+    )
     wcx, wcy = WX + WS / 2, T(WY + WS / 2)
     # energy table
     ex0, ex1 = 240.0, R
@@ -353,6 +362,6 @@ def build(path, data):
     c.save()
 
 if __name__ == "__main__":
-    build("/home/claude/aha-clean-template.pdf", None)
-    build("/home/claude/aha-clean-filled.pdf", DATA)
+    build(str(ASSET_DIR / "aha-clean-template-blank.pdf"), None)
+    build(str(ASSET_DIR / "aha-clean-filled-sample.pdf"), DATA)
     print("built both")

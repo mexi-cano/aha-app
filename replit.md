@@ -4,10 +4,11 @@ Mobile-first PWA for construction crews to complete their daily Activity Hazard 
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/api-server run dev` — run the API server (`PORT` is required; Replit supplies 8080)
 - `pnpm --filter @workspace/client run dev` — run the client (Vite)
 - `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
+- `pnpm test` — API liveness smoke test
+- `pnpm run build` — typecheck the workspace + build the deployable client and API artifacts
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required env: `DATABASE_URL` — external **Neon** Postgres connection string (in Secrets)
@@ -25,9 +26,11 @@ Mobile-first PWA for construction crews to complete their daily Activity Hazard 
 
 - Client app: `artifacts/client/src/` — stubs `pdf/`, `screens/`, `data/` for later phases
 - Server routes: `artifacts/api-server/src/routes/` (mounted under `/api`)
-- DB access: `lib/db` (schema in `lib/db/src/schema.ts`)
+- DB access: `lib/db` (schema in `lib/db/src/schema/index.ts`)
 - API contract source of truth: `lib/api-spec/openapi.yaml`
 - Master product spec: `docs/aha-replit-master-spec.md` (canonical strings in §3 are verbatim-only; §10 lists v1 exclusions)
+- Codex project context and roadmap: `docs/aha-codex-handoff.md`
+- PR 0 verification record: `docs/pr-0-readiness-checklist.md`
 - Agent guardrails: `AGENTS.md` (repo root)
 - Static assets: `assets/`
 
@@ -51,6 +54,7 @@ Mobile-first PWA for construction crews to complete their daily Activity Hazard 
 
 - Catalog pins are exact: when adding a dep that peers on react/vite/@types, keep catalog versions aligned or pnpm creates duplicate type instances and typecheck fails
 - `pnpm-workspace.yaml` has `minimumReleaseAge: 1440` — brand-new package releases (<1 day old) will fail to install; do not disable this
+- pnpm build scripts are controlled through `allowBuilds`; keep every approval explicit and justified
 - Never edit `.replit` or workflows; Vite config must keep `allowedHosts: true` and read `PORT`/`BASE_PATH` from env
 
 ## Pointers

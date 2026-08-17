@@ -1,0 +1,133 @@
+# ITS AHA App — Replit Master Build Specification (v1.0)
+
+You are building a mobile-first PWA that lets a construction crew lead complete the company's daily Activity Hazard Analysis (AHA) on an iPad, collect 5–10 finger signatures, and produce a PDF that exactly matches the official ITS form (IS_F_222_EN.2203). The app UI is modern and touch-first; the PDF output is the fixed official company sheet.
+
+**Attached assets (treat as authoritative):** approved design screenshots (match them); `aha-clean-template.py` (the PDF layout — port it, do not redesign it); `aha-energy-wheel-recolored.png` (used in-app AND in the PDF); `aha-clean-filled-sample.pdf` (your PDF output must match this); `aha-clean-template-blank.pdf` (blank reference); ITS logo.
+
+**Success test:** a worker with mediocre tech skills completes the normal morning flow without instruction; an experienced user never feels slowed down. Never lose entered safety information because of connectivity or a stray tap.
+
+---
+
+## 1. Stack & architecture
+
+- **Frontend:** Vite + React, TypeScript, PWA (vite-plugin-pwa, Add-to-Home-Screen capable). Single-column mobile-first; iPad is primary device.
+- **Local-first storage:** IndexedDB (Dexie). Every meaningful change autosaves locally. The app must fully work offline: create/edit/sign/finalize/generate PDF with no network.
+- **PDF generation:** client-side with pdf-lib. See §7.
+- **Backend:** thin Express + Postgres (DATABASE_URL env var). Purpose: backup/sync of jobs, AHAs, and finished PDFs. No Replit-proprietary APIs; all config via env vars.
+- **Auth:** single shared access code (a gate code, not a login). First launch shows a lock screen — "Enter your crew's access code" — verified server-side against a hashed env var (ACCESS_CODE_HASH); the device stores a token and never asks again unless the code rotates or the server returns 401 (which re-shows the lock screen without losing local data). Rate-limit auth attempts (e.g., 5/minute/IP). No user accounts, no roles, no sessions UI, no reset flows. Jobs/AHAs already carry a crew identifier, so multi-crew later is a codes→crew table — additive, no rework.
+- **Fonts:** Barlow (500/600/700), bundled locally in the repo — no font CDN (offline requirement). PDF uses Helvetica (built into pdf-lib), matching the template.
+- **Typography/palette:** ITS Blue #374B96 (primary), Deep ITS #2A3A78, periwinkle tints #EAEDF7 / #C6CDE8, background #F5F6F9, borders #D9DDE7, text #191D2B / secondary #59617A, attention orange #E8720C (warnings ONLY), confirmation green #1E8E3E (always paired with a ✓ glyph). Minimum touch target 48px; body text ≥16px, weight ≥500.
+
+## 2. Data model
+
+```
+Job {
+  id, name, cityLabel,
+  defaults: { location, personInCharge, closestEmergencyCentre, emergencyNumber,
+              musterPoint, workOrderPermit, jhaProcedureNumbers },
+  roster: [{ id, name }]           // persistent worker names for this job
+}
+
+AHA {
+  id, jobId, date,
+  status: 'draft' | 'in_progress' | 'completed',   // in_progress = signing has begun
+  header: { location, date, personInCharge, closestEmergencyCentre, emergencyNumber,
+            musterPoint, workOrderPermit, jhaProcedureNumbers, rescuePlanRequired: true|false|null },
+  description, meetingNotes,
+  notApplicable: { workOrderPermit: bool, jhaProcedureNumbers: bool, meetingNotes: bool },
+  tasks: [{ id, task, hazards, controls }],
+  energySelections: [{ category, examples: [string] }],   // strings MUST be from §3 verbatim
+  safetyCheck: null | 'yes' | 'no',
+  crew: [{ workerId, name, signaturePng|null, signedAt|null }],
+  completedAt|null, updatedAfterCompletionAt: [timestamps],
+  sync: { savedLocallyAt, backedUpAt|null }
+}
+```
+
+## 3. Canonical form data (verbatim — never paraphrase, never invent)
+
+These strings are data from the official form. Example chips, Review listings, the read-only AHA, and PDF highlighting all use them exactly.
+
+- **Gravity:** Excavation cave-in · Falling or sliding materials/objects · Slips/trips/falls · Working at heights
+- **Motion:** Wind · Road/ground conditions · Flying particles/debris · Simultaneous operations · Watercourses · Ergonomics · Congestion · Vehicles/vessels/mobile equipment
+- **Mechanical:** Tool/equipment nip points/pinch points · Vibration · Rotating equipment
+- **Electrical:** Electrical equipment/lines - normal or abnormal condition (shock or arc flash) · Non-intrinsically safe tools/equipment · Static electricity · Induced voltage
+- **Pressure:** Compressed cylinders · Pressurized piping/hoses/equipment · Tanks/vessels · Pressure relief systems
+- **Sound:** Tools/equipment · Pressure relief systems · Purging
+- **Radiation:** Welding arc · NDT/X-ray · NORM · Infrared scanners · Sun
+- **Biological:** Plants · Insects · Needles · Reptiles · Viruses · Animals · Mold · Bloodborne pathogens · Birds · Bacteria
+- **Chemical:** Flammable/combustible · Toxic vapors/dusts/fibers/fumes · Corrosive · Skin/eye irritants · Designated substances, pipeline contaminants, spills, suspect soils · Reactive
+- **Temperature:** Cold surfaces (Nitrogen, LNG, propane) · Hot surfaces (friction, heat sources) · Hot emissions/vapors · Weather conditions · Ignition sources
+- **Human factors:** Knowledge/skill · Risk tolerance · Working alone · Training · Communication · Fit for duty · Deviation from plan
+
+**Note:** some example strings legitimately appear under more than one category on the official form (e.g., "Pressure relief systems" is listed under BOTH Pressure and Sound). Do NOT deduplicate examples across categories — each category's list stands alone, in the order given above.
+
+**Worker acknowledgment (shown verbatim on the signature screen):** "I have reviewed all applicable documentation, site hazards, and my responsibilities to follow safe work plans to protect myself and others while on site."
+
+**Safety gate question (verbatim):** "Have all known hazards been identified and addressed using the Energy Wheel?" — with the form's instruction "Do not proceed until you can answer 'yes'" honored as a hard block (§5).
+
+## 4. Core behaviors
+
+- **Start today's AHA:** one tap. Copies the latest saved version of the most recent AHA for this job (handles weekends/gaps) — header, description, tasks, meeting notes, energy categories AND examples, crew roster. Sets today's date. Shows dismissible banner: "**Started from {date}.** Review anything that changed today. — Start blank instead" ("Start blank instead" confirms only if edits already exist). First AHA of a job starts blank, no banner.
+- **safetyCheck NEVER copies.** It is null every new day and must be answered fresh.
+- **Autosave:** every change → IndexedDB. Header shows quiet "Saving… → Saved ✓". Offline: "Offline · Saved on this iPad ✓". No Save buttons, no unsaved-changes dialogs, ever. Reopening the app with a draft/in-progress AHA lands on Home's matching state (crash recovery).
+- **Energy selection:** category cards toggle selection; "See examples" expands official examples as multi-select chips; marking an example auto-selects its parent category; a category may be selected with zero examples; unchecking a category clears its examples; one panel open at a time; collapsed selected cards show "N examples marked". Wheel preview mirrors category selections (Human Factors = center circle).
+- **Post-completion updates:** editing tasks, hazards, controls, description, or energy selections after completion clears safetyCheck (must be re-answered) and appends an internal timestamp. Signatures are retained. The PDF regenerates after the safety check is re-answered Yes.
+- **Signing Mode:** full-screen; persistent banner "SIGNING MODE — HAND THE DEVICE TO EACH CREW MEMBER"; nothing editable. Crew list with per-worker Tap to sign, signed rows show "Signed {time} ✓". "View today's AHA" (crew list) and "Review the AHA" (signature screen) open the Review summary read-only — no Edit buttons, single "Back to signing." "+ Add Worker" appends to today's crew → acknowledgment → signature. Signature screen: name, official acknowledgment (§3), canvas ("Sign here with your finger"), Clear, CONFIRM SIGNATURE (enabled only after ink; empty canvas cannot save); auto-return to crew list after brief "✓ Signature saved". Re-sign: tapping a signed row → "{Name} has already signed." [View signature] [Sign again] (confirm, replaces). "Exit signing" with unsigned workers → confirm ("3 workers still haven't signed.") and leaves status in_progress; with all signed, no warning. Signature timestamps are stored and shown in-app but do NOT print on the PDF.
+- **Completion:** FINISH TODAY'S AHA enables only when every worker in today's crew has signed AND all must-fix items pass. Completing generates and stores the PDF.
+- **Late arrival (completed AHA):** "+ Add worker & sign" → name → acknowledgment → signature → PDF regenerates; existing signatures untouched.
+- **Crew editing (Review):** Today's Crew card seeded from the roster / previous day; Edit Crew = in-place checklist (+ Add worker). Removing an absent worker adjusts the signing denominator; removing a worker who already signed requires confirmation and deletes that signature. Renaming a signed worker warns and clears their signature — never silently reassign.
+
+## 5. Validation — three tiers, enforced ONLY at Review (never while typing)
+
+- **Must fix (blocks signing):** safetyCheck ≠ 'yes'; rescuePlanRequired unanswered; any task with an empty task/hazards/controls field; crew empty; description blank; any of location / person in charge / emergency number / closest emergency centre / muster point blank.
+- **Warnings (overridable, each with `Add` · `Not applicable`):** work order/permit, JHA/procedure numbers, meeting notes. "Not applicable" silences the warning; the field prints blank on the PDF (never print "N/A").
+- **Informational:** counts/confirmations. Warnings render amber with the ⚠ icon + text (never color alone, never red); each has a `Fix` that deep-links to the exact field.
+
+## 6. Error handling — four patterns, reused everywhere
+
+1. Recoverable input: "Controls are missing for this task." `Fix`
+2. Offline: "You're offline. Your AHA is saved on this iPad and you can keep working." (never the word "error")
+3. Operation failed: "We couldn't create the PDF. Your AHA and signatures are still saved." `Try again` (never lose data; never require re-signing because rendering failed)
+4. Destructive confirm: "Delete this task? This can't be undone." `Cancel` · `Delete`
+
+Overflow limits (graceful caps, no silent truncation): 10 signature slots, 15 task rows, per-field text capacity — warn "This won't fit on the ITS sheet. Shorten it or split the work." Text rendering may auto-shrink within the template's limits (the port defines them) but never below legibility.
+
+## 7. PDF engine — port `aha-clean-template.py`, do not redesign
+
+`aha-clean-template.py` (attached, ReportLab) is the literal layout spec: page geometry, every field coordinate, fonts/sizes, table structure, wheel placement, wedge angles, highlight geometry, signature grid. Port it 1:1 to a TypeScript module using pdf-lib (`/src/pdf/`). Embed `aha-energy-wheel-recolored.png` and the ITS logo as assets.
+
+- Highlights (translucent yellow, alpha ≈0.38): per selected category → wheel wedge tint + rim ring-band over the category label + the category-name cell in the Energy table; Human Factors → center circle instead of a wedge. Per marked example → that example's bullet line in the table (already implemented in the attached template via its `line_rects` map — port it 1:1).
+- Signatures: captured strokes/PNGs placed in the sign-off grid cells with the worker's typed name in the name column (grid coordinates in the template).
+- Checkboxes: rescue plan Yes/No and safety-gate Yes/No get an X per the template's draw_x.
+- Build a dev-only route `/pdf-test` that renders the sample data from the template file and displays the PDF beside `aha-clean-filled-sample.pdf` for visual diff. **Acceptance: your output is indistinguishable from the sample.**
+- Output filename: `AHA_{jobName}_{YYYY-MM-DD}.pdf`. Sharing: Web Share API with the PDF file (iOS share sheet → Mail/print); download fallback.
+
+## 8. Backend (thin)
+
+- `POST /api/auth` (access code → token) · `GET/POST /api/jobs` · `GET/POST/PUT /api/ahas` (JSON) · `PUT /api/ahas/:id/pdf` (binary). Bearer token on everything.
+- Sync is fire-and-forget with retry: local save always succeeds first; backup status surfaces as "☁ Backup waiting for connection" → "✓ Backed up". Last-write-wins by timestamp; no conflict UI.
+
+## 9. Build phases — one phase per prompt, checkpoint after each
+
+- **Phase 1:** scaffold, data model, IndexedDB autosave, Home (all four states), Details + Work editor sections, copy-from-most-recent, prefill banner, crash recovery.
+- **Phase 2:** Energy (cards + example chips + wheel + gate), Review (three tiers, Fix deep-links, Today's Crew + Edit Crew), Signing Mode complete (read-only review, add worker, re-sign, exit confirm, timestamps).
+- **Phase 3:** PDF engine port + /pdf-test diff route, Completed screen (View PDF, Print/Share, Update today's AHA, + Add worker & sign, "Updated {time}" chip), post-completion rules.
+- **Phase 4:** Express/Postgres backend + access code + sync status, PWA manifest/service worker, offline hardening, first-run job setup.
+
+After each phase: smoke-test on a physical iPad in Safari (signature canvas and Add-to-Home-Screen behave differently than desktop preview).
+
+## 10. Do NOT build (v1 exclusions)
+
+User accounts, roles, permissions, invites, password reset · admin dashboards, analytics, charts · multi-company/tenant anything · email composer or server-side email · approval/re-sign workflows · configurable form templates or form builder · sync-conflict resolution UI · worker PINs or QR codes · onboarding tutorials · AI-generated safety suggestions · any home screen that isn't essentially "Start today's AHA" · any change to the PDF layout · any rewording of §3 strings · supervisor notifications/reminders (e.g., "crew hasn't signed by 10 AM") — future roadmap, not v1.
+
+## 11. Acceptance scenarios (all must pass)
+
+1. Monday morning: open app → one tap start → prefilled from Friday → edit one task → Energy: flip "Wind" off, "Ergonomics" on (2 taps) → answer gate → Review clean → 8 signatures → FINISH → PDF matches official format with correct highlights.
+2. One worker absent + one task changed: Edit Crew removes him (denominator becomes 7), task edited, completes normally.
+3. Worker review: mid-signing, a worker opens "View today's AHA," reads, returns, signs. Nothing editable en route.
+4. Late arrival at 11 AM: completed AHA → + Add worker & sign → PDF regenerates with 9 signatures, original 8 untouched.
+5. Post-completion change: edit a control → safety check clears with explanation → re-answer Yes → PDF regenerates; signatures remain; "Updated" chip shows.
+6. Kill the app mid-draft: reopen → Home shows Draft state → CONTINUE TODAY'S AHA → nothing lost.
+7. Airplane mode all morning: entire flow works including PDF; status shows saved-on-device; reconnect → auto-backup.
+8. 11th worker / 16th task / oversized text: graceful cap messages, nothing silently dropped.

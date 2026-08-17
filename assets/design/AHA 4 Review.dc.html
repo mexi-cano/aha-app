@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body { margin:0; background:#E4E7EE; }
+a { color:#374B96; } a:hover { color:#2A3A78; }
+</style>
+</helmet>
+<div style="min-height:100vh; box-sizing:border-box; background:#E4E7EE; padding:32px 24px 64px; display:flex; flex-direction:column; align-items:center; gap:14px; font-family:'Barlow',system-ui,sans-serif; color:#191D2B;">
+  <div style="width:874px; display:flex; justify-content:space-between; align-items:center; gap:16px;">
+    <div style="font-size:14px; font-weight:600; color:#59617A;">Screen 4 · Review — iPad</div>
+    <div style="display:flex; background:#FFFFFF; border:1px solid #D9DDE7; border-radius:10px; padding:3px; gap:2px;">
+      <button onClick="{{ setIssues }}" style="border:none; border-radius:8px; padding:9px 14px; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; white-space:nowrap; flex-shrink:0; cursor:pointer; background:{{ iBg }}; color:{{ iFg }};">Needs attention</button>
+      <button onClick="{{ setReady }}" style="border:none; border-radius:8px; padding:9px 14px; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; white-space:nowrap; flex-shrink:0; cursor:pointer; background:{{ rBg }}; color:{{ rFg }};">Ready to sign</button>
+      <button onClick="{{ editCrew }}" style="border:none; border-radius:8px; padding:9px 14px; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; white-space:nowrap; flex-shrink:0; cursor:pointer; background:{{ eBg }}; color:{{ eFg }};">Crew editing</button>
+    </div>
+  </div>
+  <div style="background:#141824; border-radius:34px; padding:20px; box-shadow:0 24px 60px rgba(20,24,36,0.28), 0 2px 6px rgba(20,24,36,0.2);">
+    <div data-screen-label="Screen 4 — Review" style="width:834px; height:1194px; background:#F5F6F9; border-radius:16px; overflow:hidden; display:flex; flex-direction:column;">
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 28px 0;">
+        <div style="display:flex; gap:8px; font-size:13px; font-weight:600;"><span>9:41</span><span style="color:#59617A;">Fri Aug 14</span></div>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span style="font-size:13px; font-weight:600;">100%</span>
+          <div style="width:25px; height:12px; border:1.5px solid #191D2B; border-radius:3.5px; padding:1.5px; box-sizing:border-box;"><div style="width:100%; height:100%; background:#191D2B; border-radius:1.5px;"></div></div>
+          <div style="width:2px; height:5px; background:#191D2B; border-radius:0 1px 1px 0; margin-left:-4px;"></div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:16px; padding:10px 28px 0;">
+        <button style="border:none; background:transparent; padding:0 6px; height:48px; white-space:nowrap; flex-shrink:0; font-family:'Barlow',sans-serif; font-size:17px; font-weight:600; color:#374B96; cursor:pointer;" style-hover="color:#2A3A78;">‹ Home</button>
+        <div style="flex:1; text-align:center; font-size:15px; font-weight:600; color:#59617A;">I-40 Utility Relocation — Friday, Aug 14</div>
+        <div style="display:flex; align-items:center; gap:6px; font-size:15px; font-weight:500; color:#59617A; min-width:76px; justify-content:flex-end;"><span>Saved</span><span style="color:#1E8E3E; font-weight:800;">✓</span></div>
+      </div>
+      <div style="padding:12px 28px 0;">
+        <div style="display:flex; gap:4px; background:#EAEDF7; padding:4px; border-radius:12px;">
+          <button style="flex:1; border:none; height:48px; border-radius:9px; background:transparent; font-family:'Barlow',sans-serif; font-size:16px; font-weight:600; color:#2A3A78; cursor:pointer;" style-hover="background:rgba(255,255,255,0.6);">1 Details <span style="color:#1E8E3E; font-weight:800;">✓</span></button>
+          <button style="flex:1; border:none; height:48px; border-radius:9px; background:transparent; font-family:'Barlow',sans-serif; font-size:16px; font-weight:600; color:#2A3A78; cursor:pointer;" style-hover="background:rgba(255,255,255,0.6);">2 Work <span style="color:#1E8E3E; font-weight:800;">✓</span></button>
+          <button style="flex:1; border:none; height:48px; border-radius:9px; background:transparent; font-family:'Barlow',sans-serif; font-size:16px; font-weight:600; color:#2A3A78; cursor:pointer;" style-hover="background:rgba(255,255,255,0.6);">3 Energy <span style="color:#1E8E3E; font-weight:800;">✓</span></button>
+          <button style="flex:1; border:none; height:48px; border-radius:9px; background:#374B96; font-family:'Barlow',sans-serif; font-size:16px; font-weight:700; color:#FFFFFF; cursor:pointer;">4 Review</button>
+          <button style="flex:1; border:none; height:48px; border-radius:9px; background:transparent; font-family:'Barlow',sans-serif; font-size:16px; font-weight:600; color:#59617A; cursor:pointer;" style-hover="background:rgba(255,255,255,0.6);">5 Sign</button>
+        </div>
+      </div>
+      <div style="flex:1; overflow-y:auto;">
+        <div style="width:700px; margin:0 auto; display:flex; flex-direction:column; gap:18px; padding:22px 0 56px;">
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <div style="font-size:28px; font-weight:700;">Review</div>
+            <div style="font-size:17px; font-weight:500; color:#59617A;">Read the full AHA before anyone signs</div>
+          </div>
+          <div style="background:#FFFFFF; border:1px solid #D9DDE7; border-radius:14px; padding:20px 24px; display:flex; flex-direction:column; gap:14px;">
+            <div style="display:flex; align-items:center; gap:16px;">
+              <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
+                <div style="font-size:13px; font-weight:700; letter-spacing:0.1em; color:#59617A;">DETAILS</div>
+                <div style="font-size:18px; font-weight:700;">I-40 Utility Relocation — Raleigh, NC</div>
+                <div style="font-size:16px; font-weight:500; color:#59617A;">Friday, Aug 14 · Foreman: Miguel Rodriguez</div>
+              </div>
+              <button style="height:48px; padding:0 22px; border:1.5px solid #C6CDE8; border-radius:10px; background:#FFFFFF; color:#374B96; font-family:'Barlow',sans-serif; font-size:16px; font-weight:600; cursor:pointer;" style-hover="background:#EAEDF7;">Edit</button>
+            </div>
+            <sc-if value="{{ jhaWarn }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex; align-items:center; gap:12px; background:#FBF1DF; border:1.5px solid #E3C27A; border-radius:10px; padding:12px 16px;">
+                <div style="flex:1; font-size:16px; font-weight:600; color:#7A5200;">No JHA/procedure number entered</div>
+                <button style="height:48px; padding:0 18px; border:none; border-radius:10px; background:#7A5200; color:#FFFFFF; font-family:'Barlow',sans-serif; font-size:15px; font-weight:700; cursor:pointer;" style-hover="background:#684600;">Add</button>
+                <button onClick="{{ jhaNotApplicable }}" style="height:48px; padding:0 18px; border:1.5px solid #E3C27A; border-radius:10px; background:transparent; color:#7A5200; font-family:'Barlow',sans-serif; font-size:15px; font-weight:600; cursor:pointer;" style-hover="background:rgba(255,255,255,0.6);">Not applicable</button>
+              </div>
+            </sc-if>
+          </div>
+          <div style="background:#FFFFFF; border:1px solid #D9DDE7; border-radius:14px; padding:20px 24px; display:flex; flex-direction:column; gap:16px;">
+            <div style="display:flex; align-items:center; gap:16px;">
+              <div style="flex:1; font-size:13px; font-weight:700; letter-spacing:0.1em; color:#59617A;">WORK — 3 TASKS</div>
+              <button style="height:48px; padding:0 22px; border:1.5px solid #C6CDE8; border-radius:10px; background:#FFFFFF; color:#374B96; font-family:'Barlow',sans-serif; font-size:16px; font-weight:600; cursor:pointer;" style-hover="background:#EAEDF7;">Edit</button>
+            </div>
+            <sc-for list="{{ rTasks }}" as="t" hint-placeholder-count="3">
+              <div style="border-top:1px solid #E7EAF2; padding-top:14px; display:flex; flex-direction:column; gap:6px;">
+                <div style="font-size:18px; font-weight:700;">{{ t.title }}</div>
+                <div style="font-size:16px; font-weight:500; line-height:1.45; color:#191D2B;"><span style="font-weight:700; color:#59617A;">Hazards:</span> {{ t.hazards }}</div>
+                <sc-if value="{{ t.ok }}" hint-placeholder-val="{{ true }}">
+                  <div style="font-size:16px; font-weight:500; line-height:1.45; color:#191D2B;"><span style="font-weight:700; color:#59617A;">Controls:</span> {{ t.controls }}</div>
+                </sc-if>
+                <sc-if value="{{ t.warn }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex; align-items:center; gap:12px; background:#FBF1DF; border:1.5px solid #E3C27A; border-radius:10px; padding:12px 16px;">
+                    <div style="flex:1; font-size:16px; font-weight:600; color:#7A5200;">Controls not entered — required before signing</div>
+                    <button style="height:48px; padding:0 18px; border:none; border-radius:10px; background:#7A5200; color:#FFFFFF; font-family:'Barlow',sans-serif; font-size:15px; font-weight:700; cursor:pointer;" style-hover="background:#684600;">Add controls</button>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+          <div style="background:#FFFFFF; border:1px solid #D9DDE7; border-radius:14px; padding:20px 24px; display:flex; flex-direction:column; gap:14px;">
+            <div style="display:flex; align-items:center; gap:16px;">
+              <div style="flex:1; font-size:13px; font-weight:700; letter-spacing:0.1em; color:#59617A;">ENERGY — 5 OF 11</div>
+              <button style="height:48px; padding:0 22px; border:1.5px solid #C6CDE8; border-radius:10px; background:#FFFFFF; color:#374B96; font-family:'Barlow',sans-serif; font-size:16px; font-weight:600; cursor:pointer;" style-hover="background:#EAEDF7;">Edit</button>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;"><div style="height:40px; display:flex; align-items:center; padding:0 14px; background:#EAEDF7; border:1px solid #C6CDE8; border-radius:20px; font-size:15px; font-weight:600; color:#2A3A78;">Gravity</div><div style="font-size:16px; font-weight:500;">Excavation cave-in, Falling or sliding materials/objects, Slips/trips/falls</div></div>
+              <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;"><div style="height:40px; display:flex; align-items:center; padding:0 14px; background:#EAEDF7; border:1px solid #C6CDE8; border-radius:20px; font-size:15px; font-weight:600; color:#2A3A78;">Motion</div><div style="font-size:16px; font-weight:500;">Vehicles/vessels/mobile equipment, Wind, Ergonomics</div></div>
+              <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;"><div style="height:40px; display:flex; align-items:center; padding:0 14px; background:#EAEDF7; border:1px solid #C6CDE8; border-radius:20px; font-size:15px; font-weight:600; color:#2A3A78;">Mechanical</div><div style="font-size:16px; font-weight:500;">Rotating equipment, Tool/equipment nip points/pinch points</div></div>
+              <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;"><div style="height:40px; display:flex; align-items:center; padding:0 14px; background:#EAEDF7; border:1px solid #C6CDE8; border-radius:20px; font-size:15px; font-weight:600; color:#2A3A78;">Electrical</div><div style="font-size:16px; font-weight:500;">Electrical equipment/lines – normal or abnormal condition (shock or arc flash), Induced voltage</div></div>
+              <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;"><div style="height:40px; display:flex; align-items:center; padding:0 14px; background:#EAEDF7; border:1px solid #C6CDE8; border-radius:20px; font-size:15px; font-weight:600; color:#2A3A78;">Human Factors</div><div style="font-size:16px; font-weight:500; color:#8A93AC;">No examples marked</div></div>
+            </div>
+            <sc-if value="{{ safetyOk }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex; align-items:center; gap:10px; border-top:1px solid #E7EAF2; padding-top:14px;">
+                <div style="font-size:16px; font-weight:600;">Safety check: <span style="color:#1E8E3E;">Yes ✓</span></div>
+                <div style="font-size:15px; font-weight:500; color:#59617A;">All known hazards identified and addressed</div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ safetyWarn }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex; align-items:center; gap:12px; background:#FBF1DF; border:1.5px solid #E3C27A; border-radius:10px; padding:12px 16px;">
+                <div style="flex:1; font-size:16px; font-weight:600; color:#7A5200;">Safety check not answered — answer Yes to finish the AHA</div>
+                <button style="height:48px; padding:0 18px; border:none; border-radius:10px; background:#7A5200; color:#FFFFFF; font-family:'Barlow',sans-serif; font-size:15px; font-weight:700; cursor:pointer;" style-hover="background:#684600;">Answer</button>
+              </div>
+            </sc-if>
+          </div>
+          <div style="background:#FFFFFF; border:1px solid #D9DDE7; border-radius:14px; padding:20px 24px; display:flex; align-items:flex-start; gap:16px;">
+            <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
+              <div style="font-size:13px; font-weight:700; letter-spacing:0.1em; color:#59617A;">ON-SITE MEETING NOTES</div>
+              <div style="font-size:16px; font-weight:500; line-height:1.45;">Watch overhead lines near station 14+50. New crew member on site — pair with Jordan Reed.</div>
+            </div>
+            <button style="height:48px; padding:0 22px; border:1.5px solid #C6CDE8; border-radius:10px; background:#FFFFFF; color:#374B96; font-family:'Barlow',sans-serif; font-size:16px; font-weight:600; cursor:pointer;" style-hover="background:#EAEDF7;">Edit</button>
+          </div>
+          <div style="background:#FFFFFF; border:1px solid #D9DDE7; border-radius:14px; padding:20px 24px; display:flex; flex-direction:column; gap:14px;">
+            <div style="display:flex; align-items:center; gap:16px;">
+              <div style="flex:1; font-size:13px; font-weight:700; letter-spacing:0.1em; color:#59617A;">TODAY'S CREW — {{ crewCount }}</div>
+              <sc-if value="{{ crewView }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ editCrew }}" style="height:48px; padding:0 22px; border:1.5px solid #C6CDE8; border-radius:10px; background:#FFFFFF; color:#374B96; font-family:'Barlow',sans-serif; font-size:16px; font-weight:600; cursor:pointer;" style-hover="background:#EAEDF7;">Edit Crew</button>
+              </sc-if>
+              <sc-if value="{{ crewEditing }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ doneCrew }}" style="height:48px; padding:0 26px; border:none; border-radius:10px; background:#374B96; color:#FFFFFF; font-family:'Barlow',sans-serif; font-size:16px; font-weight:700; cursor:pointer;" style-hover="background:#31438C;">Done</button>
+              </sc-if>
+            </div>
+            <sc-if value="{{ crewView }}" hint-placeholder-val="{{ true }}">
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 16px;">
+                <sc-for list="{{ crewOn }}" as="m" hint-placeholder-count="4">
+                  <div style="display:flex; align-items:center; gap:8px; min-height:32px; font-size:16px; font-weight:500;">{{ m.name }}<sc-if value="{{ m.isForeman }}" hint-placeholder-val="{{ false }}"><span style="font-size:13px; font-weight:700; color:#374B96; background:#EAEDF7; border-radius:6px; padding:2px 8px;">FOREMAN</span></sc-if></div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ crewEditing }}" hint-placeholder-val="{{ false }}">
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 16px;">
+                <sc-for list="{{ roster }}" as="m" hint-placeholder-count="4">
+                  <button onClick="{{ m.toggle }}" style="display:flex; align-items:center; gap:12px; min-height:48px; padding:0 12px; border:1.5px solid {{ m.border }}; border-radius:10px; background:{{ m.bg }}; cursor:pointer; font-family:'Barlow',sans-serif; text-align:left;">
+                    <div style="width:24px; height:24px; border-radius:6px; border:2px solid {{ m.boxBorder }}; background:{{ m.boxBg }}; display:flex; align-items:center; justify-content:center; color:#FFFFFF; font-size:14px; font-weight:800; box-sizing:border-box; flex-shrink:0;">{{ m.check }}</div>
+                    <div style="font-size:16px; font-weight:600; color:#191D2B;">{{ m.name }}</div>
+                  </button>
+                </sc-for>
+              </div>
+              <div style="font-size:14px; font-weight:500; color:#59617A;">From the job roster — check everyone on site today</div>
+            </sc-if>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:10px; padding-top:6px;">
+            <sc-if value="{{ hasIssues }}" hint-placeholder-val="{{ false }}">
+              <div style="text-align:center; font-size:16px; font-weight:600; color:#7A5200;">2 items need attention before signing</div>
+            </sc-if>
+            <button style="border:none; width:100%; height:72px; border-radius:14px; background:{{ startBg }}; color:{{ startFg }}; font-family:'Barlow',sans-serif; font-size:21px; font-weight:700; letter-spacing:0.05em; cursor:{{ startCursor }};">START SIGNING</button>
+            <sc-if value="{{ isReady }}" hint-placeholder-val="{{ true }}">
+              <div style="text-align:center; font-size:15px; font-weight:500; color:#59617A;">Next: 5 Sign — the whole crew signs on this device</div>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="width:874px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px; line-height:1.55; color:#59617A;">
+    <div>Review is a read-only summary; every Edit jumps to that step. Warnings appear only here (amber, no red): missing controls and an unanswered safety check block signing — START SIGNING stays disabled until both clear. “Add controls” / “Answer” deep-link to the exact task or the safety gate. Energy lists marked examples under each category. Crew comes from the job roster (Edit Crew = in-place checklist). Signing Mode reuses this summary read-only: no Edit buttons, single “Back to signing.” All example strings are official form text verbatim (ITS_F_222_EN). Amber has two tiers: blocking (missing controls, unanswered safety check — disable signing) and advisory (no JHA/procedure number — Add or Not applicable, never blocks signing).</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;initialState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;issues&quot;,&quot;ready&quot;],&quot;default&quot;:&quot;issues&quot;,&quot;tsType&quot;:&quot;\&quot;issues\&quot; | \&quot;ready\&quot;&quot;,&quot;section&quot;:&quot;Wireframe&quot;}}">
+class Component extends DCLogic {
+  initRoster() {
+    return [
+      { name: 'Miguel Rodriguez', foreman: true, on: 1 }, { name: 'Jordan Reed', on: 1 }, { name: 'Sam Patel', on: 1 }, { name: 'Chris Boone', on: 1 },
+      { name: 'Tony Nguyen', on: 1 }, { name: 'Derrick Hall', on: 1 }, { name: 'Luis Ortega', on: 1 }, { name: 'Aaron Webb', on: 1 },
+      { name: 'DJ Carter', on: 0 }, { name: 'Pete Sullivan', on: 0 }
+    ];
+  }
+  state = { view: null, crewEdit: false, jhaNA: false, roster: this.initRoster() };
+  renderVals() {
+    const v = this.state.view ?? this.props.initialState ?? 'issues';
+    const issues = v === 'issues';
+    const on = '#191D2B', off = 'transparent', onFg = '#FFFFFF', offFg = '#59617A';
+    return {
+      hasIssues: issues, isReady: !issues,
+      setIssues: () => this.setState({ view: 'issues', jhaNA: false }),
+      setReady: () => this.setState({ view: 'ready' }),
+      jhaWarn: issues && !this.state.jhaNA,
+      jhaNotApplicable: () => this.setState({ jhaNA: true }),
+      eBg: this.state.crewEdit ? on : off, eFg: this.state.crewEdit ? onFg : offFg,
+      iBg: issues ? on : off, iFg: issues ? onFg : offFg,
+      rBg: !issues ? on : off, rFg: !issues ? onFg : offFg,
+      crewCount: this.state.roster.filter(m => m.on).length,
+      crewOn: this.state.roster.filter(m => m.on).map(m => ({ name: m.name, isForeman: !!m.foreman })),
+      roster: this.state.roster.map(m => ({
+        name: m.name,
+        border: m.on ? '#374B96' : '#D9DDE7', bg: m.on ? '#EAEDF7' : '#FFFFFF',
+        boxBg: m.on ? '#374B96' : '#FFFFFF', boxBorder: m.on ? '#374B96' : '#8A93AC',
+        check: m.on ? '✓' : '',
+        toggle: () => this.setState(s => ({ roster: s.roster.map(x => x.name === m.name ? { ...x, on: x.on ? 0 : 1 } : x) }))
+      })),
+      crewView: !this.state.crewEdit, crewEditing: this.state.crewEdit,
+      editCrew: () => this.setState({ crewEdit: true }),
+      doneCrew: () => this.setState({ crewEdit: false }),
+      rTasks: [
+        { title: 'Excavation around existing utility', hazards: 'Mobile equipment, cave-in, slips/trips', controls: 'Locates verified and marked. Spotter for all digging. Trench box below 5 ft. Daily excavation inspection.', ok: true, warn: false },
+        { title: 'Directional bore under roadway', hazards: 'Rotating equipment, pinch points, traffic', controls: 'Guards in place. No loose clothing near rotating parts. Work zone signage and flagger per traffic control plan.', ok: !issues, warn: issues },
+        { title: 'Loading spoils', hazards: 'Mobile equipment, overhead load', controls: 'Never under a suspended load. Spotter when trucks reverse. Loads covered before leaving site.', ok: true, warn: false }
+      ],
+      safetyOk: !issues, safetyWarn: issues,
+      startBg: issues ? '#D9DDE7' : '#374B96',
+      startFg: issues ? '#8A93AC' : '#FFFFFF',
+      startCursor: issues ? 'default' : 'pointer'
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body { margin:0; background:#E4E7EE; }
+a { color:#374B96; } a:hover { color:#2A3A78; }
+</style>
+</helmet>
+<div style="min-height:100vh; box-sizing:border-box; background:#E4E7EE; padding:32px 24px 64px; display:flex; flex-direction:column; align-items:center; gap:14px; font-family:'Barlow',system-ui,sans-serif; color:#191D2B;">
+  <div style="width:874px; display:flex; justify-content:space-between; align-items:center; gap:16px;">
+    <div style="font-size:14px; font-weight:600; color:#59617A;">Screen 3 · Energy — iPad</div>
+    <button onClick="{{ resetDemo }}" style="border:1px solid #D9DDE7; border-radius:8px; padding:8px 14px; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; cursor:pointer; background:#FFFFFF; color:#59617A;" style-hover="color:#191D2B;">Reset demo</button>
+  </div>
+  <div style="background:#141824; border-radius:34px; padding:20px; box-shadow:0 24px 60px rgba(20,24,36,0.28), 0 2px 6px rgba(20,24,36,0.2);">
+    <div data-screen-label="Screen 3 — Energy" style="width:834px; height:1194px; background:#F5F6F9; border-radius:16px; overflow:hidden; display:flex; flex-direction:column; position:relative;">
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 28px 0;">
+        <div style="display:flex; gap:8px; font-size:13px; font-weight:600;"><span>9:41</span><span style="color:#59617A;">Fri Aug 14</span></div>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span style="font-size:13px; font-weight:600;">100%</span>
+          <div style="width:25px; height:12px; border:1.5px solid #191D2B; border-radius:3.5px; padding:1.5px; box-sizing:border-box;"><div style="width:100%; height:100%; background:#191D2B; border-radius:1.5px;"></div></div>
+          <div style="width:2px; height:5px; background:#191D2B; border-radius:0 1px 1px 0; margin-left:-4px;"></div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:16px; padding:10px 28px 0;">
+        <button style="border:none; background:transparent; padding:0 6px; height:48px; white-space:nowrap; flex-shrink:0; font-family:'Barlow',sans-serif; font-size:17px; font-weight:600; color:#374B96; cursor:pointer;" style-hover="color:#2A3A78;">‹ Home</button>
+        <div style="flex:1; text-align:center; font-size:15px; font-weight:600; color:#59617A;">I-40 Utility Relocation — Friday, Aug 14</div>
+        <div style="display:flex; align-items:center; gap:6px; font-size:15px; font-weight:500; color:#59617A; min-width:76px; justify-content:flex-end;">
+          <sc-if value="{{ isSaving }}" hint-placeholder-val="{{ false }}"><span>Saving…</span></sc-if>
+          <sc-if value="{{ isSaved }}" hint-placeholder-val="{{ true }}"><span>Saved</span><span style="color:#1E8E3E; font-weight:800;">✓</span></sc-if>
+        </div>
+      </div>
+      <div style="padding:12px 28px 0;">
+        <div style="display:flex; gap:4px; background:#EAEDF7; padding:4px; border-radius:12px;">
+          <button style="flex:1; border:none; height:48px; border-radius:9px; background:transparent; font-family:'Barlow',sans-serif; font-size:16px; font-weight:600; color:#2A3A78; cursor:pointer;" style-hover="background:rgba(255,255,255,0.6);">1 Details <span style="color:#1E8E3E; font-weight:800;">✓</span></button>
+          <button style="flex:1; border:none; height:48px; border-radius:9px; background:transparent; font-family:'Barlow',sans-serif; font-size:16px; font-weight:600; color:#2A3A78; cursor:pointer;" style-hover="background:rgba(255,255,255,0.6);">2 Work <span style="color:#1E8E3E; font-weight:800;">✓</span></button>
+          <button style="flex:1; border:none; height:48px; border-radius:9px; background:#374B96; font-family:'Barlow',sans-serif; font-size:16px; font-weight:700; color:#FFFFFF; cursor:pointer;">3 Energy</button>
+          <button style="flex:1; border:none; height:48px; border-radius:9px; background:transparent; font-family:'Barlow',sans-serif; font-size:16px; font-weight:600; color:#59617A; cursor:pointer;" style-hover="background:rgba(255,255,255,0.6);">4 Review</button>
+          <button style="flex:1; border:none; height:48px; border-radius:9px; background:transparent; font-family:'Barlow',sans-serif; font-size:16px; font-weight:600; color:#59617A; cursor:pointer;" style-hover="background:rgba(255,255,255,0.6);">5 Sign</button>
+        </div>
+      </div>
+      <div style="flex:1; overflow-y:auto;">
+        <div style="margin:0 auto; display:flex; flex-direction:column; gap:18px; padding:22px 28px 56px;">
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <div style="font-size:28px; font-weight:700;">Energy</div>
+            <div style="font-size:17px; font-weight:500; color:#59617A;">Mark every energy type in today's work</div>
+          </div>
+          <div style="display:flex; gap:16px; align-items:flex-start;">
+            <div style="flex:1; display:grid; grid-template-columns:1fr 1fr; gap:12px; align-content:start;">
+              <sc-for list="{{ cats }}" as="c" hint-placeholder-count="4">
+                <div style="background:{{ c.bg }}; border:2px solid {{ c.border }}; border-radius:14px; display:flex; flex-direction:column; grid-column:{{ c.span }};">
+                  <button onClick="{{ c.toggle }}" style="border:none; background:transparent; cursor:pointer; display:flex; align-items:center; gap:14px; padding:18px; min-height:76px; text-align:left; border-radius:12px;">
+                    <div style="width:26px; height:26px; border-radius:7px; border:2px solid {{ c.boxBorder }}; background:{{ c.boxBg }}; display:flex; align-items:center; justify-content:center; color:#FFFFFF; font-size:16px; font-weight:800; flex-shrink:0; box-sizing:border-box;">{{ c.check }}</div>
+                    <div style="display:flex; flex-direction:column; gap:3px;">
+                      <div style="font-size:18px; font-weight:700; color:#191D2B; font-family:'Barlow',sans-serif;">{{ c.name }}</div>
+                      <sc-if value="{{ c.hasBadge }}" hint-placeholder-val="{{ false }}"><div style="font-size:14px; font-weight:600; color:#374B96;">{{ c.badge }}</div></sc-if>
+                    </div>
+                  </button>
+                  <div style="height:1px; background:{{ c.divider }}; margin:0 16px;"></div>
+                  <button onClick="{{ c.toggleExamples }}" style="border:none; background:transparent; height:46px; padding:0 18px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-family:'Barlow',sans-serif; font-size:15px; font-weight:600; color:#374B96;" style-hover="color:#2A3A78;"><span>{{ c.exLabel }}</span><span>{{ c.chev }}</span></button>
+                  <sc-if value="{{ c.isOpen }}" hint-placeholder-val="{{ false }}">
+                    <div style="padding:2px 16px 16px; display:flex; flex-direction:column; gap:10px;">
+                      <div style="font-size:14px; font-weight:500; color:#59617A;">Tap any that apply — marking one selects this category</div>
+                      <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                        <sc-for list="{{ c.exChips }}" as="ex" hint-placeholder-count="4">
+                          <button onClick="{{ ex.toggle }}" style="min-height:48px; padding:10px 18px; border:1.5px solid {{ ex.border }}; border-radius:24px; background:{{ ex.bg }}; color:{{ ex.fg }}; font-family:'Barlow',sans-serif; font-size:15px; font-weight:600; line-height:1.3; text-align:left; cursor:pointer;">{{ ex.label }}</button>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+            <div style="width:244px; flex-shrink:0; position:sticky; top:0;">
+              <div style="display:flex; flex-direction:column; gap:10px; background:#FFFFFF; border:1px solid #D9DDE7; border-radius:14px; padding:16px;">
+                <div style="font-size:12px; font-weight:800; letter-spacing:0.1em; color:#59617A;">ENERGY WHEEL</div>
+                <div style="position:relative; width:210px; height:210px; align-self:center;">
+                  <img src="uploads/aha-energy-wheel-recolored-34fcb460.png" alt="Energy Wheel" style="width:100%; height:100%; display:block;">
+                  <svg viewBox="0 0 100 100" style="position:absolute; inset:0; width:100%; height:100%;">
+                    <path d="{{ wd0 }}" fill="{{ wf0 }}" stroke="{{ ws0 }}" stroke-width="1.3" stroke-linejoin="round"></path>
+                    <path d="{{ wd1 }}" fill="{{ wf1 }}" stroke="{{ ws1 }}" stroke-width="1.3" stroke-linejoin="round"></path>
+                    <path d="{{ wd2 }}" fill="{{ wf2 }}" stroke="{{ ws2 }}" stroke-width="1.3" stroke-linejoin="round"></path>
+                    <path d="{{ wd3 }}" fill="{{ wf3 }}" stroke="{{ ws3 }}" stroke-width="1.3" stroke-linejoin="round"></path>
+                    <path d="{{ wd4 }}" fill="{{ wf4 }}" stroke="{{ ws4 }}" stroke-width="1.3" stroke-linejoin="round"></path>
+                    <path d="{{ wd5 }}" fill="{{ wf5 }}" stroke="{{ ws5 }}" stroke-width="1.3" stroke-linejoin="round"></path>
+                    <path d="{{ wd6 }}" fill="{{ wf6 }}" stroke="{{ ws6 }}" stroke-width="1.3" stroke-linejoin="round"></path>
+                    <path d="{{ wd7 }}" fill="{{ wf7 }}" stroke="{{ ws7 }}" stroke-width="1.3" stroke-linejoin="round"></path>
+                    <path d="{{ wd8 }}" fill="{{ wf8 }}" stroke="{{ ws8 }}" stroke-width="1.3" stroke-linejoin="round"></path>
+                    <path d="{{ wd9 }}" fill="{{ wf9 }}" stroke="{{ ws9 }}" stroke-width="1.3" stroke-linejoin="round"></path>
+                    <circle cx="50" cy="50" r="13.5" fill="{{ hfFill }}" stroke="{{ hfStroke }}" stroke-width="1.4"></circle>
+                  </svg>
+                </div>
+                <div style="text-align:center; font-size:14px; font-weight:500; color:#59617A; line-height:1.4;">{{ selCount }} of 11 selected<br>Mirrors your selections</div>
+              </div>
+            </div>
+          </div>
+          <div style="background:#FFFFFF; border:2px solid #374B96; border-radius:16px; padding:24px 28px; display:flex; flex-direction:column; gap:14px; margin-top:6px;">
+            <div style="font-size:13px; font-weight:800; letter-spacing:0.1em; color:#374B96;">SAFETY CHECK</div>
+            <div style="font-size:20px; font-weight:700; line-height:1.35; text-wrap:pretty;">Have all known hazards been identified and addressed using the Energy Wheel?</div>
+            <div style="display:flex; gap:12px;">
+              <button onClick="{{ sayYes }}" style="flex:1; height:64px; border:2px solid {{ yesBorder }}; border-radius:12px; background:{{ yesBg }}; color:{{ yesFg }}; font-family:'Barlow',sans-serif; font-size:20px; font-weight:800; letter-spacing:0.04em; cursor:pointer;">{{ yesLabel }}</button>
+              <button onClick="{{ sayNo }}" style="flex:1; height:64px; border:2px solid {{ noBorder }}; border-radius:12px; background:{{ noBg }}; color:{{ noFg }}; font-family:'Barlow',sans-serif; font-size:20px; font-weight:800; letter-spacing:0.04em; cursor:pointer;">{{ noLabel }}</button>
+            </div>
+            <div style="font-size:15px; font-weight:500; color:#59617A;">The AHA can't be finished until this is Yes.</div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:10px; padding-top:6px;">
+            <button style="border:none; width:100%; height:72px; border-radius:14px; background:#374B96; color:#FFFFFF; font-family:'Barlow',sans-serif; font-size:21px; font-weight:700; letter-spacing:0.05em; cursor:pointer;" style-hover="background:#31438C;" style-active="background:#2A3A78;">CONTINUE</button>
+            <div style="text-align:center; font-size:15px; font-weight:500; color:#59617A;">Next: 4 Review</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="width:874px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px; line-height:1.55; color:#59617A;">
+    <div>Main card toggles the category; “See examples” expands the official examples as multi-select chips (≥48px) — marking an example auto-selects its category; a category can be selected with no examples (Human Factors here); unchecking a category clears its marked examples; one panel open at a time. Collapsed selected cards show “N examples marked.” Wheel mirrors category selections; Human Factors = center circle. Safety check never carries from a previous day — it renders unanswered every morning and must be Yes to finish; changing work content after completion clears it. All example chips are the official form text verbatim (ITS_F_222_EN).</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;safetyAnswer&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;unanswered&quot;,&quot;yes&quot;,&quot;no&quot;],&quot;default&quot;:&quot;unanswered&quot;,&quot;tsType&quot;:&quot;\&quot;unanswered\&quot; | \&quot;yes\&quot; | \&quot;no\&quot;&quot;,&quot;section&quot;:&quot;Wireframe&quot;}}">
+class Component extends DCLogic {
+  static CATS = [
+    { name: 'Gravity', ex: ['Excavation cave-in', 'Falling or sliding materials/objects', 'Slips/trips/falls', 'Working at heights'] },
+    { name: 'Motion', ex: ['Vehicles/vessels/mobile equipment', 'Wind', 'Road/ground conditions', 'Flying particles/debris', 'Simultaneous operations', 'Watercourses', 'Ergonomics', 'Congestion'] },
+    { name: 'Mechanical', ex: ['Tool/equipment nip points/pinch points', 'Rotating equipment', 'Vibration'] },
+    { name: 'Electrical', ex: ['Electrical equipment/lines – normal or abnormal condition (shock or arc flash)', 'Non-intrinsically safe tools/equipment', 'Static electricity', 'Induced voltage'] },
+    { name: 'Pressure', ex: ['Compressed cylinders', 'Pressurized piping/hoses/equipment', 'Tanks/vessels', 'Pressure relief systems'] },
+    { name: 'Sound', ex: ['Tools/equipment', 'Pressure relief systems', 'Purging'] },
+    { name: 'Radiation', ex: ['Welding arc', 'NDT/X-ray', 'Infrared scanners', 'Sun', 'NORM'] },
+    { name: 'Biological', ex: ['Plants', 'Insects', 'Needles', 'Reptiles', 'Viruses', 'Animals', 'Mold', 'Bloodborne pathogens', 'Birds', 'Bacteria'] },
+    { name: 'Chemical', ex: ['Flammable/combustible', 'Toxic vapors/dusts/fibers/fumes', 'Designated substances, pipeline contaminants, spills, suspect soils', 'Corrosive', 'Skin/eye irritants', 'Reactive'] },
+    { name: 'Temperature', ex: ['Cold surfaces (Nitrogen, LNG, propane)', 'Hot surfaces (friction, heat sources)', 'Hot emissions/vapors', 'Weather conditions', 'Ignition sources'] },
+    { name: 'Human Factors', ex: ['Knowledge/skill', 'Risk tolerance', 'Working alone', 'Training', 'Communication', 'Fit for duty', 'Deviation from plan'] }
+  ];
+  static WHEEL = ['Gravity', 'Motion', 'Mechanical', 'Electrical', 'Pressure', 'Sound', 'Radiation', 'Biological', 'Chemical', 'Temperature'];
+  initSel() { return { 'Gravity': 1, 'Motion': 1, 'Mechanical': 1, 'Electrical': 1, 'Human Factors': 1 }; }
+  initMarked() {
+    return {
+      'Gravity': { 'Excavation cave-in': 1, 'Falling or sliding materials/objects': 1, 'Slips/trips/falls': 1 },
+      'Motion': { 'Vehicles/vessels/mobile equipment': 1, 'Wind': 1, 'Ergonomics': 1 },
+      'Mechanical': { 'Rotating equipment': 1, 'Tool/equipment nip points/pinch points': 1 },
+      'Electrical': { 'Electrical equipment/lines – normal or abnormal condition (shock or arc flash)': 1, 'Induced voltage': 1 }
+    };
+  }
+  state = { selected: this.initSel(), marked: this.initMarked(), expanded: 'Gravity', answer: null, saveState: 'saved' };
+  bump() {
+    if (this._t) clearTimeout(this._t);
+    this.setState({ saveState: 'saving' });
+    this._t = setTimeout(() => this.setState({ saveState: 'saved' }), 900);
+  }
+  pt(r, a) { const t = a * Math.PI / 180; return [50 + r * Math.sin(t), 50 - r * Math.cos(t)]; }
+  sector(r0, r1, a0, a1) {
+    const p = (xy) => xy.map(v => v.toFixed(2)).join(' ');
+    const A = this.pt(r1, a0), B = this.pt(r1, a1), C = this.pt(r0, a1), D = this.pt(r0, a0);
+    return 'M ' + p(A) + ' A ' + r1 + ' ' + r1 + ' 0 0 1 ' + p(B) + ' L ' + p(C) + ' A ' + r0 + ' ' + r0 + ' 0 0 0 ' + p(D) + ' Z';
+  }
+  renderVals() {
+    const sel = this.state.selected;
+    const ans = this.state.answer ?? (this.props.safetyAnswer === 'yes' ? 'yes' : this.props.safetyAnswer === 'no' ? 'no' : null);
+    const out = {
+      cats: Component.CATS.map(c => {
+        const on = !!sel[c.name], open = this.state.expanded === c.name;
+        const mk = this.state.marked[c.name] || {};
+        const n = c.ex.filter(x => mk[x]).length;
+        return {
+          name: c.name,
+          bg: on ? '#EAEDF7' : '#FFFFFF', border: on ? '#374B96' : '#D9DDE7',
+          boxBg: on ? '#374B96' : '#FFFFFF', boxBorder: on ? '#374B96' : '#8A93AC',
+          check: on ? '✓' : '', divider: on ? '#C6CDE8' : '#E7EAF2',
+          exLabel: open ? 'Hide examples' : 'See examples', chev: open ? '▴' : '▾', isOpen: open,
+          hasBadge: n > 0 && !open,
+          badge: n + (n === 1 ? ' example marked' : ' examples marked'),
+          exChips: c.ex.map(x => ({
+            label: x,
+            bg: mk[x] ? '#374B96' : '#FFFFFF', border: mk[x] ? '#374B96' : '#C6CDE8', fg: mk[x] ? '#FFFFFF' : '#191D2B',
+            toggle: () => {
+              this.setState(s => {
+                const cur = { ...(s.marked[c.name] || {}) };
+                const turnOn = !cur[x];
+                cur[x] = turnOn ? 1 : 0;
+                return { marked: { ...s.marked, [c.name]: cur }, selected: turnOn ? { ...s.selected, [c.name]: 1 } : s.selected };
+              });
+              this.bump();
+            }
+          })),
+          span: c.name === 'Human Factors' ? '1 / -1' : 'auto',
+          toggle: () => {
+            this.setState(s => {
+              const nowOn = !s.selected[c.name];
+              return { selected: { ...s.selected, [c.name]: nowOn ? 1 : 0 }, marked: nowOn ? s.marked : { ...s.marked, [c.name]: {} } };
+            });
+            this.bump();
+          },
+          toggleExamples: () => this.setState(s => ({ expanded: s.expanded === c.name ? null : c.name }))
+        };
+      }),
+      selCount: Component.CATS.filter(c => sel[c.name]).length,
+      hfFill: sel['Human Factors'] ? 'none' : 'rgba(245,246,249,0.85)',
+      hfStroke: sel['Human Factors'] ? '#374B96' : 'none',
+      sayYes: () => { this.setState({ answer: 'yes' }); this.bump(); },
+      sayNo: () => { this.setState({ answer: 'no' }); this.bump(); },
+      yesLabel: ans === 'yes' ? '✓ YES' : 'YES', noLabel: ans === 'no' ? '✓ NO' : 'NO',
+      yesBg: ans === 'yes' ? '#1E8E3E' : '#FFFFFF', yesBorder: ans === 'yes' ? '#1E8E3E' : '#C6CDE8', yesFg: ans === 'yes' ? '#FFFFFF' : '#191D2B',
+      noBg: ans === 'no' ? '#191D2B' : '#FFFFFF', noBorder: ans === 'no' ? '#191D2B' : '#C6CDE8', noFg: ans === 'no' ? '#FFFFFF' : '#191D2B',
+      isSaving: this.state.saveState === 'saving',
+      isSaved: this.state.saveState === 'saved',
+      resetDemo: () => this.setState({ selected: this.initSel(), marked: this.initMarked(), expanded: 'Gravity', answer: null, saveState: 'saved' })
+    };
+    Component.WHEEL.forEach((n, i) => {
+      const on = !!sel[n], a0 = i * 36 - 18, a1 = i * 36 + 18;
+      out['wd' + i] = on ? this.sector(13.8, 40.3, a0, a1) : this.sector(13.8, 48.2, a0, a1);
+      out['wf' + i] = on ? 'none' : 'rgba(245,246,249,0.85)';
+      out['ws' + i] = on ? '#374B96' : 'none';
+    });
+    return out;
+  }
+}
+</script>
+</body>
+</html>

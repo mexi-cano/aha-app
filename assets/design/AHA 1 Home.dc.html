@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body { margin:0; background:#E4E7EE; }
+a { color:#374B96; } a:hover { color:#2A3A78; }
+</style>
+</helmet>
+<div style="min-height:100vh; box-sizing:border-box; background:#E4E7EE; padding:32px 24px 64px; display:flex; flex-direction:column; align-items:center; gap:14px; font-family:'Barlow',system-ui,sans-serif; color:#191D2B;">
+  <div style="width:874px; display:flex; justify-content:space-between; align-items:center; gap:16px;">
+    <div style="font-size:14px; font-weight:600; color:#59617A;">Screen 1 · Home / Today — iPad</div>
+    <div style="display:flex; background:#FFFFFF; border:1px solid #D9DDE7; border-radius:10px; padding:3px; gap:2px;">
+      <button onClick="{{ setA }}" style="border:none; border-radius:8px; padding:9px 14px; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; white-space:nowrap; flex-shrink:0; cursor:pointer; background:{{ aBg }}; color:{{ aFg }};">Not started</button>
+      <button onClick="{{ setD }}" style="border:none; border-radius:8px; padding:9px 14px; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; white-space:nowrap; flex-shrink:0; cursor:pointer; background:{{ dBg }}; color:{{ dFg }};">Draft</button>
+      <button onClick="{{ setB }}" style="border:none; border-radius:8px; padding:9px 14px; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; white-space:nowrap; flex-shrink:0; cursor:pointer; background:{{ bBg }}; color:{{ bFg }};">Signing</button>
+      <button onClick="{{ setC }}" style="border:none; border-radius:8px; padding:9px 14px; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; white-space:nowrap; flex-shrink:0; cursor:pointer; background:{{ cBg }}; color:{{ cFg }};">Completed</button>
+    </div>
+  </div>
+  <div style="background:#141824; border-radius:34px; padding:20px; box-shadow:0 24px 60px rgba(20,24,36,0.28), 0 2px 6px rgba(20,24,36,0.2);">
+    <div data-screen-label="Screen 1 — Home / Today" style="width:834px; height:1194px; background:#F5F6F9; border-radius:16px; overflow:hidden; display:flex; flex-direction:column;">
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 28px 0;">
+        <div style="display:flex; gap:8px; font-size:13px; font-weight:600;"><span>9:41</span><span style="color:#59617A;">Fri Aug 14</span></div>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span style="font-size:13px; font-weight:600;">100%</span>
+          <div style="width:25px; height:12px; border:1.5px solid #191D2B; border-radius:3.5px; padding:1.5px; box-sizing:border-box;"><div style="width:100%; height:100%; background:#191D2B; border-radius:1.5px;"></div></div>
+          <div style="width:2px; height:5px; background:#191D2B; border-radius:0 1px 1px 0; margin-left:-4px;"></div>
+        </div>
+      </div>
+      <div style="width:700px; align-self:center; display:flex; flex-direction:column; gap:24px; padding:30px 0 48px;">
+        <div style="display:flex; align-items:center;">
+          <sc-if value="{{ showLogo }}" hint-placeholder-val="{{ true }}">
+            <div style="height:38px; overflow:hidden;"><img src="uploads/its-logo.png" alt="ITS — Infrastructure Technology Services" style="height:58px; margin-top:-9px; display:block; mix-blend-mode:multiply;"></div>
+          </sc-if>
+          <div style="flex:1;"></div>
+          <div style="font-size:17px; font-weight:600; color:#59617A;">Friday, August 14</div>
+        </div>
+        <div style="background:#FFFFFF; border:1px solid #D9DDE7; border-radius:14px; padding:26px 28px; display:flex; flex-direction:column; gap:20px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px;">
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              <div style="font-size:13px; font-weight:700; letter-spacing:0.1em; color:#59617A;">CURRENT JOB</div>
+              <div style="font-size:24px; font-weight:700;">I-40 Utility Relocation</div>
+              <div style="font-size:17px; font-weight:500; color:#59617A;">Raleigh, NC</div>
+            </div>
+            <button style="height:48px; padding:0 16px; border:1.5px solid #C6CDE8; border-radius:10px; background:#FFFFFF; color:#374B96; font-family:'Barlow',sans-serif; font-size:16px; font-weight:600; cursor:pointer;" style-hover="background:#EAEDF7;">+ New Job</button>
+          </div>
+          <div style="height:1px; background:#E7EAF2;"></div>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div style="font-size:14px; font-weight:600; color:#59617A; letter-spacing:0.02em;">Recent AHAs</div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button style="display:flex; align-items:center; gap:8px; height:48px; padding:0 16px; border:1px solid #D9DDE7; border-radius:10px; background:#FFFFFF; font-family:'Barlow',sans-serif; font-size:16px; font-weight:600; color:#191D2B; cursor:pointer;" style-hover="background:#EAEDF7; border-color:#C6CDE8;">Aug 13 <span style="color:#1E8E3E; font-weight:800;">✓</span></button>
+              <button style="display:flex; align-items:center; gap:8px; height:48px; padding:0 16px; border:1px solid #D9DDE7; border-radius:10px; background:#FFFFFF; font-family:'Barlow',sans-serif; font-size:16px; font-weight:600; color:#191D2B; cursor:pointer;" style-hover="background:#EAEDF7; border-color:#C6CDE8;">Aug 12 <span style="color:#1E8E3E; font-weight:800;">✓</span></button>
+              <button style="display:flex; align-items:center; gap:8px; height:48px; padding:0 16px; border:1px solid #D9DDE7; border-radius:10px; background:#FFFFFF; font-family:'Barlow',sans-serif; font-size:16px; font-weight:600; color:#191D2B; cursor:pointer;" style-hover="background:#EAEDF7; border-color:#C6CDE8;">Aug 11 <span style="color:#1E8E3E; font-weight:800;">✓</span></button>
+            </div>
+          </div>
+        </div>
+        <div style="background:#FFFFFF; border:1px solid #D9DDE7; border-radius:16px; padding:36px 40px; box-shadow:0 1px 2px rgba(25,29,43,0.04), 0 12px 32px rgba(25,29,43,0.07); display:flex; flex-direction:column; gap:26px;">
+          <sc-if value="{{ isA }}" hint-placeholder-val="{{ true }}">
+            <div style="font-size:24px; font-weight:600; text-align:center; text-wrap:pretty;">Today's AHA has not been started</div>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              <button style="border:none; width:100%; height:72px; border-radius:14px; background:#374B96; color:#FFFFFF; font-family:'Barlow',sans-serif; font-size:21px; font-weight:700; letter-spacing:0.05em; cursor:pointer;" style-hover="background:#31438C;" style-active="background:#2A3A78;">START TODAY'S AHA</button>
+              <div style="text-align:center; font-size:16px; font-weight:500; color:#59617A;">Starts with yesterday's AHA</div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isD }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:24px; font-weight:600; text-align:center;">AHA in progress — Draft</div>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              <button style="border:none; width:100%; height:72px; border-radius:14px; background:#374B96; color:#FFFFFF; font-family:'Barlow',sans-serif; font-size:21px; font-weight:700; letter-spacing:0.05em; cursor:pointer;" style-hover="background:#31438C;" style-active="background:#2A3A78;">CONTINUE TODAY'S AHA</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isB }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; flex-direction:column; gap:4px; align-items:center;">
+              <div style="font-size:24px; font-weight:600;">AHA in progress</div>
+              <div style="font-size:18px; font-weight:500; color:#59617A;">5 of 8 signed</div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              <button style="border:none; width:100%; height:72px; border-radius:14px; background:#374B96; color:#FFFFFF; font-family:'Barlow',sans-serif; font-size:21px; font-weight:700; letter-spacing:0.05em; cursor:pointer;" style-hover="background:#31438C;" style-active="background:#2A3A78;">CONTINUE SIGNING</button>
+              <button style="width:100%; height:52px; border:1.5px solid #C6CDE8; border-radius:12px; background:#FFFFFF; color:#374B96; font-family:'Barlow',sans-serif; font-size:17px; font-weight:600; cursor:pointer;" style-hover="background:#EAEDF7;">Open editor</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isC }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:24px; font-weight:600; text-align:center;">Today's AHA — Completed <span style="color:#1E8E3E;">✓</span></div>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              <button style="border:none; width:100%; height:72px; border-radius:14px; background:#374B96; color:#FFFFFF; font-family:'Barlow',sans-serif; font-size:20px; font-weight:700; cursor:pointer;" style-hover="background:#31438C;" style-active="background:#2A3A78;">View AHA</button>
+              <button style="width:100%; height:52px; border:1.5px solid #C6CDE8; border-radius:12px; background:#FFFFFF; color:#374B96; font-family:'Barlow',sans-serif; font-size:17px; font-weight:600; cursor:pointer;" style-hover="background:#EAEDF7;">Update today's AHA</button>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="width:874px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px; line-height:1.55; color:#59617A;">
+    <sc-if value="{{ isA }}" hint-placeholder-val="{{ true }}"><div>Tap START → editor, pre-filled, with dismissible banner: “Started from Aug 13. Review anything that changed today. — Start blank instead.” First day of a job starts blank, no banner.</div></sc-if>
+    <sc-if value="{{ isD }}" hint-placeholder-val="{{ false }}"><div>CONTINUE TODAY'S AHA → editor. Draft = started or edited, signing not begun; also the crash-recovery landing.</div></sc-if>
+    <sc-if value="{{ isB }}" hint-placeholder-val="{{ false }}"><div>CONTINUE SIGNING → Signing Mode (Screen 5). Open editor → five-step editor. Exiting Signing Mode early leaves the AHA In progress.</div></sc-if>
+    <sc-if value="{{ isC }}" hint-placeholder-val="{{ false }}"><div>View AHA → Completed AHA (Screen 6). Update today's AHA → editor; if work content changes, the safety check clears and must be re-answered. Signatures remain.</div></sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;initialState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;not-started&quot;,&quot;draft&quot;,&quot;in-progress&quot;,&quot;completed&quot;],&quot;default&quot;:&quot;not-started&quot;,&quot;tsType&quot;:&quot;\&quot;not-started\&quot; | \&quot;draft\&quot; | \&quot;in-progress\&quot; | \&quot;completed\&quot;&quot;,&quot;section&quot;:&quot;Wireframe&quot;},&quot;showLogo&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Wireframe&quot;}}">
+class Component extends DCLogic {
+  state = { view: null };
+  renderVals() {
+    const v = this.state.view ?? this.props.initialState ?? 'not-started';
+    const on = '#191D2B', off = 'transparent', onFg = '#FFFFFF', offFg = '#59617A';
+    return {
+      isA: v === 'not-started', isD: v === 'draft', isB: v === 'in-progress', isC: v === 'completed',
+      setA: () => this.setState({ view: 'not-started' }),
+      setD: () => this.setState({ view: 'draft' }),
+      setB: () => this.setState({ view: 'in-progress' }),
+      setC: () => this.setState({ view: 'completed' }),
+      aBg: v === 'not-started' ? on : off, aFg: v === 'not-started' ? onFg : offFg,
+      dBg: v === 'draft' ? on : off, dFg: v === 'draft' ? onFg : offFg,
+      bBg: v === 'in-progress' ? on : off, bFg: v === 'in-progress' ? onFg : offFg,
+      cBg: v === 'completed' ? on : off, cFg: v === 'completed' ? onFg : offFg,
+      showLogo: this.props.showLogo ?? true
+    };
+  }
+}
+</script>
+</body>
+</html>

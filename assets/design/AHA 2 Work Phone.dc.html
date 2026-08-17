@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body { margin:0; background:#E4E7EE; }
+a { color:#374B96; } a:hover { color:#2A3A78; }
+</style>
+</helmet>
+<div style="min-height:100vh; box-sizing:border-box; background:#E4E7EE; padding:32px 24px 64px; display:flex; flex-direction:column; align-items:center; gap:14px; font-family:'Barlow',system-ui,sans-serif; color:#191D2B;">
+  <div style="width:417px; display:flex; justify-content:space-between; align-items:center; gap:16px;">
+    <div style="font-size:14px; font-weight:600; color:#59617A;">Screen 2 · Work — Phone</div>
+    <button onClick="{{ resetDemo }}" style="border:1px solid #D9DDE7; border-radius:8px; padding:8px 14px; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; cursor:pointer; background:#FFFFFF; color:#59617A;" style-hover="color:#191D2B;">Reset demo</button>
+  </div>
+  <div style="background:#141824; border-radius:54px; padding:12px; box-shadow:0 24px 60px rgba(20,24,36,0.28), 0 2px 6px rgba(20,24,36,0.2);">
+    <div data-screen-label="Screen 2 (Phone) — Work" style="width:393px; height:852px; background:#F5F6F9; border-radius:42px; overflow:hidden; display:flex; flex-direction:column; position:relative;">
+      <div style="position:absolute; top:11px; left:50%; transform:translateX(-50%); width:118px; height:34px; background:#141824; border-radius:17px; z-index:5;"></div>
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 28px 0; height:40px; box-sizing:border-box;">
+        <div style="font-size:15px; font-weight:700;">9:41</div>
+        <div style="display:flex; align-items:center; gap:5px;">
+          <div style="width:23px; height:11px; border:1.5px solid #191D2B; border-radius:3px; padding:1.5px; box-sizing:border-box;"><div style="width:100%; height:100%; background:#191D2B; border-radius:1px;"></div></div>
+          <div style="width:2px; height:4px; background:#191D2B; border-radius:0 1px 1px 0; margin-left:-4px;"></div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 14px 0;">
+        <button style="border:none; background:transparent; padding:0 6px; height:44px; font-family:'Barlow',sans-serif; font-size:16px; font-weight:600; color:#374B96; cursor:pointer; white-space:nowrap; flex-shrink:0;" style-hover="color:#2A3A78;">‹ Home</button>
+        <div style="flex:1; text-align:center; font-size:13px; font-weight:600; color:#59617A; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">I-40 Utility Relocation — Fri, Aug 14</div>
+        <div style="display:flex; align-items:center; gap:4px; font-size:13px; font-weight:500; color:#59617A; min-width:62px; justify-content:flex-end; flex-shrink:0;">
+          <sc-if value="{{ isSaving }}" hint-placeholder-val="{{ false }}"><span>Saving…</span></sc-if>
+          <sc-if value="{{ isSaved }}" hint-placeholder-val="{{ true }}"><span>Saved</span><span style="color:#1E8E3E; font-weight:800;">✓</span></sc-if>
+        </div>
+      </div>
+      <div style="padding:8px 14px 0;">
+        <div style="display:flex; gap:3px; background:#EAEDF7; padding:4px; border-radius:12px;">
+          <button style="width:48px; border:none; height:44px; border-radius:9px; background:transparent; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; color:#2A3A78; cursor:pointer;" style-hover="background:rgba(255,255,255,0.6);">1 <span style="color:#1E8E3E; font-weight:800;">✓</span></button>
+          <button style="flex:1; border:none; height:44px; border-radius:9px; background:#374B96; font-family:'Barlow',sans-serif; font-size:15px; font-weight:700; color:#FFFFFF; cursor:pointer;">2 Work</button>
+          <button style="width:48px; border:none; height:44px; border-radius:9px; background:transparent; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; color:#59617A; cursor:pointer;" style-hover="background:rgba(255,255,255,0.6);">3</button>
+          <button style="width:48px; border:none; height:44px; border-radius:9px; background:transparent; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; color:#59617A; cursor:pointer;" style-hover="background:rgba(255,255,255,0.6);">4</button>
+          <button style="width:48px; border:none; height:44px; border-radius:9px; background:transparent; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; color:#59617A; cursor:pointer;" style-hover="background:rgba(255,255,255,0.6);">5</button>
+        </div>
+      </div>
+      <div style="flex:1; overflow-y:auto;">
+        <div style="display:flex; flex-direction:column; gap:14px; padding:16px 20px 48px;">
+          <sc-if value="{{ bannerVisible }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex; flex-direction:column; gap:10px; background:#EAEDF7; border:1px solid #C6CDE8; border-radius:12px; padding:14px;">
+              <div style="font-size:14.5px; font-weight:500; color:#191D2B; line-height:1.4;"><strong>Started from Aug 13.</strong> Review anything that changed today.</div>
+              <div style="display:flex; gap:8px;">
+                <button onClick="{{ startBlank }}" style="flex:1; height:44px; border:1.5px solid #C6CDE8; border-radius:10px; background:#FFFFFF; color:#374B96; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; cursor:pointer;" style-hover="background:#F5F6F9;">Start blank instead</button>
+                <button onClick="{{ dismissBanner }}" style="height:44px; padding:0 14px; border:none; border-radius:10px; background:transparent; color:#59617A; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; cursor:pointer;" style-hover="background:rgba(255,255,255,0.7); color:#191D2B;">✕ Dismiss</button>
+              </div>
+            </div>
+          </sc-if>
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <div style="font-size:24px; font-weight:700;">Work</div>
+            <div style="font-size:15px; font-weight:500; color:#59617A;">Today's tasks, hazards, and controls</div>
+          </div>
+          <sc-for list="{{ tasks }}" as="task" hint-placeholder-count="3">
+            <div style="background:#FFFFFF; border:1px solid #D9DDE7; border-radius:14px;">
+              <sc-if value="{{ task.collapsed }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex; flex-direction:column; gap:10px; padding:16px;">
+                  <div style="display:flex; flex-direction:column; gap:4px;">
+                    <div style="font-size:17px; font-weight:700;">{{ task.titleShown }}</div>
+                    <div style="font-size:14.5px; font-weight:500; color:#59617A;">{{ task.hazards }}</div>
+                    <sc-if value="{{ task.hasControls }}" hint-placeholder-val="{{ true }}"><div style="font-size:14.5px; font-weight:600; color:#1E8E3E;">✓ Controls entered</div></sc-if>
+                    <sc-if value="{{ task.noControls }}" hint-placeholder-val="{{ false }}"><div style="font-size:14.5px; font-weight:600; color:#59617A;">Controls not entered</div></sc-if>
+                  </div>
+                  <div style="display:flex; gap:8px;">
+                    <button onClick="{{ task.edit }}" style="flex:1; height:44px; border:1.5px solid #C6CDE8; border-radius:10px; background:#FFFFFF; color:#374B96; font-family:'Barlow',sans-serif; font-size:15px; font-weight:600; cursor:pointer;" style-hover="background:#EAEDF7;">Edit</button>
+                    <button onClick="{{ task.askDelete }}" style="height:44px; padding:0 16px; border:1.5px solid #D9DDE7; border-radius:10px; background:#FFFFFF; color:#59617A; font-family:'Barlow',sans-serif; font-size:15px; font-weight:600; cursor:pointer;" style-hover="background:#F5F6F9; color:#191D2B;">Delete</button>
+                  </div>
+                </div>
+              </sc-if>
+              <sc-if value="{{ task.isEditing }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex; flex-direction:column; gap:14px; padding:16px; border-radius:13px; box-shadow:inset 0 0 0 2px #374B96;">
+                  <div style="display:flex; flex-direction:column; gap:6px;">
+                    <div style="font-size:15px; font-weight:700;">Task <span style="font-weight:500; color:#59617A;">— What are you doing?</span></div>
+                    <input type="text" value="{{ task.title }}" onChange="{{ task.onTitle }}" style="width:100%; box-sizing:border-box; border:1.5px solid #D9DDE7; border-radius:10px; padding:12px 14px; font-family:'Barlow',sans-serif; font-size:16px; font-weight:500; color:#191D2B; background:#FFFFFF; outline:none;" style-focus="border-color:#374B96; box-shadow:0 0 0 3px #EAEDF7;">
+                  </div>
+                  <div style="display:flex; flex-direction:column; gap:6px;">
+                    <div style="font-size:15px; font-weight:700;">Hazards <span style="font-weight:500; color:#59617A;">— What could cause harm?</span></div>
+                    <textarea rows="3" value="{{ task.hazards }}" onChange="{{ task.onHazards }}" style="width:100%; box-sizing:border-box; border:1.5px solid #D9DDE7; border-radius:10px; padding:12px 14px; font-family:'Barlow',sans-serif; font-size:16px; font-weight:500; color:#191D2B; background:#FFFFFF; outline:none; resize:none; line-height:1.45;" style-focus="border-color:#374B96; box-shadow:0 0 0 3px #EAEDF7;"></textarea>
+                  </div>
+                  <div style="display:flex; flex-direction:column; gap:6px;">
+                    <div style="font-size:15px; font-weight:700;">Controls <span style="font-weight:500; color:#59617A;">— How are you controlling it?</span></div>
+                    <textarea rows="4" value="{{ task.controls }}" onChange="{{ task.onControls }}" style="width:100%; box-sizing:border-box; border:1.5px solid #D9DDE7; border-radius:10px; padding:12px 14px; font-family:'Barlow',sans-serif; font-size:16px; font-weight:500; color:#191D2B; background:#FFFFFF; outline:none; resize:none; line-height:1.45;" style-focus="border-color:#374B96; box-shadow:0 0 0 3px #EAEDF7;"></textarea>
+                  </div>
+                  <div style="display:flex; gap:8px;">
+                    <button onClick="{{ task.askDelete }}" style="height:48px; padding:0 16px; border:1.5px solid #D9DDE7; border-radius:10px; background:#FFFFFF; color:#59617A; font-family:'Barlow',sans-serif; font-size:15px; font-weight:600; cursor:pointer;" style-hover="background:#F5F6F9; color:#191D2B;">Delete</button>
+                    <button onClick="{{ task.done }}" style="flex:1; height:48px; border:none; border-radius:10px; background:#374B96; color:#FFFFFF; font-family:'Barlow',sans-serif; font-size:15px; font-weight:700; cursor:pointer;" style-hover="background:#31438C;" style-active="background:#2A3A78;">Done</button>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+          <button onClick="{{ addTask }}" style="width:100%; height:52px; border:1.5px dashed #C6CDE8; border-radius:12px; background:#FFFFFF; color:#374B96; font-family:'Barlow',sans-serif; font-size:16px; font-weight:700; cursor:pointer;" style-hover="background:#EAEDF7;">+ Add Task</button>
+          <div style="background:#FFFFFF; border:1px solid #D9DDE7; border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:8px;">
+            <div style="font-size:16px; font-weight:700;">On-site meeting notes</div>
+            <div style="font-size:14px; font-weight:500; color:#59617A;">Anything discussed at the on-site meeting</div>
+            <textarea rows="3" value="{{ notesVal }}" onChange="{{ onNotes }}" style="width:100%; box-sizing:border-box; border:1.5px solid #D9DDE7; border-radius:10px; padding:12px 14px; font-family:'Barlow',sans-serif; font-size:16px; font-weight:500; color:#191D2B; background:#FFFFFF; outline:none; resize:none; line-height:1.45;" style-focus="border-color:#374B96; box-shadow:0 0 0 3px #EAEDF7;"></textarea>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px; padding-top:4px;">
+            <button style="border:none; width:100%; height:64px; border-radius:14px; background:#374B96; color:#FFFFFF; font-family:'Barlow',sans-serif; font-size:18px; font-weight:700; letter-spacing:0.05em; cursor:pointer;" style-hover="background:#31438C;" style-active="background:#2A3A78;">CONTINUE</button>
+            <div style="text-align:center; font-size:14px; font-weight:500; color:#59617A;">Next: 3 Energy</div>
+          </div>
+        </div>
+      </div>
+      <sc-if value="{{ hasDialog }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute; inset:0; background:rgba(20,24,36,0.45); display:flex; align-items:center; justify-content:center; z-index:10;">
+          <div style="background:#FFFFFF; border-radius:16px; padding:22px; width:320px; display:flex; flex-direction:column; gap:8px; box-shadow:0 24px 60px rgba(20,24,36,0.35);">
+            <div style="font-size:18px; font-weight:700; line-height:1.35;">Delete “{{ deleteTitle }}”?</div>
+            <div style="font-size:15px; font-weight:500; color:#59617A;">This can't be undone.</div>
+            <div style="display:flex; gap:10px; justify-content:flex-end; padding-top:12px;">
+              <button onClick="{{ cancelDelete }}" style="height:44px; padding:0 18px; border:1.5px solid #C6CDE8; border-radius:10px; background:#FFFFFF; color:#374B96; font-family:'Barlow',sans-serif; font-size:15px; font-weight:600; cursor:pointer;" style-hover="background:#EAEDF7;">Cancel</button>
+              <button onClick="{{ confirmDelete }}" style="height:44px; padding:0 20px; border:none; border-radius:10px; background:#191D2B; color:#FFFFFF; font-family:'Barlow',sans-serif; font-size:15px; font-weight:700; cursor:pointer;" style-hover="background:#2A3A78;">Delete</button>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+  <div style="width:417px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px; line-height:1.55; color:#59617A;">
+    <div>Phone variant of Screen 2 — same content and rules as iPad: prefill banner (confirm on “Start blank instead” only if edits exist), inline task editing with autosave, neutral “Controls not entered,” delete confirm, official meeting-notes field. Step bar compacts to numbers; active step shows its label. All hit targets ≥44px.</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showBanner&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Wireframe&quot;}}">
+class Component extends DCLogic {
+  initTasks() {
+    return [
+      { id: 1, title: 'Excavation around existing utility', hazards: 'Mobile equipment, cave-in, slips/trips', controls: 'Locates verified and marked. Spotter for all digging. Trench box below 5 ft. Daily excavation inspection.' },
+      { id: 2, title: 'Directional bore under roadway', hazards: 'Rotating equipment, pinch points, traffic', controls: 'Guards in place. No loose clothing near rotating parts. Work zone signage and flagger per traffic control plan.' },
+      { id: 3, title: 'Loading spoils', hazards: 'Mobile equipment, overhead load', controls: 'Never under a suspended load. Spotter when trucks reverse. Loads covered before leaving site.' }
+    ];
+  }
+  state = { banner: null, editingId: null, deleteId: null, notes: '', saveState: 'saved', nextId: 4, tasks: this.initTasks() };
+  bump() {
+    if (this._t) clearTimeout(this._t);
+    this.setState({ saveState: 'saving' });
+    this._t = setTimeout(() => this.setState({ saveState: 'saved' }), 900);
+  }
+  upd(id, k, val) {
+    this.setState(s => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, [k]: val } : t) }));
+    this.bump();
+  }
+  renderVals() {
+    const del = this.state.tasks.find(t => t.id === this.state.deleteId);
+    return {
+      bannerVisible: this.state.banner ?? (this.props.showBanner ?? true),
+      dismissBanner: () => this.setState({ banner: false }),
+      startBlank: () => this.setState({ banner: false, tasks: [], editingId: null, notes: '' }),
+      tasks: this.state.tasks.map(t => ({
+        ...t,
+        titleShown: t.title || 'Untitled task',
+        hasControls: t.controls.trim().length > 0,
+        noControls: t.controls.trim().length === 0,
+        collapsed: t.id !== this.state.editingId,
+        isEditing: t.id === this.state.editingId,
+        edit: () => this.setState({ editingId: t.id }),
+        done: () => this.setState({ editingId: null }),
+        askDelete: () => this.setState({ deleteId: t.id }),
+        onTitle: (e) => this.upd(t.id, 'title', e.target.value),
+        onHazards: (e) => this.upd(t.id, 'hazards', e.target.value),
+        onControls: (e) => this.upd(t.id, 'controls', e.target.value)
+      })),
+      addTask: () => this.setState(s => ({ tasks: [...s.tasks, { id: s.nextId, title: '', hazards: '', controls: '' }], editingId: s.nextId, nextId: s.nextId + 1 })),
+      hasDialog: this.state.deleteId != null,
+      deleteTitle: del ? (del.title || 'this task') : 'this task',
+      cancelDelete: () => this.setState({ deleteId: null }),
+      confirmDelete: () => this.setState(s => ({ tasks: s.tasks.filter(t => t.id !== s.deleteId), deleteId: null, editingId: s.editingId === s.deleteId ? null : s.editingId })),
+      notesVal: this.state.notes,
+      onNotes: (e) => { this.setState({ notes: e.target.value }); this.bump(); },
+      isSaving: this.state.saveState === 'saving',
+      isSaved: this.state.saveState === 'saved',
+      resetDemo: () => this.setState({ banner: null, editingId: null, deleteId: null, notes: '', saveState: 'saved', nextId: 4, tasks: this.initTasks() })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   ENERGY_CATEGORIES,
+  MAX_CREW_MEMBERS,
   MAX_TASKS,
   SAFETY_GATE_QUESTION,
   WORKER_ACKNOWLEDGMENT,
@@ -170,8 +171,32 @@ test("AHA validation rejects non-canonical energy examples and date drift", () =
 test("corrupt saved records fail safely without exposing validation internals", () => {
   assert.throws(
     () => parseStoredAha({ id: "damaged" }),
-    /local data has not been changed/,
+    (error) => {
+      assert.ok(error instanceof Error);
+      assert.match(error.message, /local data has not been changed/);
+      assert.ok(error.cause);
+      return true;
+    },
   );
+});
+
+test("signature pairing validation identifies the timestamp field", () => {
+  const result = ahaSchema.safeParse({
+    ...previousAha(),
+    crew: [
+      {
+        workerId: "worker-1",
+        name: "Miguel Rodriguez",
+        signaturePng: "data:image/png;base64,signature",
+        signedAt: null,
+      },
+    ],
+  });
+
+  assert.equal(result.success, false);
+  if (!result.success) {
+    assert.deepEqual(result.error.issues[0]?.path, ["crew", 0, "signedAt"]);
+  }
 });
 
 test("blank first-day AHA uses job defaults and unsigned roster", () => {
@@ -236,9 +261,20 @@ test("Monday copy carries work forward but resets daily and signature state", ()
 
 test("most recent selection respects jobs, gaps, and today boundary", () => {
   const friday = previousAha();
-  const thursday = { ...friday, id: "thursday", date: "2026-08-13" } as Aha;
-  const otherJob = { ...friday, id: "other", jobId: "job-2" } as Aha;
-  const today = { ...friday, id: "today", date: "2026-08-17" } as Aha;
+  const withDate = (id: string, date: string) =>
+    ahaSchema.parse({
+      ...friday,
+      id,
+      date,
+      header: { ...friday.header, date },
+    });
+  const thursday = withDate("thursday", "2026-08-13");
+  const otherJob = ahaSchema.parse({
+    ...friday,
+    id: "other",
+    jobId: "job-2",
+  });
+  const today = withDate("today", "2026-08-17");
 
   assert.equal(
     selectMostRecentAha(
@@ -286,6 +322,50 @@ test("start-today planning copies the newest prior job record across a gap", () 
   assert.equal(planned.copiedFromDate, friday.date);
   assert.equal(planned.aha.id, "thursday");
   assert.equal(planned.aha.tasks[0]?.id, "new-task");
+});
+
+test("job and date guards reject unsafe copy and duplicate-start inputs", () => {
+  const existing = previousAha();
+  const otherJob = jobSchema.parse({ ...job, id: "job-2" });
+
+  assert.throws(
+    () =>
+      planStartToday(existing, otherJob, [], existing.date, dependencies([])),
+    /does not match this job and date/,
+  );
+  assert.throws(
+    () => planStartToday(existing, job, [], "2026-08-15", dependencies([])),
+    /does not match this job and date/,
+  );
+  assert.throws(
+    () => copyAhaForNewDay(otherJob, existing, "2026-08-17", dependencies([])),
+    /different job/,
+  );
+});
+
+test("AHA schema rejects task and crew counts above their ceilings", () => {
+  const aha = previousAha();
+  const task = aha.tasks[0]!;
+  const crewMember = aha.crew[0]!;
+
+  assert.throws(() =>
+    ahaSchema.parse({
+      ...aha,
+      tasks: Array.from({ length: MAX_TASKS + 1 }, (_, index) => ({
+        ...task,
+        id: `task-${index}`,
+      })),
+    }),
+  );
+  assert.throws(() =>
+    ahaSchema.parse({
+      ...aha,
+      crew: Array.from({ length: MAX_CREW_MEMBERS + 1 }, (_, index) => ({
+        ...crewMember,
+        workerId: `worker-${index}`,
+      })),
+    }),
+  );
 });
 
 test("home state and task-cap rules cover every Phase 1 state", () => {

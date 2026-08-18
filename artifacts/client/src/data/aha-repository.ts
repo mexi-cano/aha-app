@@ -19,11 +19,13 @@ import {
   type DraftMetadata,
 } from "./draft-metadata";
 import { ensureDevFixture, isDevFixtureId } from "./dev-fixture";
+import { partitionReadableAhas } from "./stored-records";
 
 export interface HomeSnapshot {
   job: Job | null;
   todayAha: Aha | null;
   recentAhas: Aha[];
+  unreadableCount: number;
 }
 
 export interface EditorSnapshot {
@@ -86,12 +88,12 @@ async function readActiveJob(): Promise<Job | null> {
 export async function getHomeSnapshot(today: LocalDate): Promise<HomeSnapshot> {
   const job = await readActiveJob();
   if (!job) {
-    return { job: null, todayAha: null, recentAhas: [] };
+    return { job: null, todayAha: null, recentAhas: [], unreadableCount: 0 };
   }
 
-  const records = (
-    await ahaDatabase.ahas.where("jobId").equals(job.id).toArray()
-  ).map(parseStoredAha);
+  const { records, unreadableCount } = partitionReadableAhas(
+    await ahaDatabase.ahas.where("jobId").equals(job.id).toArray(),
+  );
   const sorted = records.sort((left, right) =>
     right.date.localeCompare(left.date),
   );
@@ -100,6 +102,7 @@ export async function getHomeSnapshot(today: LocalDate): Promise<HomeSnapshot> {
     job,
     todayAha: sorted.find((aha) => aha.date === today) ?? null,
     recentAhas: sorted.filter((aha) => aha.date < today).slice(0, 3),
+    unreadableCount,
   };
 }
 
@@ -128,9 +131,9 @@ export async function startToday(
           return { aha: plan.aha, created: plan.created };
         }
 
-        const allJobAhas = (
-          await ahaDatabase.ahas.where("jobId").equals(job.id).toArray()
-        ).map(parseStoredAha);
+        const { records: allJobAhas } = partitionReadableAhas(
+          await ahaDatabase.ahas.where("jobId").equals(job.id).toArray(),
+        );
         const plan = planStartToday(
           null,
           job,

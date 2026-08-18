@@ -137,6 +137,7 @@ export const ahaCrewMemberSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Signature image and timestamp must be saved together",
+        path: ["signedAt"],
       });
     }
   });
@@ -230,6 +231,7 @@ export function parseStoredAha(value: unknown): Aha {
   if (!result.success) {
     throw new Error(
       "A saved AHA could not be read. Its local data has not been changed.",
+      { cause: result.error },
     );
   }
   return result.data;
@@ -240,6 +242,7 @@ export function parseStoredJob(value: unknown): Job {
   if (!result.success) {
     throw new Error(
       "A saved job could not be read. Its local data has not been changed.",
+      { cause: result.error },
     );
   }
   return result.data;

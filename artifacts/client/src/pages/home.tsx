@@ -90,21 +90,31 @@ export default function Home() {
                 Recent AHAs
               </p>
               <ul
-                className="mt-3 flex flex-wrap gap-2"
+                className="mt-2 divide-y divide-border"
                 aria-label="Recent AHAs"
               >
                 {snapshot.recentAhas.map((aha) => (
                   <li
                     key={aha.id}
-                    className="inline-flex min-h-12 items-center gap-2 rounded-[10px] border border-border bg-card px-4 text-base font-semibold"
+                    className="flex min-h-12 items-center justify-between gap-4 py-2 text-base font-semibold"
+                    aria-label={`${formatShortDate(aha.date)}, ${
+                      aha.status === "completed"
+                        ? "Completed"
+                        : aha.status === "draft"
+                          ? "Draft"
+                          : "Signing"
+                    }`}
                   >
-                    {formatShortDate(aha.date)}
+                    <time dateTime={aha.date}>{formatShortDate(aha.date)}</time>
                     {aha.status === "completed" ? (
-                      <Check
-                        className="size-5 text-[#1E8E3E]"
-                        strokeWidth={3}
-                        aria-label="Completed"
-                      />
+                      <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#1E8E3E]">
+                        <Check
+                          className="size-5"
+                          strokeWidth={3}
+                          aria-hidden="true"
+                        />
+                        Completed
+                      </span>
                     ) : (
                       <span className="text-sm text-muted-foreground">
                         {aha.status === "draft" ? "Draft" : "Signing"}
@@ -116,6 +126,17 @@ export default function Home() {
             </div>
           ) : null}
         </section>
+
+        {snapshot.unreadableCount ? (
+          <div
+            className="rounded-xl border border-[#E3C27A] bg-[#FBF1DF] px-4 py-3 text-base font-semibold leading-relaxed text-[#6A4800]"
+            role="status"
+          >
+            {snapshot.unreadableCount === 1
+              ? "1 saved AHA could not be read. It remains on this iPad; readable AHAs are still available."
+              : `${snapshot.unreadableCount} saved AHAs could not be read. They remain on this iPad; readable AHAs are still available.`}
+          </div>
+        ) : null}
 
         {startError ? (
           <div

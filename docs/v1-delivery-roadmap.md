@@ -12,8 +12,10 @@ point back to master-spec §§7–11.
 - Each phase has one linked delivery issue and one focused pull request. GitHub
   assigns pull-request numbers when they are opened; phase names, not predicted
   PR numbers, are the stable identifiers.
-- A phase issue closes only after its implementation PR is merged and its
-  automated, Replit, and physical-iPad acceptance evidence is recorded.
+- A phase issue closes only after its implementation PR is merged and all
+  required automated, Replit, physical-iPad, and review evidence is recorded.
+  Verified findings must be resolved or have a documented stale-finding
+  rationale, followed by rerun validation.
 - Deferred phase work is still required v1 scope. Starting a later phase does
   not waive an earlier exit gate.
 - The parent delivery issue closes only after all eight master-spec §11
@@ -57,16 +59,19 @@ Every phase issue and PR records:
 
 - [ ] One tap creates at most one AHA for the active job and local date.
 - [ ] First-day creation is blank; later creation deep-copies the most recent
-      saved AHA across weekends or date gaps.
-- [ ] Copy-forward preserves the header (including rescue-plan choice), work,
-      Energy choices, and worker identities while resetting signatures, daily N/A
+      saved AHA across weekends or date gaps, assigns the active local date to
+      the new AHA, and leaves the source AHA unchanged.
+- [ ] Copy-forward preserves the header (including rescue-plan choice),
+      description, tasks, meeting notes, Energy categories and examples, and
+      crew roster/worker identities while resetting signatures, daily N/A
       choices, safety check, completion state, and backup state.
 - [ ] Home accurately renders not-started, draft, signing-in-progress, and
       completed records without dead controls.
 - [ ] Details and Work match the approved visual system at 834 px and 393 px;
       all active controls meet the master-spec type and touch-target minimums.
 - [ ] Rapid typing, internal navigation, app hiding, hard reload, and relaunch
-      preserve the latest confirmed input.
+      persist and recover the latest user input, including edits made while
+      autosave is pending; `Saved` appears only after IndexedDB confirms it.
 - [ ] IndexedDB failure remains visible and retryable; the app never reports a
       failed write as saved and never deletes unreadable data.
 - [ ] Both start-blank paths work: immediate before edits and confirmed after

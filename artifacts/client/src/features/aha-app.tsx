@@ -24,6 +24,8 @@ function InitialEditorRecoveryRedirect() {
   useEffect(() => {
     if (hasCheckedInitialPath.current) return;
     hasCheckedInitialPath.current = true;
+    // A reload or relaunch always recovers through Home. Internal editor
+    // navigation is unaffected because this checks only the captured first URL.
     if (initialPath.current.startsWith("/ahas/")) {
       navigate("/", { replace: true });
     }

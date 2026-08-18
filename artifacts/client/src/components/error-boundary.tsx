@@ -13,6 +13,8 @@ export interface ErrorFallbackProps {
 interface ErrorBoundaryProps {
   children: ReactNode;
   FallbackComponent?: ComponentType<ErrorFallbackProps>;
+  /** Override the retry action when resetting React state cannot recover. */
+  onRetry?: () => void;
   /** Changing this clears a caught error. Pass the route to recover on navigation. */
   resetKey?: unknown;
 }
@@ -95,12 +97,20 @@ export class ErrorBoundary extends Component<
     this.setState({ error: null });
   };
 
+  retry = (): void => {
+    if (this.props.onRetry) {
+      this.props.onRetry();
+      return;
+    }
+    this.resetError();
+  };
+
   render(): ReactNode {
     const { error } = this.state;
     if (error === null) {
       return this.props.children;
     }
     const Fallback = this.props.FallbackComponent ?? DefaultFallback;
-    return <Fallback error={error} resetError={this.resetError} />;
+    return <Fallback error={error} resetError={this.retry} />;
   }
 }

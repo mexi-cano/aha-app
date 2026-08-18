@@ -2,6 +2,7 @@ import {
   ahaSchema,
   createBlankAha,
   jobSchema,
+  toLocalDate,
   type Job,
   type LocalDate,
 } from "@workspace/aha-domain";
@@ -28,10 +29,7 @@ function previousWorkday(today: LocalDate): LocalDate {
     date.setDate(date.getDate() - 1);
   } while (date.getDay() === 0 || date.getDay() === 6);
 
-  const resultYear = date.getFullYear();
-  const resultMonth = String(date.getMonth() + 1).padStart(2, "0");
-  const resultDay = String(date.getDate()).padStart(2, "0");
-  return `${resultYear}-${resultMonth}-${resultDay}`;
+  return toLocalDate(date);
 }
 
 const fixtureJob: Job = jobSchema.parse({

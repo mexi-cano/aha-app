@@ -6,7 +6,13 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "typecheck:test": "tsc -p tsconfig.test.json --noEmit"
+  },
   "dependencies": {
     "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:"
   }
 }

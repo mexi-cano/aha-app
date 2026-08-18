@@ -105,21 +105,25 @@ export const ENERGY_CATEGORIES = [
   },
 ] as const;
 
-export const ENERGY_CATEGORY_NAMES = ENERGY_CATEGORIES.map(
-  ({ category }) => category,
-) as [
-  "Gravity",
-  "Motion",
-  "Mechanical",
-  "Electrical",
-  "Pressure",
-  "Sound",
-  "Radiation",
-  "Biological",
-  "Chemical",
-  "Temperature",
-  "Human factors",
-];
+type CategoryNames<
+  Categories extends readonly { readonly category: string }[],
+> = {
+  -readonly [Index in keyof Categories]: Categories[Index] extends {
+    readonly category: infer Name extends string;
+  }
+    ? Name
+    : never;
+};
+
+function categoryNames<
+  const Categories extends readonly { readonly category: string }[],
+>(categories: Categories): CategoryNames<Categories> {
+  return categories.map(
+    ({ category }) => category,
+  ) as CategoryNames<Categories>;
+}
+
+export const ENERGY_CATEGORY_NAMES = categoryNames(ENERGY_CATEGORIES);
 
 export type EnergyCategoryName = (typeof ENERGY_CATEGORY_NAMES)[number];
 

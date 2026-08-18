@@ -22,6 +22,11 @@ import { Button } from "@/components/ui/button";
 
 export type SaveState = "saved" | "saving" | "error";
 
+type FailedPersistenceOperation =
+  | { kind: "autosave" }
+  | { kind: "dismissBanner"; ahaId: string }
+  | { kind: "startBlank"; ahaId: string; job: Job; date: Aha["date"] };
+
 interface EditorContextValue {
   aha: Aha;
   job: Job;
@@ -79,11 +84,32 @@ export function AhaEditorLayout() {
   const draftRef = useRef<Aha | null>(null);
   const pendingRef = useRef<Aha | null>(null);
   const savePromiseRef = useRef<Promise<boolean> | null>(null);
+  const loadGenerationRef = useRef(0);
+  const failedOperationsRef = useRef(
+    new Map<FailedPersistenceOperation["kind"], FailedPersistenceOperation>(),
+  );
+
+  const rememberFailure = useCallback(
+    (operation: FailedPersistenceOperation) => {
+      failedOperationsRef.current.set(operation.kind, operation);
+      setSaveState("error");
+    },
+    [],
+  );
+
+  const settleSaveState = useCallback(() => {
+    setSaveState(failedOperationsRef.current.size ? "error" : "saved");
+  }, []);
 
   const load = useCallback(async () => {
+    const generation = ++loadGenerationRef.current;
+    const isCurrent = () => generation === loadGenerationRef.current;
+
     if (!ahaId) {
-      setLoadError("The AHA address is incomplete.");
-      setIsLoading(false);
+      if (isCurrent()) {
+        setLoadError("The AHA address is incomplete.");
+        setIsLoading(false);
+      }
       return;
     }
 
@@ -91,26 +117,33 @@ export function AhaEditorLayout() {
     setLoadError(null);
     try {
       const loaded = await getEditorSnapshot(ahaId);
+      if (!isCurrent()) return;
       if (!loaded) {
         setLoadError("This AHA is not available on this iPad.");
         return;
       }
+      pendingRef.current = null;
+      failedOperationsRef.current.clear();
       draftRef.current = loaded.aha;
       setSnapshot(loaded);
       setSaveState("saved");
     } catch (error) {
+      if (!isCurrent()) return;
       setLoadError(
         error instanceof Error
           ? error.message
           : "Local storage is unavailable.",
       );
     } finally {
-      setIsLoading(false);
+      if (isCurrent()) setIsLoading(false);
     }
   }, [ahaId]);
 
   useEffect(() => {
     void load();
+    return () => {
+      loadGenerationRef.current += 1;
+    };
   }, [load]);
 
   const runSaveQueue = useCallback((): Promise<boolean> => {
@@ -136,12 +169,13 @@ export function AhaEditorLayout() {
         } catch {
           saveFailed = true;
           pendingRef.current = pendingRef.current ?? pending;
-          setSaveState("error");
+          rememberFailure({ kind: "autosave" });
           return false;
         }
       }
 
-      setSaveState("saved");
+      failedOperationsRef.current.delete("autosave");
+      settleSaveState();
       return true;
     })().finally(() => {
       savePromiseRef.current = null;
@@ -152,17 +186,25 @@ export function AhaEditorLayout() {
 
     savePromiseRef.current = savePromise;
     return savePromise;
-  }, []);
+  }, [rememberFailure, settleSaveState]);
 
-  const flushSaves = useCallback(async () => {
+  const flushAhaSaves = useCallback(async () => {
     let attemptedSave = false;
     while (pendingRef.current || savePromiseRef.current) {
       attemptedSave = true;
       const saved = await runSaveQueue();
       if (!saved) return false;
     }
-    return attemptedSave || saveState !== "error";
-  }, [runSaveQueue, saveState]);
+    return (
+      (attemptedSave || pendingRef.current === null) &&
+      !failedOperationsRef.current.has("autosave")
+    );
+  }, [runSaveQueue]);
+
+  const flushSaves = useCallback(async () => {
+    if (!(await flushAhaSaves())) return false;
+    return failedOperationsRef.current.size === 0;
+  }, [flushAhaSaves]);
 
   useEffect(() => {
     const flushWhenHidden = () => {
@@ -208,11 +250,64 @@ export function AhaEditorLayout() {
   );
 
   const retrySave = useCallback(async () => {
-    if (!pendingRef.current && draftRef.current) {
-      pendingRef.current = draftRef.current;
+    if (!failedOperationsRef.current.size && draftRef.current) {
+      pendingRef.current = pendingRef.current ?? draftRef.current;
+      failedOperationsRef.current.set("autosave", { kind: "autosave" });
     }
-    return flushSaves();
-  }, [flushSaves]);
+
+    setSaveState("saving");
+    const operations = [
+      failedOperationsRef.current.get("autosave"),
+      failedOperationsRef.current.get("dismissBanner"),
+      failedOperationsRef.current.get("startBlank"),
+    ].filter((operation): operation is FailedPersistenceOperation =>
+      Boolean(operation),
+    );
+
+    for (const operation of operations) {
+      try {
+        if (operation.kind === "autosave") {
+          if (!pendingRef.current && draftRef.current) {
+            pendingRef.current = draftRef.current;
+          }
+          if (!(await runSaveQueue())) return false;
+          continue;
+        }
+
+        if (operation.kind === "dismissBanner") {
+          if (!(await flushAhaSaves())) return false;
+          await dismissPrefillBanner(operation.ahaId);
+          failedOperationsRef.current.delete(operation.kind);
+          setSnapshot((current) =>
+            current?.aha.id === operation.ahaId
+              ? {
+                  ...current,
+                  metadata: { ...current.metadata, bannerDismissed: true },
+                }
+              : current,
+          );
+          continue;
+        }
+
+        if (!(await flushAhaSaves())) return false;
+        const replacement = await replaceWithBlankAha(
+          operation.ahaId,
+          operation.job,
+          operation.date,
+        );
+        pendingRef.current = null;
+        failedOperationsRef.current.clear();
+        draftRef.current = replacement.aha;
+        setSnapshot(replacement);
+      } catch {
+        rememberFailure(operation);
+        return false;
+      }
+    }
+
+    settleSaveState();
+    return failedOperationsRef.current.size === 0;
+  }, [flushAhaSaves, rememberFailure, runSaveQueue, settleSaveState]);
 
   const navigateSafely = useCallback(
     async (path: string) => {
@@ -227,20 +322,29 @@ export function AhaEditorLayout() {
 
   const dismissBanner = useCallback(async () => {
     if (!snapshot) return;
+    if (!(await flushSaves())) return;
+
+    const operation: FailedPersistenceOperation = {
+      kind: "dismissBanner",
+      ahaId: snapshot.aha.id,
+    };
+    setSaveState("saving");
     try {
-      await dismissPrefillBanner(snapshot.aha.id);
+      await dismissPrefillBanner(operation.ahaId);
+      failedOperationsRef.current.delete(operation.kind);
       setSnapshot((current) =>
-        current
+        current?.aha.id === operation.ahaId
           ? {
               ...current,
               metadata: { ...current.metadata, bannerDismissed: true },
             }
           : current,
       );
+      settleSaveState();
     } catch {
-      setSaveState("error");
+      rememberFailure(operation);
     }
-  }, [snapshot]);
+  }, [flushSaves, rememberFailure, settleSaveState, snapshot]);
 
   const startBlank = useCallback(async () => {
     if (!snapshot) return false;
@@ -248,24 +352,32 @@ export function AhaEditorLayout() {
       return false;
     }
 
+    const operation: FailedPersistenceOperation = {
+      kind: "startBlank",
+      ahaId: snapshot.aha.id,
+      job: snapshot.job,
+      date: snapshot.aha.date,
+    };
+    setSaveState("saving");
     try {
       const replacement = await replaceWithBlankAha(
-        snapshot.aha.id,
-        snapshot.job,
-        snapshot.aha.date,
+        operation.ahaId,
+        operation.job,
+        operation.date,
       );
       pendingRef.current = null;
+      failedOperationsRef.current.clear();
       draftRef.current = replacement.aha;
       setSnapshot(replacement);
       setSaveState("saved");
       return true;
     } catch {
-      setSaveState("error");
+      rememberFailure(operation);
       return false;
     }
-  }, [flushSaves, snapshot]);
+  }, [flushSaves, rememberFailure, snapshot]);
 
-  if (isLoading) {
+  if (isLoading || (snapshot !== null && snapshot.aha.id !== ahaId)) {
     return (
       <main className="min-h-screen bg-background px-5 py-12">
         <p className="mx-auto max-w-lg text-center text-base font-semibold text-muted-foreground">

@@ -1,9 +1,14 @@
 export type EditorLoadView = "failure" | "loading" | "ready";
 
+export interface EditorLoadError {
+  ahaId: string | undefined;
+  message: string;
+}
+
 interface EditorLoadState {
   activeAhaId: string | undefined;
   isLoading: boolean;
-  loadError: string | null;
+  loadError: EditorLoadError | null;
   snapshotAhaId: string | null;
 }
 
@@ -13,7 +18,9 @@ export function getEditorLoadView({
   loadError,
   snapshotAhaId,
 }: EditorLoadState): EditorLoadView {
-  if (loadError !== null) return "failure";
+  if (loadError !== null) {
+    return loadError.ahaId === activeAhaId ? "failure" : "loading";
+  }
   if (isLoading || (snapshotAhaId !== null && snapshotAhaId !== activeAhaId)) {
     return "loading";
   }

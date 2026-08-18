@@ -20,7 +20,7 @@ import type { DraftMetadata } from "@/data/draft-metadata";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { Button } from "@/components/ui/button";
 
-import { getEditorLoadView } from "./editor-load-state";
+import { getEditorLoadView, type EditorLoadError } from "./editor-load-state";
 
 export type SaveState = "saved" | "saving" | "error";
 
@@ -80,7 +80,7 @@ export function AhaEditorLayout() {
   const isOnline = useOnlineStatus();
   const [snapshot, setSnapshot] = useState<EditorSnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<EditorLoadError | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("saved");
 
   const draftRef = useRef<Aha | null>(null);
@@ -114,7 +114,10 @@ export function AhaEditorLayout() {
     if (!ahaId) {
       if (isCurrent()) {
         clearLoadedSnapshot();
-        setLoadError("The AHA address is incomplete.");
+        setLoadError({
+          ahaId,
+          message: "The AHA address is incomplete.",
+        });
         setIsLoading(false);
       }
       return;
@@ -127,7 +130,10 @@ export function AhaEditorLayout() {
       if (!isCurrent()) return;
       if (!loaded) {
         clearLoadedSnapshot();
-        setLoadError("This AHA is not available on this iPad.");
+        setLoadError({
+          ahaId,
+          message: "This AHA is not available on this iPad.",
+        });
         return;
       }
       pendingRef.current = null;
@@ -138,11 +144,13 @@ export function AhaEditorLayout() {
     } catch (error) {
       if (!isCurrent()) return;
       clearLoadedSnapshot();
-      setLoadError(
-        error instanceof Error
-          ? error.message
-          : "Local storage is unavailable.",
-      );
+      setLoadError({
+        ahaId,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Local storage is unavailable.",
+      });
     } finally {
       if (isCurrent()) setIsLoading(false);
     }
@@ -396,7 +404,7 @@ export function AhaEditorLayout() {
   if (loadView === "failure") {
     return (
       <EditorLoadFailure
-        message={loadError ?? "Local storage is unavailable."}
+        message={loadError?.message ?? "Local storage is unavailable."}
         onRetry={() => void load()}
       />
     );

@@ -8,10 +8,28 @@ test("a route-specific load failure takes precedence over a stale snapshot", () 
     getEditorLoadView({
       activeAhaId: "new-aha",
       isLoading: false,
-      loadError: "This AHA is not available on this iPad.",
+      loadError: {
+        ahaId: "new-aha",
+        message: "This AHA is not available on this iPad.",
+      },
       snapshotAhaId: "previous-aha",
     }),
     "failure",
+  );
+});
+
+test("a previous route's load failure does not fail the active route", () => {
+  assert.equal(
+    getEditorLoadView({
+      activeAhaId: "new-aha",
+      isLoading: false,
+      loadError: {
+        ahaId: "previous-aha",
+        message: "This AHA is not available on this iPad.",
+      },
+      snapshotAhaId: null,
+    }),
+    "loading",
   );
 });
 

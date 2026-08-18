@@ -19,6 +19,16 @@ point back to master-spec §§7–11.
 - The parent delivery issue closes only after all eight master-spec §11
   scenarios pass end to end and no blocking issue remains open.
 
+## GitHub tracking
+
+- Milestone: [`v1-pilot`](https://github.com/mexi-cano/aha-app/milestone/1)
+- Parent delivery gate: [#4](https://github.com/mexi-cano/aha-app/issues/4)
+- Phase 1 — Local drafting: [#5](https://github.com/mexi-cano/aha-app/issues/5)
+- Phase 2 — Energy, Review, and Signing: [#6](https://github.com/mexi-cano/aha-app/issues/6)
+- Phase 3 — Exact PDF and Completed workflow: [#7](https://github.com/mexi-cano/aha-app/issues/7)
+- Phase 4 — Setup, backend sync, auth, and PWA hardening: [#8](https://github.com/mexi-cano/aha-app/issues/8)
+- Final v1 acceptance: [#9](https://github.com/mexi-cano/aha-app/issues/9)
+
 ## Delivery matrix
 
 | Delivery                                               | Binding scope                                                                                                                                               | Exit gate                                                                                                                              |

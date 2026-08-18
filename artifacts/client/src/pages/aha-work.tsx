@@ -101,7 +101,7 @@ export default function AhaWork() {
                 <p
                   className={`mt-1 text-base font-semibold ${
                     task.controls.trim()
-                      ? "text-[#1E8E3E]"
+                      ? "text-success"
                       : "text-muted-foreground"
                   }`}
                 >
@@ -199,7 +199,7 @@ export default function AhaWork() {
         {limitMessage ? (
           <p
             id="task-limit-message"
-            className="rounded-xl border border-[#E3C27A] bg-[#FBF1DF] px-4 py-3 text-base font-semibold text-[#7A5200]"
+            className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-base font-semibold text-warning-foreground"
             role="status"
           >
             This AHA can include up to {MAX_TASKS} tasks. Split the work into

@@ -74,7 +74,7 @@ export function HomeStateCard({
       <h2 className="inline-flex items-center justify-center gap-2 text-2xl font-semibold">
         Today's AHA — Completed
         <Check
-          className="size-7 text-[#1E8E3E]"
+          className="size-7 text-success"
           strokeWidth={3}
           aria-hidden="true"
         />

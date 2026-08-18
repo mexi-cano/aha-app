@@ -13,7 +13,8 @@ point back to master-spec §§7–11.
   assigns pull-request numbers when they are opened; phase names, not predicted
   PR numbers, are the stable identifiers.
 - A phase issue closes only after its implementation PR is merged and all
-  required automated, Replit, physical-iPad, and review evidence is recorded.
+  required evidence in the automated, Replit, physical-iPad, and review
+  categories is recorded.
   Verified findings must be resolved or have a documented stale-finding
   rationale, followed by rerun validation.
 - Deferred phase work is still required v1 scope. Starting a later phase does

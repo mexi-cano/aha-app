@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "hello": "tsx ./src/hello.ts",
-    "test": "node --import tsx --test ../artifacts/api-server/src/*.test.ts ../artifacts/client/src/data/*.test.ts ../lib/aha-domain/test/*.test.ts",
+    "test": "node --import tsx --test ../artifacts/api-server/src/*.test.ts ../artifacts/client/src/data/*.test.ts ../artifacts/client/src/features/aha-editor/*.test.ts ../lib/aha-domain/test/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

@@ -2,12 +2,19 @@ import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Check } from "lucide-react";
 import { useNavigate } from "react-router";
+import type { Aha } from "@workspace/aha-domain";
 
 import { AppLogo } from "@/components/aha/app-logo";
 import { HomeStateCard } from "@/components/aha/home-state-card";
 import { getHomeSnapshot, startToday } from "@/data/aha-repository";
 import { useToday } from "@/hooks/use-today";
 import { formatLongDate, formatShortDate } from "@/lib/date-format";
+
+const RECENT_AHA_STATUS_LABELS = {
+  completed: "Completed",
+  draft: "Draft",
+  in_progress: "Signing",
+} as const satisfies Record<Aha["status"], string>;
 
 function EmptyJobState() {
   return (
@@ -93,35 +100,34 @@ export default function Home() {
                 className="mt-2 divide-y divide-border"
                 aria-label="Recent AHAs"
               >
-                {snapshot.recentAhas.map((aha) => (
-                  <li
-                    key={aha.id}
-                    className="flex min-h-12 items-center justify-between gap-4 py-2 text-base font-semibold"
-                    aria-label={`${formatShortDate(aha.date)}, ${
-                      aha.status === "completed"
-                        ? "Completed"
-                        : aha.status === "draft"
-                          ? "Draft"
-                          : "Signing"
-                    }`}
-                  >
-                    <time dateTime={aha.date}>{formatShortDate(aha.date)}</time>
-                    {aha.status === "completed" ? (
-                      <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#1E8E3E]">
-                        <Check
-                          className="size-5"
-                          strokeWidth={3}
-                          aria-hidden="true"
-                        />
-                        Completed
-                      </span>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">
-                        {aha.status === "draft" ? "Draft" : "Signing"}
-                      </span>
-                    )}
-                  </li>
-                ))}
+                {snapshot.recentAhas.map((aha) => {
+                  const statusLabel = RECENT_AHA_STATUS_LABELS[aha.status];
+                  return (
+                    <li
+                      key={aha.id}
+                      className="flex min-h-12 items-center justify-between gap-4 py-2 text-base font-semibold"
+                      aria-label={`${formatShortDate(aha.date)}, ${statusLabel}`}
+                    >
+                      <time dateTime={aha.date}>
+                        {formatShortDate(aha.date)}
+                      </time>
+                      {aha.status === "completed" ? (
+                        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-success">
+                          <Check
+                            className="size-5"
+                            strokeWidth={3}
+                            aria-hidden="true"
+                          />
+                          {statusLabel}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">
+                          {statusLabel}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ) : null}
@@ -129,7 +135,7 @@ export default function Home() {
 
         {snapshot.unreadableCount ? (
           <div
-            className="rounded-xl border border-[#E3C27A] bg-[#FBF1DF] px-4 py-3 text-base font-semibold leading-relaxed text-[#6A4800]"
+            className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-base font-semibold leading-relaxed text-warning-foreground"
             role="status"
           >
             {snapshot.unreadableCount === 1

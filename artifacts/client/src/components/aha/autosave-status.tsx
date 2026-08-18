@@ -43,7 +43,7 @@ export function AutosaveStatus() {
     >
       {isOnline ? "Saved" : "Offline · Saved on this iPad"}
       <Check
-        className="size-5 text-[#1E8E3E]"
+        className="size-5 text-success"
         strokeWidth={3}
         aria-hidden="true"
       />

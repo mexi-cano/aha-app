@@ -13,12 +13,15 @@ import {
   canStartSigning,
   completeAha,
   createBlankAha,
+  enterCustomPersonInCharge,
   getEditorSectionReadiness,
   getReviewReport,
   jobSchema,
   recordSignature,
   removeCrewMember,
   renameCrewMember,
+  resolvePersonInChargeWorkerId,
+  selectPersonInChargeWorker,
   toggleEnergyCategory,
   toggleEnergyExample,
   type Aha,
@@ -296,6 +299,13 @@ test("document revision changes only with PDF-visible source data", () => {
     updatedAfterCompletionAt: ["2026-08-18T15:00:00.000Z"],
   });
   assert.equal(timestampOnly.documentRevision, current.documentRevision);
+
+  const associationOnly = applyAhaMutationRules(current, {
+    ...current,
+    personInChargeWorkerId: "worker-2",
+  });
+  assert.equal(associationOnly.documentRevision, current.documentRevision);
+  assert.equal(associationOnly.safetyCheck, current.safetyCheck);
 });
 
 test("completed updates group timestamps, reset only the safety gate, and retain signatures", () => {
@@ -381,6 +391,31 @@ test("crew mutations are AHA-local, trim names, and clear renamed signatures", (
   assert.equal(
     removedWhileSigned.crew.some(({ workerId }) => workerId === "worker-3"),
     false,
+  );
+});
+
+test("person in charge selection is explicit and stays consistent with crew edits", () => {
+  const aha = reviewReadyAha();
+  assert.equal(resolvePersonInChargeWorkerId(aha), "worker-1");
+
+  const selected = selectPersonInChargeWorker(aha, "worker-2");
+  assert.equal(selected.header.personInCharge, "Jordan Reed");
+  assert.equal(resolvePersonInChargeWorkerId(selected), "worker-2");
+
+  const renamed = renameCrewMember(selected, "worker-2", "Jordan R.");
+  assert.equal(renamed.header.personInCharge, "Jordan R.");
+  assert.equal(resolvePersonInChargeWorkerId(renamed), "worker-2");
+
+  const removed = removeCrewMember(renamed, "worker-2");
+  assert.equal(removed.header.personInCharge, "Jordan R.");
+  assert.equal(resolvePersonInChargeWorkerId(removed), null);
+
+  const custom = enterCustomPersonInCharge(aha, "Off-site supervisor");
+  assert.equal(custom.header.personInCharge, "Off-site supervisor");
+  assert.equal(resolvePersonInChargeWorkerId(custom), null);
+  assert.throws(
+    () => selectPersonInChargeWorker(aha, "missing-worker"),
+    /Crew member was not found/,
   );
 });
 

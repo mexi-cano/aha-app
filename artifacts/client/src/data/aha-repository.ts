@@ -71,7 +71,25 @@ function dependencies() {
 export async function initializeLocalData(today: LocalDate): Promise<void> {
   await openLocalDataWithRecovery(ahaDatabase);
   if (import.meta.env.DEV) {
-    await ensureDevFixture(ahaDatabase, today);
+    try {
+      await ensureDevFixture(ahaDatabase, today);
+    } catch (error) {
+      const diagnostic =
+        typeof error === "object" && error !== null
+          ? {
+              name:
+                "name" in error && typeof error.name === "string"
+                  ? error.name
+                  : "UnknownError",
+              stack:
+                "stack" in error && typeof error.stack === "string"
+                  ? error.stack
+                  : undefined,
+            }
+          : { name: "UnknownError" };
+      console.error("Local data initialization failed", diagnostic);
+      throw error;
+    }
   }
 }
 

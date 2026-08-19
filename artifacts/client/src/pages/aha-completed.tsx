@@ -10,8 +10,10 @@ import { formatEditorDate, formatTime } from "@/lib/date-format";
 import {
   PDF_FAILURE_MESSAGE,
   downloadPdf,
-  generateAndStoreAhaPdf,
+  getCurrentPdfOpenMode,
+  saveAhaAndGeneratePdf,
   shareOrDownloadPdf,
+  usePdfObjectUrl,
   type PdfFitIssue,
 } from "@/pdf";
 
@@ -27,17 +29,25 @@ export default function AhaCompleted() {
   const [shareFailed, setShareFailed] = useState(false);
   const [downloadStarted, setDownloadStarted] = useState(false);
   const [shareIsTakingLong, setShareIsTakingLong] = useState(false);
+  const pdfOpenMode = getCurrentPdfOpenMode();
+  const nativePdfUrl = usePdfObjectUrl(
+    pdf?.status === "current" ? pdf.record : null,
+  );
 
   const regenerate = async () => {
     if (isGenerating) return;
     setIsGenerating(true);
     setFitIssues([]);
-    const saved = await commitAha((current) => current);
-    if (saved) {
-      const result = await generateAndStoreAhaPdf(saved, job);
+    try {
+      const result = await saveAhaAndGeneratePdf({
+        commitAha,
+        update: (current) => current,
+        job,
+      });
       if (result.status === "fit_failed") setFitIssues(result.issues);
+    } finally {
+      setIsGenerating(false);
     }
-    setIsGenerating(false);
   };
 
   const share = async () => {
@@ -129,7 +139,8 @@ export default function AhaCompleted() {
           ) : null}
         </section>
 
-        {pdf === undefined ? (
+        {pdf === undefined ||
+        (pdfCurrent && pdfOpenMode === "native" && !nativePdfUrl) ? (
           <section
             className="rounded-2xl border border-card-border bg-card p-5 text-center"
             role="status"
@@ -139,12 +150,23 @@ export default function AhaCompleted() {
             </p>
           </section>
         ) : pdfCurrent && pdf.record ? (
-          <Button
-            className="min-h-[72px] w-full rounded-[14px] text-xl font-bold tracking-wide"
-            onClick={() => void navigateSafely(`/ahas/${aha.id}/pdf`)}
-          >
-            VIEW PDF
-          </Button>
+          pdfOpenMode === "native" && nativePdfUrl ? (
+            <Button
+              asChild
+              className="min-h-[72px] w-full rounded-[14px] text-xl font-bold tracking-wide"
+            >
+              <a href={nativePdfUrl} target="_blank" rel="noopener noreferrer">
+                VIEW PDF
+              </a>
+            </Button>
+          ) : (
+            <Button
+              className="min-h-[72px] w-full rounded-[14px] text-xl font-bold tracking-wide"
+              onClick={() => void navigateSafely(`/ahas/${aha.id}/pdf`)}
+            >
+              VIEW PDF
+            </Button>
+          )
         ) : (
           <section
             className="rounded-2xl border border-warning/30 bg-warning/10 p-5"

@@ -18,7 +18,7 @@ import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import { formatLongDate } from "@/lib/date-format";
 import {
   analyzeAhaPdfFit,
-  generateAndStoreAhaPdf,
+  saveAhaAndGeneratePdf,
   type PdfFitIssue,
 } from "@/pdf";
 
@@ -45,57 +45,61 @@ export default function AhaLateWorker() {
     setIsSaving(true);
     setError(null);
     setFitIssues([]);
-    const now = new Date();
-    let candidate;
     try {
-      candidate = addLateSignedCrewMember(
-        aha,
-        { id: workerId, name },
-        signaturePng,
-        now,
-      );
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "This worker could not be added.",
-      );
+      const now = new Date();
+      let candidate;
+      try {
+        candidate = addLateSignedCrewMember(
+          aha,
+          { id: workerId, name },
+          signaturePng,
+          now,
+        );
+      } catch (cause) {
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "This worker could not be added.",
+        );
+        return;
+      }
+      let fit;
+      try {
+        fit = await analyzeAhaPdfFit(candidate, job);
+      } catch {
+        setError(
+          "We couldn't check the official PDF. The new signature has not been saved. Try again.",
+        );
+        return;
+      }
+      if (fit.issues.length > 0) {
+        setFitIssues(fit.issues);
+        return;
+      }
+      const result = await saveAhaAndGeneratePdf({
+        commitAha,
+        update: (current) =>
+          addLateSignedCrewMember(
+            current,
+            { id: workerId, name },
+            signaturePng,
+            now,
+          ),
+        job,
+      });
+      if (result.status === "save_failed") {
+        setError(
+          "We couldn't save this signature. It is still on this screen. Try again.",
+        );
+        return;
+      }
+      if (result.status === "fit_failed") {
+        setFitIssues(result.issues);
+      }
+      await navigateSafely(`/ahas/${result.savedAha.id}/completed`);
+    } finally {
       setIsSaving(false);
-      return;
     }
-    let fit;
-    try {
-      fit = await analyzeAhaPdfFit(candidate, job);
-    } catch {
-      setError(
-        "We couldn't check the official PDF. The new signature has not been saved. Try again.",
-      );
-      setIsSaving(false);
-      return;
-    }
-    if (fit.issues.length > 0) {
-      setFitIssues(fit.issues);
-      setIsSaving(false);
-      return;
-    }
-    const saved = await commitAha((current) =>
-      addLateSignedCrewMember(
-        current,
-        { id: workerId, name },
-        signaturePng,
-        now,
-      ),
-    );
-    if (!saved) {
-      setError(
-        "We couldn't save this signature. It is still on this screen. Try again.",
-      );
-      setIsSaving(false);
-      return;
-    }
-    await generateAndStoreAhaPdf(saved, job);
-    setIsSaving(false);
-    await navigateSafely(`/ahas/${aha.id}/completed`);
   };
 
   if (aha.status !== "completed" || aha.crew.length >= MAX_CREW_MEMBERS) {

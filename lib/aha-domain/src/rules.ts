@@ -1,6 +1,7 @@
 import { MAX_TASKS } from "./canonical";
 import {
   ahaSchema,
+  findUniqueWorkerIdByName,
   type Aha,
   type AhaStatus,
   type Job,
@@ -112,6 +113,10 @@ export function createBlankAha(
       signaturePng: null,
       signedAt: null,
     })),
+    personInChargeWorkerId: findUniqueWorkerIdByName(
+      job.roster,
+      job.defaults.personInCharge,
+    ),
     documentRevision: 0,
     completedAt: null,
     updatedAfterCompletionAt: [],
@@ -166,6 +171,11 @@ export function copyAhaForNewDay(
       signaturePng: null,
       signedAt: null,
     })),
+    personInChargeWorkerId: previous.crew.some(
+      ({ workerId }) => workerId === previous.personInChargeWorkerId,
+    )
+      ? previous.personInChargeWorkerId
+      : null,
     documentRevision: 0,
     completedAt: null,
     updatedAfterCompletionAt: [],

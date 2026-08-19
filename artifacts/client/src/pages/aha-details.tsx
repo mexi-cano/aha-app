@@ -9,6 +9,7 @@ import {
   TextField,
 } from "@/components/aha/form-field";
 import { PrefillBanner } from "@/components/aha/prefill-banner";
+import { PersonInChargeField } from "@/components/aha/person-in-charge-field";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import { formatLongDate } from "@/lib/date-format";
 import { cn } from "@/lib/utils";
@@ -73,15 +74,7 @@ export default function AhaDetails() {
               value={aha.header.location}
               onChange={(event) => updateHeader("location", event.target.value)}
             />
-            <TextField
-              id="person-in-charge"
-              label="Person in charge"
-              requirement="required"
-              value={aha.header.personInCharge}
-              onChange={(event) =>
-                updateHeader("personInCharge", event.target.value)
-              }
-            />
+            <PersonInChargeField aha={aha} updateAha={updateAha} />
             <TextField
               id="closest-emergency-centre"
               label="Closest emergency centre"

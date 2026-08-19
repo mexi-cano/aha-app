@@ -1,6 +1,6 @@
-# ITS AHA App — Replit Master Build Specification (v1.2)
+# ITS AHA App — Replit Master Build Specification (v1.3)
 
-*v1.2 changelog: database moved to external Neon (Drizzle + @neondatabase/serverless); PDF library pinned to @cantoo/pdf-lib; full frontend stack pinned; §3 no-deduplication rule; gate-code auth detailed; §10 exclusions expanded (banned dependencies, supervisor notifications deferred). Supersedes v1.0/v1.1.*
+_v1.3 changelog: clarifies that FOREMAN is the official Person in charge, not necessarily the device operator; the app may associate that printed name with a crew worker ID for unambiguous presentation. v1.2 moved the database to external Neon (Drizzle + @neondatabase/serverless), pinned the PDF/frontend stack, added the §3 no-deduplication rule, detailed gate-code auth, and expanded §10 exclusions. Supersedes v1.0/v1.1/v1.2._
 
 You are building a mobile-first PWA that lets a construction crew lead complete the company's daily Activity Hazard Analysis (AHA) on an iPad, collect 5–10 finger signatures, and produce a PDF that exactly matches the official ITS form (IS_F_222_EN.2203). The app UI is modern and touch-first; the PDF output is the fixed official company sheet.
 
@@ -41,6 +41,7 @@ AHA {
   energySelections: [{ category, examples: [string] }],   // strings MUST be from §3 verbatim
   safetyCheck: null | 'yes' | 'no',
   crew: [{ workerId, name, signaturePng|null, signedAt|null }],
+  personInChargeWorkerId: string|null,     // internal crew association; never printed
   completedAt|null, updatedAfterCompletionAt: [timestamps],
   sync: { savedLocallyAt, backedUpAt|null }
 }
@@ -79,6 +80,7 @@ These strings are data from the official form. Example chips, Review listings, t
 - **Completion:** FINISH TODAY'S AHA enables only when every worker in today's crew has signed AND all must-fix items pass. Completing generates and stores the PDF.
 - **Late arrival (completed AHA):** "+ Add worker & sign" → name → acknowledgment → signature → PDF regenerates; existing signatures untouched.
 - **Crew editing (Review):** Today's Crew card seeded from the roster / previous day; Edit Crew = in-place checklist (+ Add worker). Removing an absent worker adjusts the signing denominator; removing a worker who already signed requires confirmation and deletes that signature. Renaming a signed worker warns and clears their signature — never silently reassign.
+- **Person in charge / FOREMAN:** These are the same business role. The required Person in charge name is the official value printed on the PDF; when it is associated with a worker in today's crew, that worker receives the FOREMAN badge. The person entering the AHA on the device is not inferred or tracked. The user may choose from today's crew or enter a custom responsible person who is not signing.
 
 ## 5. Validation — three tiers, enforced ONLY at Review (never while typing)
 

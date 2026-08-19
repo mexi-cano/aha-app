@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Check } from "lucide-react";
 import {
   ENERGY_CATEGORY_NAMES,
+  resolvePersonInChargeWorkerId,
   type Aha,
   type Job,
   type ReviewIssue,
@@ -9,6 +10,7 @@ import {
 } from "@workspace/aha-domain";
 
 import { ReviewIssueGroupNotice } from "@/components/aha/review-issue-notice";
+import { ForemanBadge } from "@/components/aha/foreman-badge";
 import { Button } from "@/components/ui/button";
 import {
   groupReviewIssues,
@@ -107,6 +109,7 @@ export function AhaSummary({
   disabled = false,
 }: AhaSummaryProps) {
   const editable = mode === "review";
+  const foremanWorkerId = resolvePersonInChargeWorkerId(aha);
   const issues =
     editable && report
       ? ([...report.mustFix, ...report.warnings] as ReviewIssue[])
@@ -342,9 +345,12 @@ export function AhaSummary({
               {aha.crew.map((member) => (
                 <div
                   key={member.workerId}
-                  className="min-h-8 text-base font-medium"
+                  className="flex min-h-8 items-center gap-2 text-base font-medium"
                 >
                   {member.name}
+                  {member.workerId === foremanWorkerId ? (
+                    <ForemanBadge />
+                  ) : null}
                 </div>
               ))}
             </div>

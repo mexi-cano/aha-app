@@ -70,7 +70,7 @@ export function LocalDataGate({ children }: { children: ReactNode }) {
           <p className="mt-3 text-base font-medium leading-relaxed text-muted-foreground">
             {failureKind === "app_update_required"
               ? "Another tab has already updated the saved AHA format. Reload this tab before continuing. Your saved records were not deleted."
-              : "We couldn't open the AHAs saved on this iPad. Your saved records were not deleted. Close other AHA tabs, then try again."}
+              : "We couldn't open the AHAs saved on this iPad. Your saved records were not deleted. Try again, then reload the app if the problem continues."}
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             {failureKind === "storage_unavailable" ? (

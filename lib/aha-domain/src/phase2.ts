@@ -510,6 +510,31 @@ function assertCrewEditable(aha: Aha): void {
   }
 }
 
+export function resolvePersonInChargeWorkerId(aha: Aha): string | null {
+  return aha.personInChargeWorkerId !== null &&
+    aha.crew.some(({ workerId }) => workerId === aha.personInChargeWorkerId)
+    ? aha.personInChargeWorkerId
+    : null;
+}
+
+export function selectPersonInChargeWorker(aha: Aha, workerId: string): Aha {
+  const worker = aha.crew.find((member) => member.workerId === workerId);
+  if (!worker) throw new Error("Crew member was not found");
+  return {
+    ...aha,
+    personInChargeWorkerId: worker.workerId,
+    header: { ...aha.header, personInCharge: worker.name },
+  };
+}
+
+export function enterCustomPersonInCharge(aha: Aha, name: string): Aha {
+  return {
+    ...aha,
+    personInChargeWorkerId: null,
+    header: { ...aha.header, personInCharge: name },
+  };
+}
+
 export function addCrewMember(aha: Aha, worker: JobWorker): Aha {
   assertCrewEditable(aha);
   if (aha.crew.some((member) => member.workerId === worker.id)) return aha;
@@ -527,6 +552,10 @@ export function removeCrewMember(aha: Aha, workerId: string): Aha {
   return {
     ...aha,
     crew: aha.crew.filter((member) => member.workerId !== workerId),
+    personInChargeWorkerId:
+      aha.personInChargeWorkerId === workerId
+        ? null
+        : aha.personInChargeWorkerId,
   };
 }
 
@@ -543,6 +572,10 @@ export function renameCrewMember(
   }
   return {
     ...aha,
+    header:
+      aha.personInChargeWorkerId === workerId
+        ? { ...aha.header, personInCharge: normalizedName }
+        : aha.header,
     crew: aha.crew.map((member) =>
       member.workerId === workerId
         ? {

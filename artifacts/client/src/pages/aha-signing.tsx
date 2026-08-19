@@ -9,9 +9,11 @@ import {
   completeAha,
   countSignedCrew,
   recordSignature,
+  resolvePersonInChargeWorkerId,
 } from "@workspace/aha-domain";
 
 import { AhaSummary } from "@/components/aha/aha-summary";
+import { ForemanBadge } from "@/components/aha/foreman-badge";
 import {
   SignatureCanvas,
   type SignatureCanvasHandle,
@@ -36,7 +38,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { createLocalId } from "@/data/aha-repository";
-import { getForemanWorkerId } from "@/features/aha-editor/crew-presentation";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import {
   formatEditorDate,
@@ -45,7 +46,7 @@ import {
 } from "@/lib/date-format";
 import {
   analyzeAhaPdfFit,
-  generateAndStoreAhaPdf,
+  saveAhaAndGeneratePdf,
   type PdfFitIssue,
 } from "@/pdf";
 
@@ -76,6 +77,7 @@ export default function AhaSigning() {
   const signatureRef = useRef<SignatureCanvasHandle>(null);
   const finishSectionRef = useRef<HTMLDivElement>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const finishInFlightRef = useRef(false);
 
   const signedCount = countSignedCrew(aha);
   const unsignedCount = aha.crew.length - signedCount;
@@ -92,14 +94,13 @@ export default function AhaSigning() {
   const finishReady = useMemo(() => canFinishAha(aha), [aha]);
   const hasStagedEntry =
     hasInk || (view.kind === "add" && addName.trim().length > 0);
-  const foremanWorkerId = getForemanWorkerId(
-    aha.crew,
-    aha.header.personInCharge,
-  );
+  const foremanWorkerId = resolvePersonInChargeWorkerId(aha);
 
   useEffect(() => {
     if (aha.status === "completed") {
-      void navigateSafely(`/ahas/${aha.id}/completed`);
+      if (!finishInFlightRef.current) {
+        void navigateSafely(`/ahas/${aha.id}/completed`);
+      }
     } else if (aha.status !== "in_progress" || !canStartSigning(aha)) {
       void navigateSafely(`/ahas/${aha.id}/review`);
     }
@@ -214,37 +215,44 @@ export default function AhaSigning() {
   };
 
   const finish = async () => {
-    if (!finishReady || isCommitting) return;
+    if (!finishReady || isCommitting || finishInFlightRef.current) return;
+    finishInFlightRef.current = true;
     setIsCommitting(true);
     setOperationError(null);
     setFitIssues([]);
-    let fit;
     try {
-      fit = await analyzeAhaPdfFit(aha, job);
-    } catch {
-      setOperationError(
-        "We couldn't check the official PDF. Your AHA and signatures are still saved. Try again.",
-      );
+      let fit;
+      try {
+        fit = await analyzeAhaPdfFit(aha, job);
+      } catch {
+        setOperationError(
+          "We couldn't check the official PDF. Your AHA and signatures are still saved. Try again.",
+        );
+        return;
+      }
+      if (fit.issues.length > 0) {
+        setFitIssues(fit.issues);
+        return;
+      }
+
+      const result = await saveAhaAndGeneratePdf({
+        commitAha,
+        update: (current) => completeAha(current, new Date()),
+        job,
+      });
+      if (result.status === "save_failed") {
+        setOperationError(
+          "We couldn't finish today's AHA. Your AHA and signatures are still saved. Try again.",
+        );
+        return;
+      }
+      if (result.status === "fit_failed") {
+        setFitIssues(result.issues);
+      }
+      await navigateSafely(`/ahas/${result.savedAha.id}/completed`);
+    } finally {
+      finishInFlightRef.current = false;
       setIsCommitting(false);
-      return;
-    }
-    if (fit.issues.length > 0) {
-      setFitIssues(fit.issues);
-      setIsCommitting(false);
-      return;
-    }
-    const saved = await commitAha((current) =>
-      completeAha(current, new Date()),
-    );
-    if (saved) {
-      await generateAndStoreAhaPdf(saved, job);
-      setIsCommitting(false);
-      await navigateSafely(`/ahas/${aha.id}/completed`);
-    } else {
-      setIsCommitting(false);
-      setOperationError(
-        "We couldn't finish today's AHA. Your AHA and signatures are still saved. Try again.",
-      );
     }
   };
 
@@ -331,9 +339,7 @@ export default function AhaSigning() {
                     <span className="min-w-0 flex-1 text-lg font-semibold">
                       {member.name}
                       {member.workerId === foremanWorkerId ? (
-                        <span className="ml-2 rounded-md bg-secondary px-2 py-0.5 align-middle text-xs font-bold text-primary">
-                          FOREMAN
-                        </span>
+                        <ForemanBadge className="ml-2 align-middle" />
                       ) : null}
                     </span>
                     {signed && member.signedAt ? (

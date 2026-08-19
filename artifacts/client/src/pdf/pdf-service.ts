@@ -1,7 +1,7 @@
 import type { Aha, Job } from "@workspace/aha-domain";
 
-import type { AhaPdfRecord } from "@/data/database";
-import { storeAhaPdf } from "@/data/aha-repository";
+import type { AhaPdfRecord } from "../data/database";
+import { storeAhaPdf } from "../data/aha-repository";
 
 import type { AhaPdfLayoutPlan, PdfFitIssue } from "./aha-pdf";
 import { PDF_FAILURE_MESSAGE } from "./pdf-constants";

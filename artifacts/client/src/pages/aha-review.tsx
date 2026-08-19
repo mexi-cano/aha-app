@@ -3,16 +3,18 @@ import { useSearchParams } from "react-router";
 import {
   beginSigning,
   getReviewReport,
+  resolvePersonInChargeWorkerId,
   type ReviewIssue,
 } from "@workspace/aha-domain";
 
 import { AhaSummary } from "@/components/aha/aha-summary";
+import { ForemanBadge } from "@/components/aha/foreman-badge";
 import { CrewEditor } from "@/components/aha/crew-editor";
 import { EditorShell } from "@/components/aha/editor-shell";
 import { Button } from "@/components/ui/button";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import { reviewTargetPath } from "@/features/aha-editor/editor-navigation";
-import { generateAndStoreAhaPdf, type PdfFitIssue } from "@/pdf";
+import { saveAhaAndGeneratePdf, type PdfFitIssue } from "@/pdf";
 
 export default function AhaReview() {
   const {
@@ -30,6 +32,7 @@ export default function AhaReview() {
   const [fitIssues, setFitIssues] = useState<PdfFitIssue[]>([]);
   const report = useMemo(() => getReviewReport(aha), [aha]);
   const focusCrew = searchParams.get("focus") === "crew";
+  const foremanWorkerId = resolvePersonInChargeWorkerId(aha);
 
   const fixIssue = (issue: ReviewIssue) => {
     const initialPath = reviewTargetPath(aha.id, issue.target);
@@ -56,22 +59,24 @@ export default function AhaReview() {
     setStartError(null);
     setFitIssues([]);
     if (editorMode === "completed_update") {
-      const saved = await commitAha((current) => current);
-      if (!saved) {
-        setStartError(
-          "We couldn't save these updates. The last saved PDF is unchanged. Try again.",
-        );
-      } else {
-        const result = await generateAndStoreAhaPdf(saved, job);
-        if (result.status === "stored") {
-          await navigateSafely(`/ahas/${aha.id}/completed`);
+      try {
+        const result = await saveAhaAndGeneratePdf({
+          commitAha,
+          update: (current) => current,
+          job,
+        });
+        if (result.status === "save_failed") {
+          setStartError(
+            "We couldn't save these updates. The last saved PDF is unchanged. Try again.",
+          );
         } else if (result.status === "fit_failed") {
           setFitIssues(result.issues);
         } else {
-          await navigateSafely(`/ahas/${aha.id}/completed`);
+          await navigateSafely(`/ahas/${result.savedAha.id}/completed`);
         }
+      } finally {
+        setIsStarting(false);
       }
-      setIsStarting(false);
       return;
     }
     const saved = await commitAha((current) => beginSigning(current));
@@ -120,9 +125,12 @@ export default function AhaReview() {
                   {aha.crew.map((member) => (
                     <p
                       key={member.workerId}
-                      className="min-h-10 text-base font-medium"
+                      className="flex min-h-10 items-center gap-2 text-base font-medium"
                     >
-                      {member.name}{" "}
+                      {member.name}
+                      {member.workerId === foremanWorkerId ? (
+                        <ForemanBadge />
+                      ) : null}
                       {member.signaturePng ? (
                         <span className="font-bold text-success">✓</span>
                       ) : null}

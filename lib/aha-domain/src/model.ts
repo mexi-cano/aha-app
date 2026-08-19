@@ -166,6 +166,7 @@ export const ahaSchema = z
       .max(ENERGY_CATEGORIES.length),
     safetyCheck: z.enum(["yes", "no"]).nullable(),
     crew: z.array(ahaCrewMemberSchema).max(MAX_CREW_MEMBERS),
+    personInChargeWorkerId: z.string().min(1).nullable().default(null),
     documentRevision: z.number().int().nonnegative().default(0),
     completedAt: z.string().datetime().nullable(),
     updatedAfterCompletionAt: z.array(z.string().datetime()),
@@ -229,6 +230,31 @@ export const ahaSchema = z
 
 export type Aha = z.infer<typeof ahaSchema>;
 
+function normalizeComparableWorkerName(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+export function findUniqueWorkerIdByName(
+  workers: readonly { id: string; name: string }[],
+  name: string,
+): string | null {
+  const normalizedName = normalizeComparableWorkerName(name);
+  if (!normalizedName) return null;
+
+  const matches = workers.filter(
+    (worker) => normalizeComparableWorkerName(worker.name) === normalizedName,
+  );
+  return matches.length === 1 ? matches[0]!.id : null;
+}
+
+function hasOwnPersonInChargeWorkerId(value: unknown): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Object.prototype.hasOwnProperty.call(value, "personInChargeWorkerId")
+  );
+}
+
 export function parseStoredAha(value: unknown): Aha {
   const result = ahaSchema.safeParse(value);
   if (!result.success) {
@@ -237,7 +263,24 @@ export function parseStoredAha(value: unknown): Aha {
       { cause: result.error },
     );
   }
-  return result.data;
+
+  const parsed = result.data;
+  const associationIsValid =
+    parsed.personInChargeWorkerId === null ||
+    parsed.crew.some(
+      ({ workerId }) => workerId === parsed.personInChargeWorkerId,
+    );
+  if (hasOwnPersonInChargeWorkerId(value) && associationIsValid) {
+    return parsed;
+  }
+
+  const inferredWorkerId = hasOwnPersonInChargeWorkerId(value)
+    ? null
+    : findUniqueWorkerIdByName(
+        parsed.crew.map(({ workerId, name }) => ({ id: workerId, name })),
+        parsed.header.personInCharge,
+      );
+  return { ...parsed, personInChargeWorkerId: inferredWorkerId };
 }
 
 export function parseStoredJob(value: unknown): Job {

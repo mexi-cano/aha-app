@@ -2,26 +2,51 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { initializeLocalData } from "@/data/aha-repository";
+import {
+  classifyLocalDataError,
+  type LocalDataFailureKind,
+} from "@/data/local-data-initialization";
 import { useToday } from "@/hooks/use-today";
 
 export function LocalDataGate({ children }: { children: ReactNode }) {
   const today = useToday();
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [failureKind, setFailureKind] = useState<LocalDataFailureKind>(
+    "storage_unavailable",
+  );
+  const [isReloading, setIsReloading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setState("loading");
     void initializeLocalData(today)
       .then(() => {
         if (!cancelled) setState("ready");
       })
-      .catch(() => {
-        if (!cancelled) setState("error");
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setFailureKind(classifyLocalDataError(error));
+          setState("error");
+        }
       });
     return () => {
       cancelled = true;
     };
   }, [attempt, today]);
+
+  const reloadLatestVersion = async () => {
+    if (isReloading) return;
+    setIsReloading(true);
+    try {
+      const registration = await navigator.serviceWorker?.getRegistration();
+      await registration?.update();
+    } catch {
+      // A cached offline app can still reload even when update checking fails.
+    } finally {
+      window.location.reload();
+    }
+  };
 
   if (state === "loading") {
     return (
@@ -37,20 +62,36 @@ export function LocalDataGate({ children }: { children: ReactNode }) {
     return (
       <main className="min-h-screen bg-background px-5 py-12">
         <section className="mx-auto max-w-lg rounded-2xl border border-card-border bg-card p-7 shadow-sm">
-          <h1 className="text-2xl font-bold">Local storage is unavailable</h1>
+          <h1 className="text-2xl font-bold">
+            {failureKind === "app_update_required"
+              ? "This tab needs the latest app version"
+              : "Local storage is temporarily unavailable"}
+          </h1>
           <p className="mt-3 text-base font-medium leading-relaxed text-muted-foreground">
-            We couldn't open the AHAs saved on this iPad. Nothing has been
-            deleted. Check that private browsing is off, then try again.
+            {failureKind === "app_update_required"
+              ? "Another tab has already updated the saved AHA format. Reload this tab before continuing. Your saved records were not deleted."
+              : "We couldn't open the AHAs saved on this iPad. Your saved records were not deleted. Close other AHA tabs, then try again."}
           </p>
-          <Button
-            className="mt-6 min-h-12 px-6 text-base"
-            onClick={() => {
-              setState("loading");
-              setAttempt((value) => value + 1);
-            }}
-          >
-            Try again
-          </Button>
+          <div className="mt-6 flex flex-wrap gap-3">
+            {failureKind === "storage_unavailable" ? (
+              <Button
+                className="min-h-12 px-6 text-base"
+                onClick={() => setAttempt((value) => value + 1)}
+              >
+                Try again
+              </Button>
+            ) : null}
+            <Button
+              variant={
+                failureKind === "app_update_required" ? "default" : "outline"
+              }
+              className="min-h-12 px-6 text-base"
+              disabled={isReloading}
+              onClick={() => void reloadLatestVersion()}
+            >
+              {isReloading ? "Reloading…" : "Reload app"}
+            </Button>
+          </div>
         </section>
       </main>
     );

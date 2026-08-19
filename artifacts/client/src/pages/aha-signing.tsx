@@ -66,12 +66,15 @@ export default function AhaSigning() {
   const [stagedData, setStagedData] = useState<PointGroup[]>([]);
   const [isCommitting, setIsCommitting] = useState(false);
   const [operationError, setOperationError] = useState<string | null>(null);
-  const [savedNotice, setSavedNotice] = useState(false);
+  const [savedNotice, setSavedNotice] = useState<"signature" | "ready" | null>(
+    null,
+  );
   const [exitAsk, setExitAsk] = useState(false);
   const [discardAsk, setDiscardAsk] = useState(false);
   const [limitMessage, setLimitMessage] = useState(false);
   const [fitIssues, setFitIssues] = useState<PdfFitIssue[]>([]);
   const signatureRef = useRef<SignatureCanvasHandle>(null);
+  const finishSectionRef = useRef<HTMLDivElement>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const signedCount = countSignedCrew(aha);
@@ -117,11 +120,20 @@ export default function AhaSigning() {
     [],
   );
 
-  const showSavedNotice = () => {
-    setSavedNotice(true);
+  const showSavedNotice = (readyToFinish: boolean) => {
+    setSavedNotice(readyToFinish ? "ready" : "signature");
     if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
-    savedTimerRef.current = setTimeout(() => setSavedNotice(false), 1600);
+    savedTimerRef.current = setTimeout(() => setSavedNotice(null), 4_000);
   };
+
+  useEffect(() => {
+    if (view.kind === "list" && savedNotice === "ready") {
+      finishSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [savedNotice, view.kind]);
 
   const resetStagedSignature = () => {
     signatureRef.current?.clear();
@@ -188,7 +200,7 @@ export default function AhaSigning() {
     resetStagedSignature();
     setAddName("");
     setView({ kind: "list" });
-    showSavedNotice();
+    showSavedNotice(canFinishAha(saved));
   };
 
   const requestBackToList = () => {
@@ -281,7 +293,9 @@ export default function AhaSigning() {
                 className="rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-center text-base font-bold text-success"
                 role="status"
               >
-                ✓ Signature saved
+                {savedNotice === "ready"
+                  ? "✓ All signatures saved — finish today's AHA below"
+                  : "✓ Signature saved"}
               </div>
             ) : null}
 
@@ -380,7 +394,7 @@ export default function AhaSigning() {
               </div>
             ) : null}
 
-            <div className="flex flex-col gap-2.5 pt-2">
+            <div ref={finishSectionRef} className="flex flex-col gap-2.5 pt-2">
               <Button
                 className="min-h-[72px] w-full rounded-[14px] text-xl font-bold tracking-wide"
                 disabled={!finishReady || isCommitting}

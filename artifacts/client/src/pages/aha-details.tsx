@@ -129,7 +129,7 @@ export default function AhaDetails() {
               }
             />
             <fieldset className="flex flex-col gap-2" aria-required="true">
-              <legend className="text-base font-bold">
+              <legend className="mb-2 text-base font-bold">
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span>Is a rescue plan required?</span>
                   <FieldRequirementBadge requirement="required" />

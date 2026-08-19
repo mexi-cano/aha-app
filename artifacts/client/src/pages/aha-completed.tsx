@@ -25,6 +25,8 @@ export default function AhaCompleted() {
   const [isSharing, setIsSharing] = useState(false);
   const [fitIssues, setFitIssues] = useState<PdfFitIssue[]>([]);
   const [shareFailed, setShareFailed] = useState(false);
+  const [downloadStarted, setDownloadStarted] = useState(false);
+  const [shareIsTakingLong, setShareIsTakingLong] = useState(false);
 
   const regenerate = async () => {
     if (isGenerating) return;
@@ -42,9 +44,28 @@ export default function AhaCompleted() {
     if (!pdf?.record || isSharing) return;
     setIsSharing(true);
     setShareFailed(false);
-    const result = await shareOrDownloadPdf(pdf.record);
-    if (result.status === "failed") setShareFailed(true);
-    setIsSharing(false);
+    setDownloadStarted(false);
+    setShareIsTakingLong(false);
+    const takingLongTimer = window.setTimeout(
+      () => setShareIsTakingLong(true),
+      1_500,
+    );
+    try {
+      const result = await shareOrDownloadPdf(pdf.record);
+      if (result.status === "failed") setShareFailed(true);
+      if (result.status === "downloaded") setDownloadStarted(true);
+    } finally {
+      window.clearTimeout(takingLongTimer);
+      setShareIsTakingLong(false);
+      setIsSharing(false);
+    }
+  };
+
+  const downloadStoredPdf = () => {
+    if (!pdf?.record) return;
+    downloadPdf(pdf.record);
+    setShareFailed(false);
+    setDownloadStarted(true);
   };
 
   if (aha.status !== "completed") {
@@ -108,7 +129,16 @@ export default function AhaCompleted() {
           ) : null}
         </section>
 
-        {pdfCurrent && pdf.record ? (
+        {pdf === undefined ? (
+          <section
+            className="rounded-2xl border border-card-border bg-card p-5 text-center"
+            role="status"
+          >
+            <p className="text-base font-semibold text-muted-foreground">
+              Opening the saved PDF…
+            </p>
+          </section>
+        ) : pdfCurrent && pdf.record ? (
           <Button
             className="min-h-[72px] w-full rounded-[14px] text-xl font-bold tracking-wide"
             onClick={() => void navigateSafely(`/ahas/${aha.id}/pdf`)}
@@ -175,6 +205,32 @@ export default function AhaCompleted() {
           <Printer className="mr-2 size-5" aria-hidden="true" />
           {isSharing ? "OPENING…" : "Print / Share"}
         </Button>
+        {downloadStarted ? (
+          <p
+            className="rounded-xl border border-card-border bg-card px-4 py-3 text-center text-sm font-semibold text-muted-foreground"
+            role="status"
+          >
+            Sharing is not available here, so the PDF download was started.
+          </p>
+        ) : null}
+        {isSharing && shareIsTakingLong && pdf?.record ? (
+          <div
+            className="rounded-xl border border-card-border bg-card p-4"
+            role="status"
+          >
+            <p className="text-sm font-semibold text-muted-foreground">
+              If the share window did not open, download the saved PDF instead.
+            </p>
+            <Button
+              variant="outline"
+              className="mt-3 min-h-12 w-full"
+              onClick={downloadStoredPdf}
+            >
+              <Download className="mr-2 size-5" aria-hidden="true" /> Download
+              PDF
+            </Button>
+          </div>
+        ) : null}
         {shareFailed && pdf?.record ? (
           <div
             className="rounded-xl border border-warning/30 bg-warning/10 p-4"
@@ -186,7 +242,7 @@ export default function AhaCompleted() {
             <Button
               variant="outline"
               className="mt-3 min-h-12 w-full"
-              onClick={() => downloadPdf(pdf.record!)}
+              onClick={downloadStoredPdf}
             >
               <Download className="mr-2 size-5" aria-hidden="true" /> Download
               PDF

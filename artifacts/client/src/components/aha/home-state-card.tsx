@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
 import {
+  canFinishAha,
   canStartSigning,
   countSignedCrew,
   getReviewReport,
@@ -69,9 +70,12 @@ export function HomeStateCard({
   if (todayAha.status === "in_progress") {
     const signed = countSignedCrew(todayAha);
     const signingReady = canStartSigning(todayAha);
+    const readyToFinish = canFinishAha(todayAha);
     return (
       <section className="rounded-2xl border border-card-border bg-card px-6 py-9 text-center shadow-sm sm:px-10">
-        <h2 className="text-2xl font-semibold">AHA in progress</h2>
+        <h2 className="text-2xl font-semibold">
+          {readyToFinish ? "AHA ready to finish" : "AHA in progress"}
+        </h2>
         <p className="mt-1 text-lg font-medium text-muted-foreground">
           {signed} of {todayAha.crew.length} signed
         </p>
@@ -80,7 +84,11 @@ export function HomeStateCard({
             className="min-h-[72px] w-full rounded-[14px] text-xl font-bold tracking-wide"
             onClick={onResumeInProgress}
           >
-            {signingReady ? "CONTINUE SIGNING" : "REVIEW CHANGES"}
+            {readyToFinish
+              ? "REVIEW & FINISH"
+              : signingReady
+                ? "CONTINUE SIGNING"
+                : "REVIEW CHANGES"}
           </Button>
           <Button
             variant="outline"
@@ -90,7 +98,11 @@ export function HomeStateCard({
             Open editor
           </Button>
         </div>
-        {!signingReady ? (
+        {readyToFinish ? (
+          <p className="mt-3 text-base font-semibold text-muted-foreground">
+            Review the saved signatures, then create the official PDF.
+          </p>
+        ) : !signingReady ? (
           <p className="mt-3 text-base font-semibold text-warning-foreground">
             Changes need review before signing can continue.
           </p>

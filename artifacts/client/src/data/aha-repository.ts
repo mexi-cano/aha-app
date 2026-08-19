@@ -19,6 +19,7 @@ import {
   type DraftMetadata,
 } from "./draft-metadata";
 import { ensureDevFixture, isDevFixtureId } from "./dev-fixture";
+import { openLocalDataWithRecovery } from "./local-data-initialization";
 import { partitionReadableAhas } from "./stored-records";
 
 export interface HomeSnapshot {
@@ -68,7 +69,7 @@ function dependencies() {
 }
 
 export async function initializeLocalData(today: LocalDate): Promise<void> {
-  await ahaDatabase.open();
+  await openLocalDataWithRecovery(ahaDatabase);
   if (import.meta.env.DEV) {
     await ensureDevFixture(ahaDatabase, today);
   }

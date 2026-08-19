@@ -5,6 +5,7 @@ import { storeAhaPdf } from "@/data/aha-repository";
 
 import type { AhaPdfLayoutPlan, PdfFitIssue } from "./aha-pdf";
 import { PDF_FAILURE_MESSAGE } from "./pdf-constants";
+import { supportsNativeFileShare } from "./share-capability";
 
 export type StoredPdfResult =
   | { status: "stored"; record: AhaPdfRecord }
@@ -72,11 +73,16 @@ export async function shareOrDownloadPdf(
       type: "application/pdf",
     });
     const shareData = { files: [file], title: record.filename };
-    if (
-      typeof navigator.share !== "function" ||
-      typeof navigator.canShare !== "function" ||
-      !navigator.canShare(shareData)
-    ) {
+    const hasShare = typeof navigator.share === "function";
+    let canShareFiles: boolean | null = null;
+    if (typeof navigator.canShare === "function") {
+      try {
+        canShareFiles = navigator.canShare(shareData);
+      } catch {
+        canShareFiles = false;
+      }
+    }
+    if (!supportsNativeFileShare(hasShare, canShareFiles)) {
       downloadPdf(record);
       return { status: "downloaded" };
     }

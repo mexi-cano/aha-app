@@ -47,6 +47,8 @@ export const jobSchema = z.object({
 
 export type Job = z.infer<typeof jobSchema>;
 
+export type JobWorker = z.infer<typeof jobWorkerSchema>;
+
 export const ahaStatusSchema = z.enum(["draft", "in_progress", "completed"]);
 
 export type AhaStatus = z.infer<typeof ahaStatusSchema>;

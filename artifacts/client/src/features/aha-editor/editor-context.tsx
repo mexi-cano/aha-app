@@ -7,7 +7,11 @@ import {
   useState,
 } from "react";
 import { Outlet, useNavigate, useParams } from "react-router";
-import type { Aha, Job } from "@workspace/aha-domain";
+import {
+  applyInProgressEditRules,
+  type Aha,
+  type Job,
+} from "@workspace/aha-domain";
 
 import {
   dismissPrefillBanner,
@@ -21,6 +25,7 @@ import { useOnlineStatus } from "@/hooks/use-online-status";
 import { Button } from "@/components/ui/button";
 
 import { getEditorLoadView, type EditorLoadError } from "./editor-load-state";
+import { createSerializedPersistence } from "./persistence-queue";
 
 export type SaveState = "saved" | "saving" | "error";
 
@@ -36,6 +41,7 @@ interface EditorContextValue {
   saveState: SaveState;
   isOnline: boolean;
   updateAha: (update: (current: Aha) => Aha) => void;
+  commitAha: (update: (current: Aha) => Aha) => Promise<boolean>;
   navigateSafely: (path: string) => Promise<boolean>;
   retrySave: () => Promise<boolean>;
   dismissBanner: () => Promise<void>;
@@ -82,10 +88,14 @@ export function AhaEditorLayout() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<EditorLoadError | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("saved");
+  const [persistSerially] = useState(() =>
+    createSerializedPersistence(persistEditedAha),
+  );
 
   const draftRef = useRef<Aha | null>(null);
   const pendingRef = useRef<Aha | null>(null);
   const savePromiseRef = useRef<Promise<boolean> | null>(null);
+  const criticalSavePromiseRef = useRef<Promise<boolean> | null>(null);
   const loadGenerationRef = useRef(0);
   const failedOperationsRef = useRef(
     new Map<FailedPersistenceOperation["kind"], FailedPersistenceOperation>(),
@@ -163,6 +173,12 @@ export function AhaEditorLayout() {
     };
   }, [load]);
 
+  useEffect(() => {
+    if (snapshot?.aha.status === "completed") {
+      navigate("/", { replace: true });
+    }
+  }, [navigate, snapshot?.aha.status]);
+
   const runSaveQueue = useCallback((): Promise<boolean> => {
     if (savePromiseRef.current) {
       return savePromiseRef.current;
@@ -176,7 +192,7 @@ export function AhaEditorLayout() {
         const pending = pendingRef.current;
         pendingRef.current = null;
         try {
-          const saved = await persistEditedAha(pending);
+          const saved = await persistSerially(pending);
           if (draftRef.current === pending) {
             draftRef.current = saved;
             setSnapshot((current) =>
@@ -203,7 +219,7 @@ export function AhaEditorLayout() {
 
     savePromiseRef.current = savePromise;
     return savePromise;
-  }, [rememberFailure, settleSaveState]);
+  }, [persistSerially, rememberFailure, settleSaveState]);
 
   const flushAhaSaves = useCallback(async () => {
     let attemptedSave = false;
@@ -248,7 +264,8 @@ export function AhaEditorLayout() {
       const current = draftRef.current;
       if (!current) return;
 
-      const next = update(current);
+      const next = applyInProgressEditRules(current, update(current));
+      if (next === current) return;
       draftRef.current = next;
       pendingRef.current = next;
       setSnapshot((value) =>
@@ -264,6 +281,52 @@ export function AhaEditorLayout() {
       void runSaveQueue();
     },
     [runSaveQueue],
+  );
+
+  const commitAha = useCallback(
+    (update: (current: Aha) => Aha): Promise<boolean> => {
+      if (criticalSavePromiseRef.current) {
+        return criticalSavePromiseRef.current;
+      }
+
+      const promise = (async () => {
+        if (!(await flushSaves())) return false;
+        const current = draftRef.current;
+        if (!current) return false;
+
+        setSaveState("saving");
+        try {
+          const next = applyInProgressEditRules(current, update(current));
+          const saved = await persistSerially(next);
+          if (draftRef.current !== current) {
+            return false;
+          }
+          draftRef.current = saved;
+          pendingRef.current = null;
+          failedOperationsRef.current.delete("autosave");
+          setSnapshot((value) =>
+            value
+              ? {
+                  ...value,
+                  aha: saved,
+                  metadata: { ...value.metadata, hasUserEdits: true },
+                }
+              : value,
+          );
+          settleSaveState();
+          return true;
+        } catch {
+          setSaveState("error");
+          return false;
+        }
+      })().finally(() => {
+        criticalSavePromiseRef.current = null;
+      });
+
+      criticalSavePromiseRef.current = promise;
+      return promise;
+    },
+    [flushSaves, persistSerially, settleSaveState],
   );
 
   const retrySave = useCallback(async () => {
@@ -434,6 +497,7 @@ export function AhaEditorLayout() {
     saveState,
     isOnline,
     updateAha,
+    commitAha,
     navigateSafely,
     retrySave,
     dismissBanner,

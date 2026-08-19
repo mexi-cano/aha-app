@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Check } from "lucide-react";
 import { useNavigate } from "react-router";
-import type { Aha } from "@workspace/aha-domain";
+import { canStartSigning, type Aha } from "@workspace/aha-domain";
 
 import { AppLogo } from "@/components/aha/app-logo";
 import { HomeStateCard } from "@/components/aha/home-state-card";
@@ -161,6 +161,14 @@ export default function Home() {
           onOpenEditor={() =>
             snapshot.todayAha && openEditor(snapshot.todayAha.id)
           }
+          onResumeInProgress={() => {
+            if (!snapshot.todayAha) return;
+            navigate(
+              canStartSigning(snapshot.todayAha)
+                ? `/ahas/${snapshot.todayAha.id}/sign`
+                : `/ahas/${snapshot.todayAha.id}/review`,
+            );
+          }}
         />
       </div>
     </main>

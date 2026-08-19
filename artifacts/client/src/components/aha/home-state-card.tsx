@@ -2,27 +2,35 @@ import { Check } from "lucide-react";
 import {
   canStartSigning,
   countSignedCrew,
+  getReviewReport,
   type Aha,
 } from "@workspace/aha-domain";
 
 import { Button } from "@/components/ui/button";
+import type { AhaPdfStatus } from "@/data/aha-repository";
 
 interface HomeStateCardProps {
   todayAha: Aha | null;
+  todayPdfStatus: AhaPdfStatus | null;
   hasRecentAha: boolean;
   isStarting: boolean;
   onStart: () => void;
   onOpenEditor: () => void;
   onResumeInProgress: () => void;
+  onViewCompleted: () => void;
+  onUpdateCompleted: () => void;
 }
 
 export function HomeStateCard({
   todayAha,
+  todayPdfStatus,
   hasRecentAha,
   isStarting,
   onStart,
   onOpenEditor,
   onResumeInProgress,
+  onViewCompleted,
+  onUpdateCompleted,
 }: HomeStateCardProps) {
   if (!todayAha) {
     return (
@@ -102,8 +110,29 @@ export function HomeStateCard({
         />
       </h2>
       <p className="mt-3 text-base font-medium text-muted-foreground">
-        The completed AHA is saved on this iPad.
+        {todayPdfStatus === "current"
+          ? "The completed AHA and current PDF are saved on this iPad."
+          : "The AHA is saved. Its current PDF still needs to be created."}
       </p>
+      <div className="mt-7 flex flex-col gap-3">
+        <Button
+          className="min-h-[72px] w-full rounded-[14px] text-xl font-bold tracking-wide"
+          onClick={onViewCompleted}
+        >
+          {todayPdfStatus === "current"
+            ? "VIEW AHA"
+            : getReviewReport(todayAha).canStartSigning
+              ? "FINISH PDF"
+              : "FINISH UPDATE"}
+        </Button>
+        <Button
+          variant="outline"
+          className="min-h-14 w-full border-[#C6CDE8] text-[17px] text-primary"
+          onClick={onUpdateCompleted}
+        >
+          Update today's AHA
+        </Button>
+      </div>
     </section>
   );
 }

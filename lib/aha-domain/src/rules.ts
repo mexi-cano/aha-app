@@ -112,6 +112,7 @@ export function createBlankAha(
       signaturePng: null,
       signedAt: null,
     })),
+    documentRevision: 0,
     completedAt: null,
     updatedAfterCompletionAt: [],
     sync: {
@@ -165,6 +166,7 @@ export function copyAhaForNewDay(
       signaturePng: null,
       signedAt: null,
     })),
+    documentRevision: 0,
     completedAt: null,
     updatedAfterCompletionAt: [],
     sync: {

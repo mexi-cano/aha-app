@@ -4,8 +4,10 @@ import test from "node:test";
 import {
   ENERGY_CATEGORIES,
   addCrewMember,
+  addLateSignedCrewMember,
   addSignedCrewMember,
   applyInProgressEditRules,
+  applyAhaMutationRules,
   beginSigning,
   canFinishAha,
   canStartSigning,
@@ -63,6 +65,23 @@ function reviewReadyAha(): Aha {
     description: "Excavate and install conduit.",
     safetyCheck: "yes",
   };
+}
+
+function completedAha(): Aha {
+  let aha = beginSigning(reviewReadyAha());
+  aha = recordSignature(
+    aha,
+    "worker-1",
+    png,
+    new Date("2026-08-18T12:30:00.000Z"),
+  );
+  aha = recordSignature(
+    aha,
+    "worker-2",
+    png,
+    new Date("2026-08-18T12:31:00.000Z"),
+  );
+  return completeAha(aha, new Date("2026-08-18T13:00:00.000Z"));
 }
 
 test("energy toggles preserve canonical category and example order", () => {
@@ -256,6 +275,84 @@ test("mid-signing safety-sensitive edits clear only the safety answer", () => {
     toggleEnergyCategory(signed, ENERGY_CATEGORIES[0].category),
   );
   assert.equal(changedEnergy.safetyCheck, null);
+});
+
+test("document revision changes only with PDF-visible source data", () => {
+  const current = reviewReadyAha();
+  const statusOnly = applyAhaMutationRules(current, {
+    ...current,
+    status: "in_progress",
+  });
+  assert.equal(statusOnly.documentRevision, current.documentRevision);
+
+  const changedNotes = applyAhaMutationRules(current, {
+    ...current,
+    meetingNotes: "New meeting note",
+  });
+  assert.equal(changedNotes.documentRevision, current.documentRevision + 1);
+
+  const timestampOnly = applyAhaMutationRules(current, {
+    ...current,
+    updatedAfterCompletionAt: ["2026-08-18T15:00:00.000Z"],
+  });
+  assert.equal(timestampOnly.documentRevision, current.documentRevision);
+});
+
+test("completed updates group timestamps, reset only the safety gate, and retain signatures", () => {
+  const completed = completedAha();
+  const firstUpdateAt = new Date("2026-08-18T14:00:00.000Z");
+  const changedDescription = applyAhaMutationRules(
+    completed,
+    { ...completed, description: "Changed completed work" },
+    { recordCompletedUpdateAt: firstUpdateAt },
+  );
+  assert.equal(changedDescription.safetyCheck, null);
+  assert.deepEqual(
+    changedDescription.crew.map(({ signaturePng }) => signaturePng),
+    completed.crew.map(({ signaturePng }) => signaturePng),
+  );
+  assert.deepEqual(changedDescription.updatedAfterCompletionAt, [
+    firstUpdateAt.toISOString(),
+  ]);
+
+  const notesChange = applyAhaMutationRules(changedDescription, {
+    ...changedDescription,
+    meetingNotes: "Updated notes",
+  });
+  assert.equal(notesChange.safetyCheck, null);
+  assert.deepEqual(notesChange.updatedAfterCompletionAt, [
+    firstUpdateAt.toISOString(),
+  ]);
+
+  const newGate = applyAhaMutationRules(notesChange, {
+    ...notesChange,
+    safetyCheck: "yes",
+  });
+  const headerChange = applyAhaMutationRules(newGate, {
+    ...newGate,
+    header: { ...newGate.header, location: "Updated location" },
+  });
+  assert.equal(headerChange.safetyCheck, "yes");
+});
+
+test("late worker signing preserves completion and does not create an Updated chip timestamp", () => {
+  const completed = completedAha();
+  const late = applyAhaMutationRules(
+    completed,
+    addLateSignedCrewMember(
+      completed,
+      { id: "worker-late", name: "Late Worker" },
+      replacementPng,
+      new Date("2026-08-18T14:15:00.000Z"),
+    ),
+    { recordCompletedUpdateAt: new Date("2026-08-18T14:15:00.000Z") },
+  );
+  assert.equal(late.completedAt, completed.completedAt);
+  assert.equal(late.safetyCheck, completed.safetyCheck);
+  assert.deepEqual(late.updatedAfterCompletionAt, []);
+  assert.equal(late.documentRevision, completed.documentRevision + 1);
+  assert.equal(late.crew.length, completed.crew.length + 1);
+  assert.deepEqual(late.crew.slice(0, completed.crew.length), completed.crew);
 });
 
 test("crew mutations are AHA-local, trim names, and clear renamed signatures", () => {

@@ -15,7 +15,8 @@ import { cn } from "@/lib/utils";
 import { scrollToAndFocus } from "@/features/aha-editor/editor-navigation";
 
 export default function AhaDetails() {
-  const { aha, updateAha, navigateSafely } = useAhaEditor();
+  const { aha, updateAha, navigateSafely, editorBasePath, editorMode } =
+    useAhaEditor();
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
@@ -49,7 +50,7 @@ export default function AhaDetails() {
   return (
     <EditorShell>
       <div className="flex flex-col gap-5">
-        <PrefillBanner />
+        {editorMode === "initial" ? <PrefillBanner /> : null}
         <header>
           <h1 className="text-[28px] font-bold">Details</h1>
           <p className="mt-1 text-base font-medium text-muted-foreground">
@@ -183,7 +184,7 @@ export default function AhaDetails() {
 
         <EditorContinue
           next="2 Work"
-          onContinue={() => void navigateSafely(`/ahas/${aha.id}/work`)}
+          onContinue={() => void navigateSafely(`${editorBasePath}/work`)}
         />
       </div>
     </EditorShell>

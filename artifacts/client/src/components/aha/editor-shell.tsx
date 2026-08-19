@@ -12,26 +12,31 @@ import { formatEditorDate } from "@/lib/date-format";
 import { cn } from "@/lib/utils";
 
 export function EditorShell({ children }: { children: ReactNode }) {
-  const { aha, job, navigateSafely } = useAhaEditor();
+  const { aha, job, navigateSafely, editorMode, editorBasePath } =
+    useAhaEditor();
   const location = useLocation();
   const activeStep =
     ["details", "work", "energy", "review"].find((step) =>
       location.pathname.endsWith(`/${step}`),
     ) ?? "details";
-  const basePath = `/ahas/${aha.id}`;
+  const basePath = editorBasePath;
   const readiness = getEditorSectionReadiness(aha);
   const steps = [
     { id: "details", number: 1, label: "Details", ready: readiness.details },
     { id: "work", number: 2, label: "Work", ready: readiness.work },
     { id: "energy", number: 3, label: "Energy", ready: readiness.energy },
     { id: "review", number: 4, label: "Review", ready: readiness.review },
-    {
-      id: "sign",
-      number: 5,
-      label: "Sign",
-      ready: false,
-      disabled: aha.status === "draft" || !canStartSigning(aha),
-    },
+    ...(editorMode === "initial"
+      ? [
+          {
+            id: "sign",
+            number: 5,
+            label: "Sign",
+            ready: false,
+            disabled: aha.status === "draft" || !canStartSigning(aha),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -97,6 +102,12 @@ export function EditorShell({ children }: { children: ReactNode }) {
             })}
           </div>
         </nav>
+        {editorMode === "completed_update" ? (
+          <p className="border-t border-border bg-secondary px-4 py-2.5 text-center text-sm font-semibold text-secondary-foreground">
+            Update mode — existing signatures remain saved. Safety-sensitive
+            changes must pass the safety check again.
+          </p>
+        ) : null}
       </header>
       <div className="mx-auto max-w-[748px] px-5 py-5 sm:px-6 sm:py-7">
         {children}

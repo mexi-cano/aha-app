@@ -43,6 +43,11 @@ import {
   formatLongDate,
   formatTime,
 } from "@/lib/date-format";
+import {
+  analyzeAhaPdfFit,
+  generateAndStoreAhaPdf,
+  type PdfFitIssue,
+} from "@/pdf";
 
 type SigningOrigin =
   { kind: "list" } | { kind: "member"; workerId: string } | { kind: "add" };
@@ -65,6 +70,7 @@ export default function AhaSigning() {
   const [exitAsk, setExitAsk] = useState(false);
   const [discardAsk, setDiscardAsk] = useState(false);
   const [limitMessage, setLimitMessage] = useState(false);
+  const [fitIssues, setFitIssues] = useState<PdfFitIssue[]>([]);
   const signatureRef = useRef<SignatureCanvasHandle>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -90,7 +96,7 @@ export default function AhaSigning() {
 
   useEffect(() => {
     if (aha.status === "completed") {
-      void navigateSafely("/");
+      void navigateSafely(`/ahas/${aha.id}/completed`);
     } else if (aha.status !== "in_progress" || !canStartSigning(aha)) {
       void navigateSafely(`/ahas/${aha.id}/review`);
     }
@@ -199,13 +205,31 @@ export default function AhaSigning() {
     if (!finishReady || isCommitting) return;
     setIsCommitting(true);
     setOperationError(null);
+    setFitIssues([]);
+    let fit;
+    try {
+      fit = await analyzeAhaPdfFit(aha, job);
+    } catch {
+      setOperationError(
+        "We couldn't check the official PDF. Your AHA and signatures are still saved. Try again.",
+      );
+      setIsCommitting(false);
+      return;
+    }
+    if (fit.issues.length > 0) {
+      setFitIssues(fit.issues);
+      setIsCommitting(false);
+      return;
+    }
     const saved = await commitAha((current) =>
       completeAha(current, new Date()),
     );
-    setIsCommitting(false);
     if (saved) {
-      await navigateSafely("/");
+      await generateAndStoreAhaPdf(saved, job);
+      setIsCommitting(false);
+      await navigateSafely(`/ahas/${aha.id}/completed`);
     } else {
+      setIsCommitting(false);
       setOperationError(
         "We couldn't finish today's AHA. Your AHA and signatures are still saved. Try again.",
       );
@@ -337,6 +361,23 @@ export default function AhaSigning() {
               >
                 {operationError}
               </p>
+            ) : null}
+            {fitIssues.length > 0 ? (
+              <div
+                className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-warning-foreground"
+                role="alert"
+              >
+                <p className="font-bold">
+                  The official PDF needs shorter content before completion:
+                </p>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm font-semibold">
+                  {fitIssues.map((issue) => (
+                    <li key={`${issue.fieldPath}-${issue.code}`}>
+                      {issue.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
 
             <div className="flex flex-col gap-2.5 pt-2">

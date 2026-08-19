@@ -20,7 +20,7 @@ import { scrollToAndFocus } from "@/features/aha-editor/editor-navigation";
 import { cn } from "@/lib/utils";
 
 export default function AhaEnergy() {
-  const { aha, updateAha, navigateSafely } = useAhaEditor();
+  const { aha, updateAha, navigateSafely, editorBasePath } = useAhaEditor();
   const [expanded, setExpanded] = useState<EnergyCategoryName | null>(null);
   const [searchParams] = useSearchParams();
 
@@ -244,7 +244,7 @@ export default function AhaEnergy() {
 
         <EditorContinue
           next="4 Review"
-          onContinue={() => void navigateSafely(`/ahas/${aha.id}/review`)}
+          onContinue={() => void navigateSafely(`${editorBasePath}/review`)}
         />
       </div>
     </EditorShell>

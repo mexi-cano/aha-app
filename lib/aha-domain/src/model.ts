@@ -166,6 +166,7 @@ export const ahaSchema = z
       .max(ENERGY_CATEGORIES.length),
     safetyCheck: z.enum(["yes", "no"]).nullable(),
     crew: z.array(ahaCrewMemberSchema).max(MAX_CREW_MEMBERS),
+    documentRevision: z.number().int().nonnegative().default(0),
     completedAt: z.string().datetime().nullable(),
     updatedAfterCompletionAt: z.array(z.string().datetime()),
     sync: z.object({

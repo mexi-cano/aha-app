@@ -28,7 +28,7 @@ import { scrollToAndFocus } from "@/features/aha-editor/editor-navigation";
 import { taskNeedsDetails } from "@/features/aha-editor/review-presentation";
 
 export default function AhaWork() {
-  const { aha, updateAha, navigateSafely } = useAhaEditor();
+  const { aha, updateAha, navigateSafely, editorBasePath } = useAhaEditor();
   const [searchParams] = useSearchParams();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -269,7 +269,7 @@ export default function AhaWork() {
 
         <EditorContinue
           next="3 Energy"
-          onContinue={() => void navigateSafely(`/ahas/${aha.id}/energy`)}
+          onContinue={() => void navigateSafely(`${editorBasePath}/energy`)}
         />
       </div>
 

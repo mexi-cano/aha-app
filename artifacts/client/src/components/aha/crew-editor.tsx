@@ -39,7 +39,7 @@ interface CrewEditorProps {
   aha: Aha;
   job: Job;
   updateAha: (update: (current: Aha) => Aha) => void;
-  commitAha: (update: (current: Aha) => Aha) => Promise<boolean>;
+  commitAha: (update: (current: Aha) => Aha) => Promise<Aha | null>;
   focusCrew?: boolean;
   disabled?: boolean;
 }

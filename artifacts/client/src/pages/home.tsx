@@ -2,7 +2,11 @@ import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Check } from "lucide-react";
 import { useNavigate } from "react-router";
-import { canStartSigning, type Aha } from "@workspace/aha-domain";
+import {
+  canStartSigning,
+  getReviewReport,
+  type Aha,
+} from "@workspace/aha-domain";
 
 import { AppLogo } from "@/components/aha/app-logo";
 import { HomeStateCard } from "@/components/aha/home-state-card";
@@ -155,6 +159,7 @@ export default function Home() {
 
         <HomeStateCard
           todayAha={snapshot.todayAha}
+          todayPdfStatus={snapshot.todayPdfStatus}
           hasRecentAha={snapshot.recentAhas.length > 0}
           isStarting={isStarting}
           onStart={() => void handleStart()}
@@ -168,6 +173,20 @@ export default function Home() {
                 ? `/ahas/${snapshot.todayAha.id}/sign`
                 : `/ahas/${snapshot.todayAha.id}/review`,
             );
+          }}
+          onViewCompleted={() => {
+            if (!snapshot.todayAha) return;
+            navigate(
+              snapshot.todayPdfStatus === "current"
+                ? `/ahas/${snapshot.todayAha.id}/pdf`
+                : !getReviewReport(snapshot.todayAha).canStartSigning
+                  ? `/ahas/${snapshot.todayAha.id}/update/review`
+                  : `/ahas/${snapshot.todayAha.id}/completed`,
+            );
+          }}
+          onUpdateCompleted={() => {
+            if (!snapshot.todayAha) return;
+            navigate(`/ahas/${snapshot.todayAha.id}/update/details`);
           }}
         />
       </div>

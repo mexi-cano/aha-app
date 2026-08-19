@@ -40,6 +40,15 @@ export default defineConfig({
     runtimeErrorOverlay(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        // The official energy-wheel PNG and lazily loaded PDF renderer must be
+        // available before a crew goes offline for the day.
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,ttf}'],
+        // Manifest icons are added by vite-plugin-pwa, so exclude their public
+        // copies from the glob to keep each precache URL unique.
+        globIgnores: ['pwa-192.png', 'pwa-512.png'],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+      },
       manifest: {
         name: 'ITS AHA',
         short_name: 'AHA',
@@ -58,7 +67,6 @@ export default defineConfig({
           },
         ],
       },
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
     }),
     ...(process.env.NODE_ENV !== 'production' &&
     process.env.REPL_ID !== undefined

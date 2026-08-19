@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { createLocalId } from "@/data/aha-repository";
+import { getForemanWorkerId } from "@/features/aha-editor/crew-presentation";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import {
   formatEditorDate,
@@ -82,6 +83,10 @@ export default function AhaSigning() {
   const finishReady = useMemo(() => canFinishAha(aha), [aha]);
   const hasStagedEntry =
     hasInk || (view.kind === "add" && addName.trim().length > 0);
+  const foremanWorkerId = getForemanWorkerId(
+    aha.crew,
+    aha.header.personInCharge,
+  );
 
   useEffect(() => {
     if (aha.status === "completed") {
@@ -267,7 +272,7 @@ export default function AhaSigning() {
             </Button>
 
             <div className="flex flex-col gap-2.5 pt-1">
-              {aha.crew.map((member, index) => {
+              {aha.crew.map((member) => {
                 const signed = Boolean(member.signaturePng && member.signedAt);
                 return (
                   <button
@@ -287,12 +292,7 @@ export default function AhaSigning() {
                   >
                     <span className="min-w-0 flex-1 text-lg font-semibold">
                       {member.name}
-                      {index ===
-                      aha.crew.findIndex(
-                        ({ name }) =>
-                          name.trim().toLocaleLowerCase() ===
-                          aha.header.personInCharge.trim().toLocaleLowerCase(),
-                      ) ? (
+                      {member.workerId === foremanWorkerId ? (
                         <span className="ml-2 rounded-md bg-secondary px-2 py-0.5 align-middle text-xs font-bold text-primary">
                           FOREMAN
                         </span>

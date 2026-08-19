@@ -85,7 +85,10 @@ test("energy toggles preserve canonical category and example order", () => {
 
   aha = toggleEnergyCategory(aha, "Gravity");
   assert.deepEqual(aha.energySelections, [{ category: "Sound", examples: [] }]);
-  assert.throws(() => toggleEnergyExample(aha, "Sound", "Made up"));
+  assert.throws(
+    () => toggleEnergyExample(aha, "Sound", "Made up"),
+    /Non-canonical Sound example/,
+  );
 });
 
 test("Review reports every blocker and optional warning without inventing counts", () => {
@@ -271,7 +274,7 @@ test("crew mutations are AHA-local, trim names, and clear renamed signatures", (
     png,
     new Date("2026-08-18T12:30:00.000Z"),
   );
-  const renamed = renameCrewMember(signed, "worker-3", "Samuel Patel");
+  const renamed = renameCrewMember(signed, "worker-3", "  Samuel Patel  ");
   assert.equal(renamed.crew[2]?.name, "Samuel Patel");
   assert.equal(renamed.crew[2]?.signaturePng, null);
   assert.equal(renamed.crew[2]?.signedAt, null);
@@ -292,8 +295,9 @@ test("the eleventh crew member is rejected without changing the AHA", () => {
       name: `Worker ${index}`,
     });
   }
-  assert.throws(() =>
-    addCrewMember(aha, { id: "worker-11", name: "Worker 11" }),
+  assert.throws(
+    () => addCrewMember(aha, { id: "worker-11", name: "Worker 11" }),
+    /already has 10 signature slots/,
   );
   assert.equal(aha.crew.length, 10);
 });
@@ -302,7 +306,10 @@ test("signing and completion transitions revalidate every invariant", () => {
   let aha = beginSigning(reviewReadyAha());
   assert.equal(aha.status, "in_progress");
   assert.equal(canFinishAha(aha), false);
-  assert.throws(() => completeAha(aha, new Date()));
+  assert.throws(
+    () => completeAha(aha, new Date()),
+    /Every crew member must sign/,
+  );
 
   aha = recordSignature(
     aha,
@@ -321,14 +328,20 @@ test("signing and completion transitions revalidate every invariant", () => {
   const completed = completeAha(aha, new Date("2026-08-18T13:00:00.000Z"));
   assert.equal(completed.status, "completed");
   assert.equal(completed.completedAt, "2026-08-18T13:00:00.000Z");
-  assert.throws(() => beginSigning(completed));
+  assert.throws(
+    () => beginSigning(completed),
+    /completed AHA cannot enter signing mode/,
+  );
   assert.equal(canStartSigning(completed), false);
   assert.equal(canFinishAha({ ...completed, status: "draft" }), false);
 });
 
 test("signature recording requires active, still-valid signing mode", () => {
   const draft = reviewReadyAha();
-  assert.throws(() => recordSignature(draft, "worker-1", png, new Date()));
+  assert.throws(
+    () => recordSignature(draft, "worker-1", png, new Date()),
+    /Signing mode must be active/,
+  );
 
   const started = beginSigning(draft);
   const invalidated = applyInProgressEditRules(started, {
@@ -336,10 +349,14 @@ test("signature recording requires active, still-valid signing mode", () => {
     description: "Changed after signing started",
   });
   assert.equal(invalidated.safetyCheck, null);
-  assert.throws(() =>
-    recordSignature(invalidated, "worker-1", png, new Date()),
+  assert.throws(
+    () => recordSignature(invalidated, "worker-1", png, new Date()),
+    /Review items must be fixed before recording/,
   );
-  assert.throws(() => completeAha(invalidated, new Date()));
+  assert.throws(
+    () => completeAha(invalidated, new Date()),
+    /Every crew member must sign/,
+  );
 });
 
 test("re-signing replaces only the selected worker's image and timestamp", () => {
@@ -361,30 +378,66 @@ test("re-signing replaces only the selected worker's image and timestamp", () =>
   assert.equal(replaced.crew[0]?.signaturePng, replacementPng);
   assert.equal(replaced.crew[0]?.signedAt, "2026-08-18T12:45:00.000Z");
   assert.equal(replaced.crew[1], aha.crew[1]);
-  assert.throws(() =>
-    recordSignature(aha, "worker-1", "data:image/png;base64,", new Date()),
+  assert.throws(
+    () =>
+      recordSignature(aha, "worker-1", "data:image/png;base64,", new Date()),
+    /PNG signature is required/,
   );
 });
 
 test("adding a worker and signature is atomic at the domain boundary", () => {
   const started = beginSigning(reviewReadyAha());
-  assert.throws(() =>
-    addSignedCrewMember(
-      started,
-      { id: "worker-3", name: "Sam Patel" },
-      "not-a-png",
-      new Date(),
-    ),
+  assert.throws(
+    () =>
+      addSignedCrewMember(
+        started,
+        { id: "worker-3", name: "Sam Patel" },
+        "not-a-png",
+        new Date(),
+      ),
+    /PNG signature is required/,
   );
   assert.equal(started.crew.length, 2);
 
   const added = addSignedCrewMember(
     started,
-    { id: "worker-3", name: "Sam Patel" },
+    { id: "worker-3", name: "  Sam Patel  " },
     png,
     new Date("2026-08-18T12:45:00.000Z"),
   );
   assert.equal(added.crew.length, 3);
+  assert.equal(added.crew[2]?.name, "Sam Patel");
   assert.equal(added.crew[2]?.signaturePng, png);
   assert.equal(added.crew[2]?.signedAt, "2026-08-18T12:45:00.000Z");
+});
+
+test("completed AHAs reject every crew mutation without changing data", () => {
+  let signed = beginSigning(reviewReadyAha());
+  signed = recordSignature(
+    signed,
+    "worker-1",
+    png,
+    new Date("2026-08-18T12:30:00.000Z"),
+  );
+  signed = recordSignature(
+    signed,
+    "worker-2",
+    png,
+    new Date("2026-08-18T12:31:00.000Z"),
+  );
+  const completed = completeAha(signed, new Date("2026-08-18T13:00:00.000Z"));
+
+  assert.throws(
+    () => addCrewMember(completed, { id: "worker-3", name: "Sam Patel" }),
+    /completed AHA cannot change its crew/,
+  );
+  assert.throws(
+    () => removeCrewMember(completed, "worker-1"),
+    /completed AHA cannot change its crew/,
+  );
+  assert.throws(
+    () => renameCrewMember(completed, "worker-1", "New name"),
+    /completed AHA cannot change its crew/,
+  );
+  assert.deepEqual(completed.crew, signed.crew);
 });

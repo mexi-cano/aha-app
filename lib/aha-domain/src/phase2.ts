@@ -407,7 +407,14 @@ function normalizedWorker(member: JobWorker): AhaCrewMember {
   };
 }
 
+function assertCrewEditable(aha: Aha): void {
+  if (aha.status === "completed") {
+    throw new Error("A completed AHA cannot change its crew");
+  }
+}
+
 export function addCrewMember(aha: Aha, worker: JobWorker): Aha {
+  assertCrewEditable(aha);
   if (aha.crew.some((member) => member.workerId === worker.id)) return aha;
   if (aha.crew.length >= MAX_CREW_MEMBERS) {
     throw new Error("This AHA already has 10 signature slots");
@@ -416,6 +423,7 @@ export function addCrewMember(aha: Aha, worker: JobWorker): Aha {
 }
 
 export function removeCrewMember(aha: Aha, workerId: string): Aha {
+  assertCrewEditable(aha);
   if (!aha.crew.some((member) => member.workerId === workerId)) {
     throw new Error("Crew member was not found");
   }
@@ -430,6 +438,7 @@ export function renameCrewMember(
   workerId: string,
   name: string,
 ): Aha {
+  assertCrewEditable(aha);
   const normalizedName = name.trim();
   if (!normalizedName) throw new Error("Worker name is required");
   if (!aha.crew.some((member) => member.workerId === workerId)) {

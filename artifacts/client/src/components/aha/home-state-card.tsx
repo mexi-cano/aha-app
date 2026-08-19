@@ -13,7 +13,7 @@ interface HomeStateCardProps {
   isStarting: boolean;
   onStart: () => void;
   onOpenEditor: () => void;
-  onContinueSigning: () => void;
+  onResumeInProgress: () => void;
 }
 
 export function HomeStateCard({
@@ -22,7 +22,7 @@ export function HomeStateCard({
   isStarting,
   onStart,
   onOpenEditor,
-  onContinueSigning,
+  onResumeInProgress,
 }: HomeStateCardProps) {
   if (!todayAha) {
     return (
@@ -60,6 +60,7 @@ export function HomeStateCard({
 
   if (todayAha.status === "in_progress") {
     const signed = countSignedCrew(todayAha);
+    const signingReady = canStartSigning(todayAha);
     return (
       <section className="rounded-2xl border border-card-border bg-card px-6 py-9 text-center shadow-sm sm:px-10">
         <h2 className="text-2xl font-semibold">AHA in progress</h2>
@@ -69,9 +70,9 @@ export function HomeStateCard({
         <div className="mt-7 flex flex-col gap-3">
           <Button
             className="min-h-[72px] w-full rounded-[14px] text-xl font-bold tracking-wide"
-            onClick={onContinueSigning}
+            onClick={onResumeInProgress}
           >
-            CONTINUE SIGNING
+            {signingReady ? "CONTINUE SIGNING" : "REVIEW CHANGES"}
           </Button>
           <Button
             variant="outline"
@@ -81,7 +82,7 @@ export function HomeStateCard({
             Open editor
           </Button>
         </div>
-        {!canStartSigning(todayAha) ? (
+        {!signingReady ? (
           <p className="mt-3 text-base font-semibold text-warning-foreground">
             Changes need review before signing can continue.
           </p>

@@ -32,11 +32,13 @@ export const SignatureCanvas = forwardRef<
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const padRef = useRef<SignaturePad | null>(null);
   const dimensionsRef = useRef({ width: 0, height: 0 });
+  const onInkChangeRef = useRef(onInkChange);
   const [hasInk, setHasInk] = useState(false);
+  onInkChangeRef.current = onInkChange;
 
   const updateInkState = (value: boolean) => {
     setHasInk(value);
-    onInkChange?.(value);
+    onInkChangeRef.current?.(value);
   };
 
   useLayoutEffect(() => {
@@ -141,8 +143,14 @@ export const SignatureCanvas = forwardRef<
           Sign here with your finger
         </span>
       ) : null}
-      <span className="pointer-events-none absolute bottom-11 left-8 right-8 border-b border-[#C6CDE8]" />
-      <span className="pointer-events-none absolute bottom-12 left-8 text-xl text-[#8A93AC]">
+      <span
+        className="pointer-events-none absolute bottom-11 left-8 right-8 border-b border-[#C6CDE8]"
+        aria-hidden="true"
+      />
+      <span
+        className="pointer-events-none absolute bottom-12 left-8 text-xl text-[#8A93AC]"
+        aria-hidden="true"
+      >
         ✕
       </span>
     </div>

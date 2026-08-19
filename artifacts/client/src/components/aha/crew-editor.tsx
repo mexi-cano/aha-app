@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { createLocalId } from "@/data/aha-repository";
+import { getForemanWorkerId } from "@/features/aha-editor/crew-presentation";
 import { scrollToAndFocus } from "@/features/aha-editor/editor-navigation";
 import { cn } from "@/lib/utils";
 
@@ -78,6 +79,10 @@ export function CrewEditor({
     ({ workerId }) => workerId === pendingRemovalId,
   );
   const renameMember = aha.crew.find(({ workerId }) => workerId === renameId);
+  const foremanWorkerId = getForemanWorkerId(
+    aha.crew,
+    aha.header.personInCharge,
+  );
 
   useEffect(() => {
     if (focusCrew) setEditing(true);
@@ -196,18 +201,13 @@ export function CrewEditor({
           </Button>
         </div>
         <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
-          {aha.crew.map((member, index) => (
+          {aha.crew.map((member) => (
             <div
               key={member.workerId}
               className="flex min-h-10 items-center gap-2 text-base font-medium"
             >
               {member.name}
-              {index ===
-              aha.crew.findIndex(
-                ({ name }) =>
-                  name.trim().toLocaleLowerCase() ===
-                  aha.header.personInCharge.trim().toLocaleLowerCase(),
-              ) ? (
+              {member.workerId === foremanWorkerId ? (
                 <span className="rounded-md bg-secondary px-2 py-0.5 text-xs font-bold text-primary">
                   FOREMAN
                 </span>

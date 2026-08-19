@@ -25,6 +25,7 @@ import { useOnlineStatus } from "@/hooks/use-online-status";
 import { Button } from "@/components/ui/button";
 
 import { getEditorLoadView, type EditorLoadError } from "./editor-load-state";
+import { createSerializedPersistence } from "./persistence-queue";
 
 export type SaveState = "saved" | "saving" | "error";
 
@@ -87,6 +88,9 @@ export function AhaEditorLayout() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<EditorLoadError | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("saved");
+  const [persistSerially] = useState(() =>
+    createSerializedPersistence(persistEditedAha),
+  );
 
   const draftRef = useRef<Aha | null>(null);
   const pendingRef = useRef<Aha | null>(null);
@@ -188,7 +192,7 @@ export function AhaEditorLayout() {
         const pending = pendingRef.current;
         pendingRef.current = null;
         try {
-          const saved = await persistEditedAha(pending);
+          const saved = await persistSerially(pending);
           if (draftRef.current === pending) {
             draftRef.current = saved;
             setSnapshot((current) =>
@@ -215,7 +219,7 @@ export function AhaEditorLayout() {
 
     savePromiseRef.current = savePromise;
     return savePromise;
-  }, [rememberFailure, settleSaveState]);
+  }, [persistSerially, rememberFailure, settleSaveState]);
 
   const flushAhaSaves = useCallback(async () => {
     let attemptedSave = false;
@@ -293,7 +297,10 @@ export function AhaEditorLayout() {
         setSaveState("saving");
         try {
           const next = applyInProgressEditRules(current, update(current));
-          const saved = await persistEditedAha(next);
+          const saved = await persistSerially(next);
+          if (draftRef.current !== current) {
+            return false;
+          }
           draftRef.current = saved;
           pendingRef.current = null;
           failedOperationsRef.current.delete("autosave");
@@ -319,7 +326,7 @@ export function AhaEditorLayout() {
       criticalSavePromiseRef.current = promise;
       return promise;
     },
-    [flushSaves, settleSaveState],
+    [flushSaves, persistSerially, settleSaveState],
   );
 
   const retrySave = useCallback(async () => {

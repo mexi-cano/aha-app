@@ -161,7 +161,7 @@ export default function Home() {
           onOpenEditor={() =>
             snapshot.todayAha && openEditor(snapshot.todayAha.id)
           }
-          onContinueSigning={() => {
+          onResumeInProgress={() => {
             if (!snapshot.todayAha) return;
             navigate(
               canStartSigning(snapshot.todayAha)

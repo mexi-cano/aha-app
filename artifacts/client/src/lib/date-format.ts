@@ -27,3 +27,10 @@ export function formatEditorDate(value: LocalDate): string {
     day: "numeric",
   }).format(dateFromLocalDate(value));
 }
+
+export function formatTime(value: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}

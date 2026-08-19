@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router";
 import { MAX_TASKS, canAddTask, createEmptyTask } from "@workspace/aha-domain";
 
 import {
@@ -17,9 +18,11 @@ import { PrefillBanner } from "@/components/aha/prefill-banner";
 import { Button } from "@/components/ui/button";
 import { createLocalId } from "@/data/aha-repository";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
+import { scrollToAndFocus } from "@/features/aha-editor/editor-navigation";
 
 export default function AhaWork() {
-  const { aha, updateAha } = useAhaEditor();
+  const { aha, updateAha, navigateSafely } = useAhaEditor();
+  const [searchParams] = useSearchParams();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [limitMessage, setLimitMessage] = useState(false);
@@ -30,9 +33,24 @@ export default function AhaWork() {
   );
 
   useEffect(() => {
+    const requestedTaskId = searchParams.get("task");
+    if (requestedTaskId && aha.tasks.some(({ id }) => id === requestedTaskId)) {
+      setEditingId(requestedTaskId);
+      return;
+    }
+
+    const focus = searchParams.get("focus");
+    if (focus) scrollToAndFocus(focus);
+  }, [aha.tasks, searchParams]);
+
+  useEffect(() => {
     if (!editingId) return;
-    document.getElementById(`task-${editingId}`)?.focus();
-  }, [editingId]);
+    const requestedField = searchParams.get("field");
+    const field = ["task", "hazards", "controls"].includes(requestedField ?? "")
+      ? requestedField
+      : "task";
+    scrollToAndFocus(`${field}-${editingId}`);
+  }, [editingId, searchParams]);
 
   const updateTask = (
     id: string,
@@ -48,17 +66,20 @@ export default function AhaWork() {
   };
 
   const addTask = () => {
-    if (!canAddTask(aha)) {
-      setLimitMessage(true);
-      return;
-    }
-
     const id = createLocalId();
-    updateAha((current) => ({
-      ...current,
-      tasks: [...current.tasks, createEmptyTask(id)],
-    }));
-    setLimitMessage(false);
+    let rejected = false;
+    updateAha((current) => {
+      if (!canAddTask(current)) {
+        rejected = true;
+        return current;
+      }
+      return {
+        ...current,
+        tasks: [...current.tasks, createEmptyTask(id)],
+      };
+    });
+    setLimitMessage(rejected);
+    if (rejected) return;
     setEditingId(id);
   };
 
@@ -218,10 +239,25 @@ export default function AhaWork() {
               updateAha((current) => ({
                 ...current,
                 meetingNotes: event.target.value,
+                notApplicable: event.target.value.trim()
+                  ? { ...current.notApplicable, meetingNotes: false }
+                  : current.notApplicable,
               }))
             }
           />
         </section>
+
+        <div className="pt-1">
+          <Button
+            className="min-h-[72px] w-full rounded-[14px] text-xl font-bold tracking-wide"
+            onClick={() => void navigateSafely(`/ahas/${aha.id}/energy`)}
+          >
+            CONTINUE
+          </Button>
+          <p className="mt-2 text-center text-base font-medium text-muted-foreground">
+            Next: 3 Energy
+          </p>
+        </div>
       </div>
 
       <AlertDialog

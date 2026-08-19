@@ -7,7 +7,11 @@ import {
   useState,
 } from "react";
 import { Outlet, useNavigate, useParams } from "react-router";
-import type { Aha, Job } from "@workspace/aha-domain";
+import {
+  applyInProgressEditRules,
+  type Aha,
+  type Job,
+} from "@workspace/aha-domain";
 
 import {
   dismissPrefillBanner,
@@ -36,6 +40,7 @@ interface EditorContextValue {
   saveState: SaveState;
   isOnline: boolean;
   updateAha: (update: (current: Aha) => Aha) => void;
+  commitAha: (update: (current: Aha) => Aha) => Promise<boolean>;
   navigateSafely: (path: string) => Promise<boolean>;
   retrySave: () => Promise<boolean>;
   dismissBanner: () => Promise<void>;
@@ -86,6 +91,7 @@ export function AhaEditorLayout() {
   const draftRef = useRef<Aha | null>(null);
   const pendingRef = useRef<Aha | null>(null);
   const savePromiseRef = useRef<Promise<boolean> | null>(null);
+  const criticalSavePromiseRef = useRef<Promise<boolean> | null>(null);
   const loadGenerationRef = useRef(0);
   const failedOperationsRef = useRef(
     new Map<FailedPersistenceOperation["kind"], FailedPersistenceOperation>(),
@@ -162,6 +168,12 @@ export function AhaEditorLayout() {
       loadGenerationRef.current += 1;
     };
   }, [load]);
+
+  useEffect(() => {
+    if (snapshot?.aha.status === "completed") {
+      navigate("/", { replace: true });
+    }
+  }, [navigate, snapshot?.aha.status]);
 
   const runSaveQueue = useCallback((): Promise<boolean> => {
     if (savePromiseRef.current) {
@@ -248,7 +260,8 @@ export function AhaEditorLayout() {
       const current = draftRef.current;
       if (!current) return;
 
-      const next = update(current);
+      const next = applyInProgressEditRules(current, update(current));
+      if (next === current) return;
       draftRef.current = next;
       pendingRef.current = next;
       setSnapshot((value) =>
@@ -264,6 +277,49 @@ export function AhaEditorLayout() {
       void runSaveQueue();
     },
     [runSaveQueue],
+  );
+
+  const commitAha = useCallback(
+    (update: (current: Aha) => Aha): Promise<boolean> => {
+      if (criticalSavePromiseRef.current) {
+        return criticalSavePromiseRef.current;
+      }
+
+      const promise = (async () => {
+        if (!(await flushSaves())) return false;
+        const current = draftRef.current;
+        if (!current) return false;
+
+        setSaveState("saving");
+        try {
+          const next = applyInProgressEditRules(current, update(current));
+          const saved = await persistEditedAha(next);
+          draftRef.current = saved;
+          pendingRef.current = null;
+          failedOperationsRef.current.delete("autosave");
+          setSnapshot((value) =>
+            value
+              ? {
+                  ...value,
+                  aha: saved,
+                  metadata: { ...value.metadata, hasUserEdits: true },
+                }
+              : value,
+          );
+          settleSaveState();
+          return true;
+        } catch {
+          setSaveState("error");
+          return false;
+        }
+      })().finally(() => {
+        criticalSavePromiseRef.current = null;
+      });
+
+      criticalSavePromiseRef.current = promise;
+      return promise;
+    },
+    [flushSaves, settleSaveState],
   );
 
   const retrySave = useCallback(async () => {
@@ -434,6 +490,7 @@ export function AhaEditorLayout() {
     saveState,
     isOnline,
     updateAha,
+    commitAha,
     navigateSafely,
     retrySave,
     dismissBanner,

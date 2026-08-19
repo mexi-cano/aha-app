@@ -1,3 +1,6 @@
+import { useEffect } from "react";
+import { useSearchParams } from "react-router";
+
 import { EditorShell } from "@/components/aha/editor-shell";
 import { TextAreaField, TextField } from "@/components/aha/form-field";
 import { PrefillBanner } from "@/components/aha/prefill-banner";
@@ -5,9 +8,16 @@ import { Button } from "@/components/ui/button";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import { formatLongDate } from "@/lib/date-format";
 import { cn } from "@/lib/utils";
+import { scrollToAndFocus } from "@/features/aha-editor/editor-navigation";
 
 export default function AhaDetails() {
   const { aha, updateAha, navigateSafely } = useAhaEditor();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const focus = searchParams.get("focus");
+    if (focus) scrollToAndFocus(focus);
+  }, [searchParams]);
 
   const updateHeader = (
     key: Exclude<keyof typeof aha.header, "date">,
@@ -16,6 +26,19 @@ export default function AhaDetails() {
     updateAha((current) => ({
       ...current,
       header: { ...current.header, [key]: value },
+    }));
+  };
+
+  const updateOptionalHeader = (
+    key: "workOrderPermit" | "jhaProcedureNumbers",
+    value: string,
+  ) => {
+    updateAha((current) => ({
+      ...current,
+      header: { ...current.header, [key]: value },
+      notApplicable: value.trim()
+        ? { ...current.notApplicable, [key]: false }
+        : current.notApplicable,
     }));
   };
 
@@ -74,7 +97,7 @@ export default function AhaDetails() {
               label="Work order / permit number"
               value={aha.header.workOrderPermit}
               onChange={(event) =>
-                updateHeader("workOrderPermit", event.target.value)
+                updateOptionalHeader("workOrderPermit", event.target.value)
               }
             />
             <TextField
@@ -82,7 +105,7 @@ export default function AhaDetails() {
               label="JHA / procedure numbers"
               value={aha.header.jhaProcedureNumbers}
               onChange={(event) =>
-                updateHeader("jhaProcedureNumbers", event.target.value)
+                updateOptionalHeader("jhaProcedureNumbers", event.target.value)
               }
             />
             <TextField
@@ -104,6 +127,7 @@ export default function AhaDetails() {
                 ].map((option) => (
                   <button
                     key={option.label}
+                    id={option.value ? "rescue-plan-yes" : "rescue-plan-no"}
                     type="button"
                     className={cn(
                       "min-h-12 rounded-[10px] border-[1.5px] px-4 text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring",

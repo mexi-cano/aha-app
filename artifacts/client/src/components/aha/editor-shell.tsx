@@ -1,5 +1,10 @@
 import type { ReactNode } from "react";
+import { Check } from "lucide-react";
 import { useLocation } from "react-router";
+import {
+  canStartSigning,
+  getEditorSectionReadiness,
+} from "@workspace/aha-domain";
 
 import { AutosaveStatus } from "./autosave-status";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
@@ -9,8 +14,25 @@ import { cn } from "@/lib/utils";
 export function EditorShell({ children }: { children: ReactNode }) {
   const { aha, job, navigateSafely } = useAhaEditor();
   const location = useLocation();
-  const activeStep = location.pathname.endsWith("/work") ? "work" : "details";
+  const activeStep =
+    ["details", "work", "energy", "review"].find((step) =>
+      location.pathname.endsWith(`/${step}`),
+    ) ?? "details";
   const basePath = `/ahas/${aha.id}`;
+  const readiness = getEditorSectionReadiness(aha);
+  const steps = [
+    { id: "details", number: 1, label: "Details", ready: readiness.details },
+    { id: "work", number: 2, label: "Work", ready: readiness.work },
+    { id: "energy", number: 3, label: "Energy", ready: readiness.energy },
+    { id: "review", number: 4, label: "Review", ready: readiness.review },
+    {
+      id: "sign",
+      number: 5,
+      label: "Sign",
+      ready: false,
+      disabled: aha.status === "draft" || !canStartSigning(aha),
+    },
+  ];
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -34,26 +56,45 @@ export function EditorShell({ children }: { children: ReactNode }) {
           className="mx-auto max-w-[834px] px-4 pb-4 sm:px-7"
           aria-label="AHA editor sections"
         >
-          <div className="grid grid-cols-2 gap-1 rounded-xl bg-secondary p-1">
-            {[
-              { id: "details", label: "1 Details" },
-              { id: "work", label: "2 Work" },
-            ].map((step) => (
-              <button
-                key={step.id}
-                type="button"
-                className={cn(
-                  "min-h-12 rounded-lg px-3 text-base font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                  activeStep === step.id
-                    ? "bg-primary font-bold text-primary-foreground"
-                    : "text-secondary-foreground hover:bg-card/70",
-                )}
-                aria-current={activeStep === step.id ? "step" : undefined}
-                onClick={() => void navigateSafely(`${basePath}/${step.id}`)}
-              >
-                {step.label}
-              </button>
-            ))}
+          <div className="flex gap-1 rounded-xl bg-secondary p-1">
+            {steps.map((step) => {
+              const isActive = activeStep === step.id;
+              return (
+                <button
+                  key={step.id}
+                  type="button"
+                  className={cn(
+                    "flex min-h-12 min-w-12 items-center justify-center gap-1 rounded-lg px-2 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring sm:flex-1 sm:px-3 sm:text-base",
+                    isActive
+                      ? "flex-1 bg-primary font-bold text-primary-foreground"
+                      : "w-12 text-secondary-foreground hover:bg-card/70 sm:w-auto",
+                    step.disabled &&
+                      "cursor-not-allowed text-muted-foreground opacity-60 hover:bg-transparent",
+                  )}
+                  aria-current={isActive ? "step" : undefined}
+                  disabled={step.disabled}
+                  onClick={() =>
+                    void navigateSafely(
+                      step.id === "sign"
+                        ? `${basePath}/sign`
+                        : `${basePath}/${step.id}`,
+                    )
+                  }
+                >
+                  <span>{step.number}</span>
+                  <span className={cn(!isActive && "hidden sm:inline")}>
+                    {step.label}
+                  </span>
+                  {step.ready && !isActive ? (
+                    <Check
+                      className="size-4 text-success"
+                      strokeWidth={3}
+                      aria-label="Complete"
+                    />
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         </nav>
       </header>

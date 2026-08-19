@@ -1,21 +1,23 @@
 import { useRef, useState } from "react";
-import type { PointGroup } from "signature_pad";
 import {
   MAX_CREW_MEMBERS,
-  WORKER_ACKNOWLEDGMENT,
   addLateSignedCrewMember,
 } from "@workspace/aha-domain";
 
-import { AhaSummary } from "@/components/aha/aha-summary";
+import { WorkerReviewAndSign } from "@/components/aha/worker-review-and-sign";
 import {
-  SignatureCanvas,
-  type SignatureCanvasHandle,
-} from "@/components/aha/signature-canvas";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { createLocalId } from "@/data/aha-repository";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
-import { formatLongDate } from "@/lib/date-format";
 import {
   analyzeAhaPdfFit,
   saveAhaAndGeneratePdf,
@@ -24,24 +26,26 @@ import {
 
 export default function AhaLateWorker() {
   const { aha, job, commitAha, navigateSafely } = useAhaEditor();
-  const [view, setView] = useState<"sign" | "review">("sign");
   const [name, setName] = useState("");
   const [workerId] = useState(() => createLocalId());
   const [hasInk, setHasInk] = useState(false);
-  const [stagedData, setStagedData] = useState<PointGroup[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [discardAsk, setDiscardAsk] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fitIssues, setFitIssues] = useState<PdfFitIssue[]>([]);
-  const signatureRef = useRef<SignatureCanvasHandle>(null);
+  const saveInFlightRef = useRef(false);
 
-  const openReview = () => {
-    setStagedData(signatureRef.current?.toData() ?? []);
-    setView("review");
+  const completedPath = `/ahas/${aha.id}/completed`;
+  const hasStagedEntry = Boolean(name.trim() || hasInk);
+
+  const requestBack = () => {
+    if (hasStagedEntry) setDiscardAsk(true);
+    else void navigateSafely(completedPath);
   };
 
-  const confirm = async () => {
-    const signaturePng = signatureRef.current?.toPng();
-    if (!signaturePng || !name.trim() || isSaving) return;
+  const confirm = async (signaturePng: string) => {
+    if (!name.trim() || isSaving || saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
     setIsSaving(true);
     setError(null);
     setFitIssues([]);
@@ -98,6 +102,7 @@ export default function AhaLateWorker() {
       }
       await navigateSafely(`/ahas/${result.savedAha.id}/completed`);
     } finally {
+      saveInFlightRef.current = false;
       setIsSaving(false);
     }
   };
@@ -111,7 +116,7 @@ export default function AhaLateWorker() {
         </p>
         <Button
           className="mt-5 min-h-12"
-          onClick={() => void navigateSafely(`/ahas/${aha.id}/completed`)}
+          onClick={() => void navigateSafely(completedPath)}
         >
           Return to Completed
         </Button>
@@ -119,124 +124,98 @@ export default function AhaLateWorker() {
     );
   }
 
+  const feedback = (
+    <>
+      {fitIssues.length > 0 ? (
+        <div
+          className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-warning-foreground"
+          role="alert"
+        >
+          {fitIssues.map((issue) => (
+            <p key={issue.fieldPath} className="font-semibold">
+              {issue.message}
+            </p>
+          ))}
+        </div>
+      ) : null}
+      {error ? (
+        <p
+          className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 font-semibold text-warning-foreground"
+          role="alert"
+        >
+          {error}
+        </p>
+      ) : null}
+    </>
+  );
+
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-border bg-card px-4 py-3">
-        <div className="mx-auto flex max-w-[834px] items-center gap-3">
+      <header className="sticky top-0 z-30 border-b border-border bg-card">
+        <div className="mx-auto flex max-w-[834px] items-center gap-3 px-4 py-3">
           <button
             type="button"
-            className="min-h-12 rounded-lg px-2 text-base font-semibold text-primary"
+            className="min-h-12 shrink-0 rounded-lg px-2 text-base font-semibold text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring"
             disabled={isSaving}
-            onClick={() => void navigateSafely(`/ahas/${aha.id}/completed`)}
+            onClick={requestBack}
           >
             ‹ Completed
           </button>
           <p className="min-w-0 flex-1 truncate text-center text-sm font-semibold text-muted-foreground sm:text-base">
-            {job.name} — {formatLongDate(aha.date)}
+            {name.trim() || "Add worker"}
           </p>
-          <span className="w-20" />
+          <p className="min-w-[92px] text-right text-sm font-bold sm:min-w-[120px] sm:text-base">
+            {aha.crew.length} signed
+          </p>
+        </div>
+        <div className="bg-primary px-3 py-2.5 text-center text-xs font-bold leading-snug tracking-[0.07em] text-primary-foreground sm:px-4 sm:py-3 sm:text-[15px] sm:tracking-[0.08em]">
+          SIGNING MODE — HAND THE DEVICE TO EACH CREW MEMBER
         </div>
       </header>
-      <div className="mx-auto max-w-[748px] px-5 py-6 sm:px-6">
-        {view === "review" ? (
-          <div className="flex flex-col gap-4">
-            <button
-              type="button"
-              className="min-h-12 self-start rounded-lg px-1 text-[17px] font-semibold text-primary"
-              onClick={() => setView("sign")}
-            >
-              ‹ Back to signing
-            </button>
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-[28px] font-bold">Today's AHA</h1>
-              <span className="inline-flex min-h-8 items-center rounded-lg border-[1.5px] border-[#C6CDE8] px-3 text-[13px] font-bold tracking-[0.08em] text-primary">
-                READ ONLY
-              </span>
-            </div>
-            <AhaSummary aha={aha} job={job} mode="signing" />
-          </div>
-        ) : (
-          <div className="flex flex-col gap-4">
-            <header>
-              <h1 className="text-[28px] font-bold">Add worker &amp; sign</h1>
-              <p className="mt-1 text-base font-medium text-muted-foreground">
-                Adds a late arrival without changing completion time or existing
-                signatures
-              </p>
-            </header>
-            <label className="flex flex-col gap-2 text-base font-bold">
-              Worker name
-              <Input
-                value={name}
-                className="min-h-14 text-xl font-semibold"
-                placeholder="First and last name"
-                autoComplete="name"
-                disabled={isSaving}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </label>
-            <button
-              type="button"
-              className="min-h-12 self-start rounded-lg px-1 text-[17px] font-semibold text-primary underline underline-offset-4"
-              onClick={openReview}
-            >
-              Review the AHA ›
-            </button>
-            <p className="rounded-xl border border-[#C6CDE8] bg-secondary px-5 py-[18px] text-[17px] font-medium leading-[1.5]">
-              {WORKER_ACKNOWLEDGMENT}
-            </p>
-            <SignatureCanvas
-              ref={signatureRef}
-              disabled={isSaving}
-              initialData={stagedData}
-              onInkChange={setHasInk}
-            />
-            <div className="flex gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                className="min-h-16 px-6 text-[17px] text-primary"
-                disabled={!hasInk || isSaving}
-                onClick={() => {
-                  signatureRef.current?.clear();
-                  setHasInk(false);
-                  setStagedData([]);
-                }}
-              >
-                Clear
-              </Button>
-              <Button
-                type="button"
-                className="min-h-16 flex-1 text-[19px] font-bold tracking-wide"
-                disabled={!hasInk || !name.trim() || isSaving}
-                onClick={() => void confirm()}
-              >
-                {isSaving ? "SAVING…" : "CONFIRM SIGNATURE"}
-              </Button>
-            </div>
-            {fitIssues.length > 0 ? (
-              <div
-                className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-warning-foreground"
-                role="alert"
-              >
-                {fitIssues.map((issue) => (
-                  <p key={issue.fieldPath} className="font-semibold">
-                    {issue.message}
-                  </p>
-                ))}
-              </div>
-            ) : null}
-            {error ? (
-              <p
-                className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 font-semibold text-warning-foreground"
-                role="alert"
-              >
-                {error}
-              </p>
-            ) : null}
-          </div>
-        )}
+
+      <div className="mx-auto max-w-[748px] px-5 py-5 sm:px-6 sm:py-6">
+        <WorkerReviewAndSign
+          aha={aha}
+          job={job}
+          signerName={name}
+          nameInput={{
+            value: name,
+            onChange: setName,
+            helper: "joins today's crew",
+          }}
+          disabled={isSaving}
+          confirmDisabled={!name.trim()}
+          confirmLabel={isSaving ? "SAVING…" : "CONFIRM SIGNATURE"}
+          feedback={feedback}
+          onInkChange={setHasInk}
+          onConfirm={confirm}
+        />
       </div>
+
+      <AlertDialog open={discardAsk} onOpenChange={setDiscardAsk}>
+        <AlertDialogContent className="max-w-md rounded-2xl bg-card">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-bold">
+              Discard this worker and signature?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base font-medium">
+              The worker has not been added. Entered name and signature ink will
+              be cleared.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="min-h-12 text-base">
+              Keep signing
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="min-h-12 bg-foreground px-6 text-base text-background"
+              onClick={() => void navigateSafely(completedPath)}
+            >
+              Discard and return
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }

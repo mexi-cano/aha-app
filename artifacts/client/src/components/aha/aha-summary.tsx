@@ -24,6 +24,7 @@ interface AhaSummaryProps {
   aha: Aha;
   job: Job;
   mode: "review" | "signing";
+  showCrew?: boolean;
   report?: ReviewReport;
   crewContent?: ReactNode;
   onEdit?: (section: EditableSection) => void;
@@ -101,6 +102,7 @@ export function AhaSummary({
   aha,
   job,
   mode,
+  showCrew = true,
   report,
   crewContent,
   onEdit,
@@ -337,31 +339,33 @@ export function AhaSummary({
         {meetingIssueGroups.map(renderIssueGroup)}
       </section>
 
-      <section className="flex flex-col gap-4 rounded-[14px] border border-card-border bg-card px-5 py-5 sm:px-6">
-        {crewContent ?? (
-          <div className="flex flex-col gap-3">
-            <SectionHeader label={`TODAY'S CREW — ${aha.crew.length}`} />
-            <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
-              {aha.crew.map((member) => (
-                <div
-                  key={member.workerId}
-                  className="flex min-h-8 items-center gap-2 text-base font-medium"
-                >
-                  {member.name}
-                  {member.workerId === foremanWorkerId ? (
-                    <ForemanBadge />
-                  ) : null}
-                </div>
-              ))}
+      {showCrew ? (
+        <section className="flex flex-col gap-4 rounded-[14px] border border-card-border bg-card px-5 py-5 sm:px-6">
+          {crewContent ?? (
+            <div className="flex flex-col gap-3">
+              <SectionHeader label={`TODAY'S CREW — ${aha.crew.length}`} />
+              <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
+                {aha.crew.map((member) => (
+                  <div
+                    key={member.workerId}
+                    className="flex min-h-8 items-center gap-2 text-base font-medium"
+                  >
+                    {member.name}
+                    {member.workerId === foremanWorkerId ? (
+                      <ForemanBadge />
+                    ) : null}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-        <InformationNotice
-          message={information("crew_count")}
-          positive={!crewHasBlocker}
-        />
-        {crewIssueGroups.map(renderIssueGroup)}
-      </section>
+          )}
+          <InformationNotice
+            message={information("crew_count")}
+            positive={!crewHasBlocker}
+          />
+          {crewIssueGroups.map(renderIssueGroup)}
+        </section>
+      ) : null}
     </div>
   );
 }

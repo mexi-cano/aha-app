@@ -158,11 +158,68 @@ test("Not applicable suppresses only its advisory warning", () => {
   });
 });
 
+test("entered optional values clear warnings without changing signing readiness", () => {
+  const blankOptionals = reviewReadyAha();
+  const initialReport = getReviewReport(blankOptionals);
+  assert.deepEqual(
+    initialReport.warnings.map(({ code }) => code),
+    ["work_order_permit", "jha_procedures", "meeting_notes"],
+  );
+  assert.equal(initialReport.canStartSigning, true);
+
+  const filledOptionals: Aha = {
+    ...blankOptionals,
+    header: {
+      ...blankOptionals.header,
+      workOrderPermit: "WO-100",
+      jhaProcedureNumbers: "JHA-200",
+    },
+    meetingNotes: "Reviewed site access.",
+  };
+  const filledReport = getReviewReport(filledOptionals);
+  assert.deepEqual(filledReport.warnings, []);
+  assert.equal(filledReport.canStartSigning, true);
+});
+
 test("zero tasks and zero energy categories are not invented blockers", () => {
   const aha = reviewReadyAha();
   assert.equal(aha.tasks.length, 0);
   assert.equal(aha.energySelections.length, 0);
   assert.equal(canStartSigning(aha), true);
+});
+
+test("whitespace-only task fields are missing while complete tasks are ready", () => {
+  const aha: Aha = {
+    ...reviewReadyAha(),
+    tasks: [
+      {
+        id: "task-complete",
+        task: "Excavate trench",
+        hazards: "Cave-in",
+        controls: "Shoring",
+      },
+      {
+        id: "task-incomplete",
+        task: "   ",
+        hazards: "\n",
+        controls: "\t",
+      },
+    ],
+  };
+
+  const taskIssues = getReviewReport(aha).mustFix.filter(
+    ({ target }) => target.section === "task",
+  );
+  assert.deepEqual(
+    taskIssues.map(({ code }) => code),
+    ["task_name", "task_hazards", "task_controls"],
+  );
+  assert.ok(
+    taskIssues.every(
+      ({ target }) =>
+        target.section === "task" && target.taskId === "task-incomplete",
+    ),
+  );
 });
 
 test("mid-signing safety-sensitive edits clear only the safety answer", () => {

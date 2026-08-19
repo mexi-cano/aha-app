@@ -2,6 +2,7 @@ import { TriangleAlert } from "lucide-react";
 import type { ReviewIssue } from "@workspace/aha-domain";
 
 import { Button } from "@/components/ui/button";
+import type { ReviewIssueGroup } from "@/features/aha-editor/review-presentation";
 
 function fixLabel(issue: ReviewIssue): string {
   if (issue.code === "safety_check") return "Answer";
@@ -10,53 +11,82 @@ function fixLabel(issue: ReviewIssue): string {
   return "Fix";
 }
 
-export function ReviewIssueNotice({
-  issue,
+function issueKey(issue: ReviewIssue): string {
+  return `${issue.tier}-${issue.code}-${
+    issue.target.section === "task" ? issue.target.taskId : ""
+  }`;
+}
+
+export function ReviewIssueGroupNotice({
+  group,
   onFix,
   onNotApplicable,
   disabled = false,
 }: {
-  issue: ReviewIssue;
+  group: ReviewIssueGroup;
   onFix: (issue: ReviewIssue) => void;
   onNotApplicable?: (issue: Extract<ReviewIssue, { tier: "warning" }>) => void;
   disabled?: boolean;
 }) {
+  const mustFix = group.tier === "must_fix";
+
   return (
-    <div className="flex flex-col gap-3 rounded-[10px] border-[1.5px] border-[#E3C27A] bg-[#FBF1DF] px-4 py-3 sm:flex-row sm:items-center">
-      <div className="flex min-w-0 flex-1 items-start gap-2.5 text-base font-semibold text-warning-foreground">
+    <section
+      className={`overflow-hidden rounded-[10px] border-[1.5px] text-warning-foreground ${
+        mustFix
+          ? "border-[#E3C27A] bg-[#FBF1DF]"
+          : "border-[#E8D7AE] bg-[#FFF9EE]"
+      }`}
+      aria-label={mustFix ? "Must fix" : "Warning"}
+    >
+      <header className="flex items-start gap-2.5 px-4 py-3">
         <TriangleAlert
           className="mt-0.5 size-5 shrink-0"
           strokeWidth={2.5}
           aria-hidden="true"
         />
-        <span className="flex flex-col gap-0.5">
+        <div className="flex min-w-0 flex-col gap-0.5">
           <span className="text-xs font-extrabold tracking-[0.08em]">
-            {issue.tier === "must_fix" ? "MUST FIX" : "WARNING"}
+            {mustFix ? "MUST FIX" : "WARNING"}
           </span>
-          <span>{issue.message}</span>
-        </span>
-      </div>
-      <div className="flex flex-wrap gap-2 sm:justify-end">
-        <Button
-          type="button"
-          className="min-h-12 bg-warning-foreground px-[18px] text-[15px] text-white hover:bg-warning-foreground/90"
-          disabled={disabled}
-          onClick={() => onFix(issue)}
-        >
-          {fixLabel(issue)}
-        </Button>
-        {issue.tier === "warning" && onNotApplicable ? (
-          <Button
-            type="button"
-            variant="outline"
-            className="min-h-12 border-[#E3C27A] bg-transparent px-[18px] text-[15px] text-warning-foreground hover:bg-white/60"
-            disabled={disabled}
-            onClick={() => onNotApplicable(issue)}
+          <span className="text-sm font-semibold">
+            {mustFix ? "Required before signing" : "Does not block signing"}
+          </span>
+        </div>
+      </header>
+      <div className="border-t border-[#E8D7AE] px-4">
+        {group.issues.map((issue) => (
+          <div
+            key={issueKey(issue)}
+            className="flex flex-col gap-3 border-t border-[#E8D7AE] py-3 first:border-t-0 sm:flex-row sm:items-center"
           >
-            Not applicable
-          </Button>
-        ) : null}
+            <p className="min-w-0 flex-1 text-base font-semibold leading-6">
+              {issue.message}
+            </p>
+            <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
+              <Button
+                type="button"
+                className="min-h-12 bg-warning-foreground px-[18px] text-[15px] text-white hover:bg-warning-foreground/90"
+                disabled={disabled}
+                onClick={() => onFix(issue)}
+              >
+                {fixLabel(issue)}
+              </Button>
+              {issue.tier === "warning" && onNotApplicable ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-12 border-[#E3C27A] bg-transparent px-[18px] text-[15px] text-warning-foreground hover:bg-white/60"
+                  disabled={disabled}
+                  onClick={() => onNotApplicable(issue)}
+                >
+                  Not applicable
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ))}
       </div>
-    </div>
+    </section>
   );
 }

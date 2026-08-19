@@ -8,8 +8,12 @@ import {
   type ReviewReport,
 } from "@workspace/aha-domain";
 
-import { ReviewIssueNotice } from "@/components/aha/review-issue-notice";
+import { ReviewIssueGroupNotice } from "@/components/aha/review-issue-notice";
 import { Button } from "@/components/ui/button";
+import {
+  groupReviewIssues,
+  type ReviewIssueGroup,
+} from "@/features/aha-editor/review-presentation";
 import { formatLongDate } from "@/lib/date-format";
 
 type EditableSection = "details" | "work" | "energy";
@@ -56,11 +60,12 @@ function SectionHeader({
 }
 
 function SummaryField({ label, value }: { label: string; value: string }) {
+  const displayValue = value.trim() ? value : "Not entered";
   return (
     <div>
       <dt className="text-sm font-bold text-muted-foreground">{label}</dt>
       <dd className="mt-0.5 whitespace-pre-wrap text-base font-medium leading-6">
-        {value || "Not entered"}
+        {displayValue}
       </dd>
     </div>
   );
@@ -102,43 +107,51 @@ export function AhaSummary({
   disabled = false,
 }: AhaSummaryProps) {
   const editable = mode === "review";
-  const issues = report
-    ? ([...report.mustFix, ...report.warnings] as ReviewIssue[])
-    : [];
-  const renderIssue = (issue: ReviewIssue) =>
+  const issues =
+    editable && report
+      ? ([...report.mustFix, ...report.warnings] as ReviewIssue[])
+      : [];
+  const issueGroups = groupReviewIssues(issues);
+  const renderIssueGroup = (group: ReviewIssueGroup) =>
     onFix ? (
-      <ReviewIssueNotice
-        key={`${issue.tier}-${issue.code}-${
-          issue.target.section === "task" ? issue.target.taskId : ""
-        }`}
-        issue={issue}
+      <ReviewIssueGroupNotice
+        key={group.key}
+        group={group}
         onFix={onFix}
         onNotApplicable={onNotApplicable}
         disabled={disabled}
       />
     ) : null;
 
-  const detailsIssues = issues.filter(
-    ({ target }) => target.section === "details",
+  const detailsIssueGroups = issueGroups.filter((group) =>
+    group.issues.some(({ target }) => target.section === "details"),
   );
-  const meetingIssues = issues.filter(
-    ({ target }) =>
-      target.section === "work" && target.field === "meetingNotes",
+  const meetingIssueGroups = issueGroups.filter((group) =>
+    group.issues.some(
+      ({ target }) =>
+        target.section === "work" && target.field === "meetingNotes",
+    ),
   );
-  const energyIssues = issues.filter(
-    ({ target }) => target.section === "energy",
+  const energyIssueGroups = issueGroups.filter((group) =>
+    group.issues.some(({ target }) => target.section === "energy"),
   );
-  const crewIssues = issues.filter(({ target }) => target.section === "crew");
+  const crewIssueGroups = issueGroups.filter((group) =>
+    group.issues.some(({ target }) => target.section === "crew"),
+  );
   const workHasBlocker = issues.some(
     (issue) => issue.tier === "must_fix" && issue.target.section === "task",
   );
-  const energyHasBlocker = energyIssues.some(
-    (issue) => issue.tier === "must_fix",
+  const energyHasBlocker = energyIssueGroups.some(
+    (group) => group.tier === "must_fix",
   );
-  const crewHasBlocker = crewIssues.some((issue) => issue.tier === "must_fix");
+  const crewHasBlocker = crewIssueGroups.some(
+    (group) => group.tier === "must_fix",
+  );
 
-  const optionalValue = (value: string, notApplicable: boolean): string =>
-    notApplicable ? "Not applicable" : value;
+  const optionalValue = (value: string, notApplicable: boolean): string => {
+    if (notApplicable) return "Not applicable";
+    return value.trim() ? value : "";
+  };
   const information = (code: ReviewReport["information"][number]["code"]) =>
     report?.information.find((item) => item.code === code)?.message;
 
@@ -156,7 +169,9 @@ export function AhaSummary({
           </h3>
           <p className="mt-1 text-base font-medium text-muted-foreground">
             {formatLongDate(aha.date)} · Person in charge:{" "}
-            {aha.header.personInCharge || "Not entered"}
+            {aha.header.personInCharge.trim()
+              ? aha.header.personInCharge
+              : "Not entered"}
           </p>
         </div>
         <dl className="grid gap-x-6 gap-y-4 border-t border-border pt-4 sm:grid-cols-2">
@@ -200,10 +215,10 @@ export function AhaSummary({
             DESCRIPTION OF WORK
           </h3>
           <p className="mt-1 whitespace-pre-wrap text-base font-medium leading-6">
-            {aha.description || "Not entered"}
+            {aha.description.trim() ? aha.description : "Not entered"}
           </p>
         </div>
-        {detailsIssues.map(renderIssue)}
+        {detailsIssueGroups.map(renderIssueGroup)}
       </section>
 
       <section className="flex flex-col gap-4 rounded-[14px] border border-card-border bg-card px-5 py-5 sm:px-6">
@@ -219,9 +234,11 @@ export function AhaSummary({
           positive={!workHasBlocker}
         />
         {aha.tasks.map((task) => {
-          const taskIssues = issues.filter(
-            ({ target }) =>
-              target.section === "task" && target.taskId === task.id,
+          const taskIssueGroups = issueGroups.filter((group) =>
+            group.issues.some(
+              ({ target }) =>
+                target.section === "task" && target.taskId === task.id,
+            ),
           );
           return (
             <article
@@ -229,21 +246,21 @@ export function AhaSummary({
               className="flex flex-col gap-2 border-t border-border pt-4 first:border-t-0 first:pt-0"
             >
               <h3 className="text-lg font-bold">
-                {task.task || "Untitled task"}
+                {task.task.trim() ? task.task : "Untitled task"}
               </h3>
               <p className="whitespace-pre-wrap text-base font-medium leading-6">
                 <span className="font-bold text-muted-foreground">
                   Hazards:
                 </span>{" "}
-                {task.hazards || "Not entered"}
+                {task.hazards.trim() ? task.hazards : "Not entered"}
               </p>
               <p className="whitespace-pre-wrap text-base font-medium leading-6">
                 <span className="font-bold text-muted-foreground">
                   Controls:
                 </span>{" "}
-                {task.controls || "Not entered"}
+                {task.controls.trim() ? task.controls : "Not entered"}
               </p>
-              {taskIssues.map(renderIssue)}
+              {taskIssueGroups.map(renderIssueGroup)}
             </article>
           );
         })}
@@ -301,7 +318,7 @@ export function AhaSummary({
             <span className="text-muted-foreground">Not answered</span>
           )}
         </div>
-        {energyIssues.map(renderIssue)}
+        {energyIssueGroups.map(renderIssueGroup)}
       </section>
 
       <section className="flex flex-col gap-4 rounded-[14px] border border-card-border bg-card px-5 py-5 sm:px-6">
@@ -314,7 +331,7 @@ export function AhaSummary({
           {optionalValue(aha.meetingNotes, aha.notApplicable.meetingNotes) ||
             "Not entered"}
         </p>
-        {meetingIssues.map(renderIssue)}
+        {meetingIssueGroups.map(renderIssueGroup)}
       </section>
 
       <section className="flex flex-col gap-4 rounded-[14px] border border-card-border bg-card px-5 py-5 sm:px-6">
@@ -337,7 +354,7 @@ export function AhaSummary({
           message={information("crew_count")}
           positive={!crewHasBlocker}
         />
-        {crewIssues.map(renderIssue)}
+        {crewIssueGroups.map(renderIssueGroup)}
       </section>
     </div>
   );

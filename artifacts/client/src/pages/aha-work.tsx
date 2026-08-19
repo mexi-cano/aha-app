@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
-import { MAX_TASKS, canAddTask, createEmptyTask } from "@workspace/aha-domain";
+import {
+  MAX_TASKS,
+  canAddTask,
+  createEmptyTask,
+  getReviewReport,
+} from "@workspace/aha-domain";
 
 import {
   AlertDialog,
@@ -12,6 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { EditorContinue } from "@/components/aha/editor-continue";
 import { EditorShell } from "@/components/aha/editor-shell";
 import { TextAreaField, TextField } from "@/components/aha/form-field";
 import { PrefillBanner } from "@/components/aha/prefill-banner";
@@ -19,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { createLocalId } from "@/data/aha-repository";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import { scrollToAndFocus } from "@/features/aha-editor/editor-navigation";
+import { taskNeedsDetails } from "@/features/aha-editor/review-presentation";
 
 export default function AhaWork() {
   const { aha, updateAha, navigateSafely } = useAhaEditor();
@@ -31,6 +38,7 @@ export default function AhaWork() {
     () => aha.tasks.find(({ id }) => id === deleteId) ?? null,
     [aha.tasks, deleteId],
   );
+  const reviewReport = useMemo(() => getReviewReport(aha), [aha]);
 
   useEffect(() => {
     const requestedTaskId = searchParams.get("task");
@@ -107,17 +115,25 @@ export default function AhaWork() {
 
         {aha.tasks.map((task) => {
           const isEditing = editingId === task.id;
+          const needsDetails = taskNeedsDetails(reviewReport, task.id);
           if (!isEditing) {
             return (
               <article
                 key={task.id}
                 className="rounded-[14px] border border-card-border bg-card p-5 sm:p-6"
               >
-                <h2 className="text-lg font-bold">
-                  {task.task || "Untitled task"}
-                </h2>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="min-w-0 text-lg font-bold">
+                    {task.task.trim() ? task.task : "Untitled task"}
+                  </h2>
+                  {needsDetails ? (
+                    <span className="inline-flex min-h-7 shrink-0 items-center rounded-full border border-[#C6CDE8] bg-secondary px-3 text-xs font-bold text-secondary-foreground">
+                      Needs details
+                    </span>
+                  ) : null}
+                </div>
                 <p className="mt-1 text-base font-medium text-muted-foreground">
-                  {task.hazards || "Hazards not entered"}
+                  {task.hazards.trim() ? task.hazards : "Hazards not entered"}
                 </p>
                 <p
                   className={`mt-1 text-base font-semibold ${
@@ -162,6 +178,7 @@ export default function AhaWork() {
                   id={`task-${task.id}`}
                   label="Task"
                   hint="What are you doing?"
+                  requirement="required"
                   value={task.task}
                   onChange={(event) =>
                     updateTask(task.id, "task", event.target.value)
@@ -171,6 +188,7 @@ export default function AhaWork() {
                   id={`hazards-${task.id}`}
                   label="Hazards"
                   hint="What could cause harm?"
+                  requirement="required"
                   rows={3}
                   value={task.hazards}
                   onChange={(event) =>
@@ -181,6 +199,7 @@ export default function AhaWork() {
                   id={`controls-${task.id}`}
                   label="Controls"
                   hint="How are you controlling it?"
+                  requirement="required"
                   rows={4}
                   value={task.controls}
                   onChange={(event) =>
@@ -233,6 +252,7 @@ export default function AhaWork() {
             id="meeting-notes"
             label="On-site meeting notes"
             hint="Anything discussed at the on-site meeting"
+            requirement="optional"
             rows={4}
             value={aha.meetingNotes}
             onChange={(event) =>
@@ -247,17 +267,10 @@ export default function AhaWork() {
           />
         </section>
 
-        <div className="pt-1">
-          <Button
-            className="min-h-[72px] w-full rounded-[14px] text-xl font-bold tracking-wide"
-            onClick={() => void navigateSafely(`/ahas/${aha.id}/energy`)}
-          >
-            CONTINUE
-          </Button>
-          <p className="mt-2 text-center text-base font-medium text-muted-foreground">
-            Next: 3 Energy
-          </p>
-        </div>
+        <EditorContinue
+          next="3 Energy"
+          onContinue={() => void navigateSafely(`/ahas/${aha.id}/energy`)}
+        />
       </div>
 
       <AlertDialog

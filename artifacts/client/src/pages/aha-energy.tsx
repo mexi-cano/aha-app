@@ -11,9 +11,10 @@ import {
   type EnergyCategoryName,
 } from "@workspace/aha-domain";
 
+import { EditorContinue } from "@/components/aha/editor-continue";
 import { EditorShell } from "@/components/aha/editor-shell";
 import { EnergyWheel } from "@/components/aha/energy-wheel";
-import { Button } from "@/components/ui/button";
+import { FieldRequirementBadge } from "@/components/aha/form-field";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import { scrollToAndFocus } from "@/features/aha-editor/editor-navigation";
 import { cn } from "@/lib/utils";
@@ -183,13 +184,27 @@ export default function AhaEnergy() {
           id="safety-check-section"
           className="rounded-2xl border-2 border-primary bg-card px-5 py-6 sm:px-7"
         >
-          <p className="text-[13px] font-bold tracking-[0.1em] text-primary">
-            SAFETY CHECK
-          </p>
-          <h2 className="mt-3 text-xl font-bold leading-7">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[13px] font-bold tracking-[0.1em] text-primary">
+              SAFETY CHECK
+            </p>
+            <FieldRequirementBadge
+              requirement="required"
+              label="Required for signing"
+            />
+          </div>
+          <h2
+            id="safety-check-question"
+            className="mt-3 text-xl font-bold leading-7"
+          >
             {SAFETY_GATE_QUESTION}
           </h2>
-          <div className="mt-4 grid grid-cols-2 gap-3" role="group">
+          <div
+            className="mt-4 grid grid-cols-2 gap-3"
+            role="group"
+            aria-labelledby="safety-check-question"
+            aria-required="true"
+          >
             <button
               id="safety-check"
               type="button"
@@ -227,17 +242,10 @@ export default function AhaEnergy() {
           </p>
         </section>
 
-        <div className="pt-1">
-          <Button
-            className="min-h-[72px] w-full rounded-[14px] text-xl font-bold tracking-wide"
-            onClick={() => void navigateSafely(`/ahas/${aha.id}/review`)}
-          >
-            CONTINUE
-          </Button>
-          <p className="mt-2 text-center text-[15px] font-medium text-muted-foreground">
-            Next: 4 Review
-          </p>
-        </div>
+        <EditorContinue
+          next="4 Review"
+          onContinue={() => void navigateSafely(`/ahas/${aha.id}/review`)}
+        />
       </div>
     </EditorShell>
   );

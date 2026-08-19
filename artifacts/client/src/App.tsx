@@ -1,25 +1,27 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Route, Routes } from 'react-router';
-import { ErrorBoundary } from '@/components/error-boundary';
-import { Toaster } from '@/components/ui/toaster';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import Home from '@/pages/home';
-import NotFound from '@/pages/not-found';
+import { lazy, Suspense } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const queryClient = new QueryClient();
+const AhaApp = lazy(() => import("@/features/aha-app"));
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-          <ErrorBoundary>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </ErrorBoundary>
-        </BrowserRouter>
+        <Suspense
+          fallback={
+            <main className="min-h-screen bg-background px-5 py-12">
+              <p className="text-center text-base font-semibold text-muted-foreground">
+                Opening your saved AHAs…
+              </p>
+            </main>
+          }
+        >
+          <AhaApp />
+        </Suspense>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

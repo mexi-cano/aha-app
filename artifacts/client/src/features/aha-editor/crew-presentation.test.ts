@@ -13,6 +13,13 @@ test("foreman matching ignores surrounding whitespace and letter case", () => {
   assert.equal(getForemanWorkerId(crew, " crew lead "), "worker-1");
 });
 
+test("foreman matching uses locale-independent case normalization", () => {
+  assert.equal(
+    getForemanWorkerId([{ workerId: "worker-1", name: "Ibrahim" }], "ibrahim"),
+    "worker-1",
+  );
+});
+
 test("duplicate foreman names consistently select the first crew member", () => {
   assert.equal(getForemanWorkerId(crew, "CREW LEAD"), "worker-1");
 });

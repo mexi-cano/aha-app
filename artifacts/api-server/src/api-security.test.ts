@@ -3,7 +3,7 @@ import { once } from "node:events";
 import type { AddressInfo } from "node:net";
 import test from "node:test";
 
-import app from "./app";
+import app, { shouldTrustPlatformProxy } from "./app";
 import { hashAccessCode } from "./lib/auth";
 
 async function withServer(
@@ -72,6 +72,49 @@ test("auth limits the sixth failed attempt from one IP", async () => {
       assert.equal(limited.status, 429);
     });
   } finally {
+    if (previousHash === undefined) delete process.env.ACCESS_CODE_HASH;
+    else process.env.ACCESS_CODE_HASH = previousHash;
+    if (previousSecret === undefined) delete process.env.AUTH_TOKEN_SECRET;
+    else process.env.AUTH_TOKEN_SECRET = previousSecret;
+  }
+});
+
+test("Replit preview trusts one proxy hop for per-IP rate limiting", async () => {
+  assert.equal(
+    shouldTrustPlatformProxy({ NODE_ENV: "development", REPL_ID: "preview" }),
+    true,
+  );
+  assert.equal(shouldTrustPlatformProxy({ NODE_ENV: "development" }), false);
+
+  const previousTrustProxy = app.get("trust proxy") as unknown;
+  const previousHash = process.env.ACCESS_CODE_HASH;
+  const previousSecret = process.env.AUTH_TOKEN_SECRET;
+  app.set("trust proxy", 1);
+  process.env.ACCESS_CODE_HASH = await hashAccessCode(
+    "forwarded-rate-limit-code",
+  );
+  process.env.AUTH_TOKEN_SECRET = "forwarded-rate-limit-secret-with-32-bytes";
+
+  try {
+    await withServer(async (baseUrl) => {
+      const attempt = (address: string) =>
+        fetch(`${baseUrl}/api/auth`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Forwarded-For": address,
+          },
+          body: JSON.stringify({ accessCode: "wrong" }),
+        });
+
+      for (let count = 0; count < 5; count += 1) {
+        assert.equal((await attempt("198.51.100.10")).status, 401);
+      }
+      assert.equal((await attempt("198.51.100.11")).status, 401);
+      assert.equal((await attempt("198.51.100.10")).status, 429);
+    });
+  } finally {
+    app.set("trust proxy", previousTrustProxy);
     if (previousHash === undefined) delete process.env.ACCESS_CODE_HASH;
     else process.env.ACCESS_CODE_HASH = previousHash;
     if (previousSecret === undefined) delete process.env.AUTH_TOKEN_SECRET;

@@ -40,6 +40,13 @@ three tables and exercise backup/restore before pilot approval. After the Phase
 the same checked-in migration once, deploys merged `main`, and runs the smoke
 test. Do not use `push` against pilot or production.
 
+The repository-owned `migrate` runner resolves the checked-in migration folder
+from its own module location rather than the shell working directory. It exits
+successfully only after verifying that the non-empty journal is represented in
+`drizzle.__drizzle_migrations` and that `jobs`, `ahas`, and `aha_pdfs` exist.
+Treat any other result as a failed migration; do not rely on a CLI success
+message without this verification.
+
 ## Repository validation
 
 Use repository Node 22 and the committed pnpm version:

@@ -10,9 +10,18 @@ import { logger } from "./lib/logger";
 const app: Express = express();
 const isProduction = process.env.NODE_ENV === "production";
 
-if (isProduction) {
-  // Replit terminates TLS at one trusted proxy hop. This keeps per-IP rate
-  // limiting accurate without trusting an arbitrary forwarded chain.
+export function shouldTrustPlatformProxy(
+  environment: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return (
+    environment.NODE_ENV === "production" || environment.REPL_ID !== undefined
+  );
+}
+
+if (shouldTrustPlatformProxy()) {
+  // Replit terminates TLS at one trusted proxy hop in both preview and
+  // production. Trust exactly that hop so per-IP rate limiting sees the
+  // forwarded client address without accepting an arbitrary proxy chain.
   app.set("trust proxy", 1);
 }
 

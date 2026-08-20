@@ -27,4 +27,15 @@ test("client timestamps remain monotonic when two writes share a clock tick", ()
     ),
     "2026-08-20T12:00:00.002Z",
   );
+  assert.equal(
+    ensureLaterTimestamp("2026-08-20T12:00:00.003Z", "not-a-timestamp"),
+    "2026-08-20T12:00:00.003Z",
+  );
+  assert.equal(
+    ensureLaterTimestamp(
+      "2026-08-20T12:00:00.001Z",
+      "2026-08-20T12:00:00.002Z",
+    ),
+    "2026-08-20T12:00:00.003Z",
+  );
 });

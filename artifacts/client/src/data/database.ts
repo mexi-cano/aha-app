@@ -60,9 +60,10 @@ export function ensureLaterTimestamp(
   candidate: string,
   previous: string | null | undefined,
 ): string {
-  if (!previous || Date.parse(candidate) > Date.parse(previous))
-    return candidate;
-  return new Date(Date.parse(previous) + 1).toISOString();
+  const previousTime = previous ? Date.parse(previous) : Number.NaN;
+  if (Number.isNaN(previousTime)) return candidate;
+  if (Date.parse(candidate) > previousTime) return candidate;
+  return new Date(previousTime + 1).toISOString();
 }
 
 export const ACTIVE_JOB_SETTING = "activeJobId";
@@ -107,10 +108,9 @@ class AhaDatabase extends Dexie {
       })
       .upgrade(async (transaction) => {
         const now = new Date().toISOString();
-        const [jobs, ahas, pdfs] = await Promise.all([
+        const [jobs, ahas] = await Promise.all([
           transaction.table("jobs").toArray(),
           transaction.table("ahas").toArray(),
-          transaction.table("ahaPdfs").toArray(),
         ]);
         const queue = transaction.table("backupQueue");
 
@@ -144,7 +144,11 @@ class AhaDatabase extends Dexie {
           }
         }
 
-        for (const value of pdfs) {
+        const pdfTable = transaction.table("ahaPdfs");
+        const pdfKeys = await pdfTable.toCollection().primaryKeys();
+        for (const key of pdfKeys) {
+          if (typeof key !== "string") continue;
+          const value = await pdfTable.get(key);
           const record = value as {
             ahaId?: unknown;
             generatedAt?: unknown;

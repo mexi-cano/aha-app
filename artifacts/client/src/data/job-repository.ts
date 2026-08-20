@@ -4,15 +4,18 @@ import { createLocalId } from "./aha-repository";
 import {
   ACTIVE_JOB_SETTING,
   ahaDatabase,
+  backupQueueKey,
   createBackupQueueItem,
   ensureLaterTimestamp,
   RESTORE_NEEDS_JOB_CHOICE_SETTING,
 } from "./database";
 import { isDevFixtureId } from "./dev-fixture";
+import { partitionReadableJobs } from "./stored-records";
 
 export interface JobListSnapshot {
   jobs: Job[];
   activeJobId: string | null;
+  unreadableCount: number;
 }
 
 export async function getJobListSnapshot(): Promise<JobListSnapshot> {
@@ -20,14 +23,14 @@ export async function getJobListSnapshot(): Promise<JobListSnapshot> {
     ahaDatabase.jobs.toArray(),
     ahaDatabase.settings.get(ACTIVE_JOB_SETTING),
   ]);
-  const jobs = records
-    .filter(({ id }) => !isDevFixtureId(id))
-    .map(parseStoredJob)
-    .sort((left, right) => left.name.localeCompare(right.name));
+  const { records: jobs, unreadableCount } = partitionReadableJobs(
+    records.filter(({ id }) => !isDevFixtureId(id)),
+  );
+  jobs.sort((left, right) => left.name.localeCompare(right.name));
   const activeJobId = jobs.some(({ id }) => id === activeSetting?.value)
     ? activeSetting!.value
     : null;
-  return { jobs, activeJobId };
+  return { jobs, activeJobId, unreadableCount };
 }
 
 export async function getJob(jobId: string): Promise<Job | null> {
@@ -37,13 +40,19 @@ export async function getJob(jobId: string): Promise<Job | null> {
 }
 
 export async function hasConfiguredJob(): Promise<boolean> {
-  const { jobs } = await getJobListSnapshot();
-  return jobs.length > 0;
+  return (await ahaDatabase.jobs.toArray()).some(
+    ({ id }) => !isDevFixtureId(id),
+  );
 }
 
 export async function setActiveJob(jobId: string): Promise<void> {
   const job = await ahaDatabase.jobs.get(jobId);
   if (!job || isDevFixtureId(job.id)) {
+    throw new Error("That job is not available on this iPad.");
+  }
+  try {
+    parseStoredJob(job);
+  } catch {
     throw new Error("That job is not available on this iPad.");
   }
   await ahaDatabase.transaction("rw", ahaDatabase.settings, async () => {
@@ -98,7 +107,9 @@ export async function updateJobConfiguration(
     ahaDatabase.jobs,
     ahaDatabase.backupQueue,
     async () => {
-      const queued = await ahaDatabase.backupQueue.get(`job:${updated.id}`);
+      const queued = await ahaDatabase.backupQueue.get(
+        backupQueueKey("job", updated.id),
+      );
       const monotonicChangedAt = ensureLaterTimestamp(
         changedAt,
         queued?.clientUpdatedAt,

@@ -57,6 +57,7 @@ export default function JobSetup() {
         if (cancelled) return;
         if (!job) {
           setLoadError("That job is not available on this iPad.");
+          setState("ready");
           return;
         }
         setDraft(jobToSetupDraft(job));
@@ -67,6 +68,7 @@ export default function JobSetup() {
           setLoadError(
             "We couldn't open this job setup. Nothing was changed. Try again.",
           );
+          setState("ready");
         }
       });
     return () => {

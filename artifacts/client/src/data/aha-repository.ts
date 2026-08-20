@@ -28,6 +28,7 @@ import {
 import { isDevFixtureId } from "./dev-fixture";
 import { openLocalDataWithRecovery } from "./local-data-initialization";
 import { partitionReadableAhas } from "./stored-records";
+import { partitionReadableJobs } from "./stored-records";
 
 export interface HomeSnapshot {
   job: Job | null;
@@ -136,15 +137,20 @@ async function readActiveJob(): Promise<Job | null> {
 
     const activeJob = await ahaDatabase.jobs.get(activeSetting.value);
     if (activeJob) {
-      return parseStoredJob(activeJob);
+      try {
+        return parseStoredJob(activeJob);
+      } catch {
+        return null;
+      }
     }
   }
 
-  const jobs = await ahaDatabase.jobs.toArray();
-  const firstUsableJob = jobs.find(
-    ({ id }) => import.meta.env.DEV || !isDevFixtureId(id),
+  const { records: jobs } = partitionReadableJobs(
+    (await ahaDatabase.jobs.toArray()).filter(
+      ({ id }) => import.meta.env.DEV || !isDevFixtureId(id),
+    ),
   );
-  return firstUsableJob ? parseStoredJob(firstUsableJob) : null;
+  return jobs[0] ?? null;
 }
 
 export async function getHomeSnapshot(today: LocalDate): Promise<HomeSnapshot> {
@@ -446,20 +452,8 @@ export async function replaceWithBlankAha(
   job: Job,
   date: LocalDate,
 ): Promise<EditorSnapshot> {
-  const blank = createBlankAha(job, date, dependencies());
-  const previous = await ahaDatabase.ahas.get(ahaId);
-  const replacement = ahaSchema.parse({
-    ...blank,
-    id: ahaId,
-    sync: {
-      ...blank.sync,
-      savedLocallyAt: ensureLaterTimestamp(
-        blank.sync.savedLocallyAt,
-        previous ? parseStoredAha(previous).sync.savedLocallyAt : null,
-      ),
-    },
-  });
   const metadata = createBlankDraftMetadata(ahaId);
+  let replacement: Aha | null = null;
 
   await ahaDatabase.transaction(
     "rw",
@@ -468,6 +462,19 @@ export async function replaceWithBlankAha(
     ahaDatabase.ahaPdfs,
     ahaDatabase.backupQueue,
     async () => {
+      const blank = createBlankAha(job, date, dependencies());
+      const previous = await ahaDatabase.ahas.get(ahaId);
+      replacement = ahaSchema.parse({
+        ...blank,
+        id: ahaId,
+        sync: {
+          ...blank.sync,
+          savedLocallyAt: ensureLaterTimestamp(
+            blank.sync.savedLocallyAt,
+            previous ? parseStoredAha(previous).sync.savedLocallyAt : null,
+          ),
+        },
+      });
       await writeBlankAhaReplacement(
         {
           putAha: (value) => ahaDatabase.ahas.put(value),
@@ -486,6 +493,8 @@ export async function replaceWithBlankAha(
       );
     },
   );
+
+  if (!replacement) throw new Error("The blank AHA replacement did not save.");
 
   return {
     aha: replacement,

@@ -10,7 +10,7 @@ import {
   type LocalDate,
 } from "@workspace/aha-domain";
 
-import { ACTIVE_JOB_SETTING, ahaDatabase } from "./database";
+import { ACTIVE_JOB_SETTING, ahaDatabase, type AhaPdfRecord } from "./database";
 import {
   createBlankDraftMetadata,
   createCopiedDraftMetadata,
@@ -19,11 +19,13 @@ import {
   type DraftMetadata,
 } from "./draft-metadata";
 import { ensureDevFixture, isDevFixtureId } from "./dev-fixture";
+import { openLocalDataWithRecovery } from "./local-data-initialization";
 import { partitionReadableAhas } from "./stored-records";
 
 export interface HomeSnapshot {
   job: Job | null;
   todayAha: Aha | null;
+  todayPdfStatus: AhaPdfStatus | null;
   recentAhas: Aha[];
   unreadableCount: number;
 }
@@ -32,11 +34,35 @@ export interface EditorSnapshot {
   job: Job;
   aha: Aha;
   metadata: DraftMetadata;
+  pdf: AhaPdfState;
 }
+
+export type AhaPdfStatus = "missing" | "stale" | "current" | "unreadable";
+
+export type AhaPdfState =
+  | { status: "missing"; record: null }
+  | { status: "unreadable"; record: null }
+  | { status: "stale" | "current"; record: AhaPdfRecord };
 
 export interface StartTodayResult {
   aha: Aha;
   created: boolean;
+}
+
+interface BlankAhaReplacementWriter {
+  putAha: (aha: Aha) => Promise<unknown>;
+  putMetadata: (metadata: DraftMetadata) => Promise<unknown>;
+  deletePdf: (ahaId: string) => Promise<unknown>;
+}
+
+export async function writeBlankAhaReplacement(
+  writer: BlankAhaReplacementWriter,
+  replacement: Aha,
+  metadata: DraftMetadata,
+): Promise<void> {
+  await writer.putAha(replacement);
+  await writer.putMetadata(metadata);
+  await writer.deletePdf(replacement.id);
 }
 
 export function createLocalId(): string {
@@ -59,9 +85,27 @@ function dependencies() {
 }
 
 export async function initializeLocalData(today: LocalDate): Promise<void> {
-  await ahaDatabase.open();
+  await openLocalDataWithRecovery(ahaDatabase);
   if (import.meta.env.DEV) {
-    await ensureDevFixture(ahaDatabase, today);
+    try {
+      await ensureDevFixture(ahaDatabase, today);
+    } catch (error) {
+      const diagnostic =
+        typeof error === "object" && error !== null
+          ? {
+              name:
+                "name" in error && typeof error.name === "string"
+                  ? error.name
+                  : "UnknownError",
+              stack:
+                "stack" in error && typeof error.stack === "string"
+                  ? error.stack
+                  : undefined,
+            }
+          : { name: "UnknownError" };
+      console.error("Local data initialization failed", diagnostic);
+      throw error;
+    }
   }
 }
 
@@ -88,7 +132,13 @@ async function readActiveJob(): Promise<Job | null> {
 export async function getHomeSnapshot(today: LocalDate): Promise<HomeSnapshot> {
   const job = await readActiveJob();
   if (!job) {
-    return { job: null, todayAha: null, recentAhas: [], unreadableCount: 0 };
+    return {
+      job: null,
+      todayAha: null,
+      todayPdfStatus: null,
+      recentAhas: [],
+      unreadableCount: 0,
+    };
   }
 
   const { records, unreadableCount } = partitionReadableAhas(
@@ -98,9 +148,11 @@ export async function getHomeSnapshot(today: LocalDate): Promise<HomeSnapshot> {
     right.date.localeCompare(left.date),
   );
 
+  const todayAha = sorted.find((aha) => aha.date === today) ?? null;
   return {
     job,
-    todayAha: sorted.find((aha) => aha.date === today) ?? null,
+    todayAha,
+    todayPdfStatus: todayAha ? (await getAhaPdfState(todayAha)).status : null,
     recentAhas: sorted.filter((aha) => aha.date < today).slice(0, 3),
     unreadableCount,
   };
@@ -190,7 +242,73 @@ export async function getEditorSnapshot(
     metadata:
       (await ahaDatabase.draftMetadata.get(ahaId)) ??
       createBlankDraftMetadata(ahaId),
+    pdf: await getAhaPdfState(aha),
   };
+}
+
+function isReadablePdfRecord(value: unknown): value is AhaPdfRecord {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Partial<AhaPdfRecord>;
+  return (
+    typeof record.ahaId === "string" &&
+    record.ahaId.length > 0 &&
+    typeof record.filename === "string" &&
+    record.filename.length > 0 &&
+    record.bytes instanceof ArrayBuffer &&
+    record.bytes.byteLength > 0 &&
+    typeof record.generatedAt === "string" &&
+    !Number.isNaN(Date.parse(record.generatedAt)) &&
+    Number.isInteger(record.sourceRevision) &&
+    record.sourceRevision! >= 0
+  );
+}
+
+export async function getAhaPdfState(aha: Aha): Promise<AhaPdfState> {
+  const value: unknown = await ahaDatabase.ahaPdfs.get(aha.id);
+  return deriveAhaPdfState(aha, value);
+}
+
+export function deriveAhaPdfState(aha: Aha, value: unknown): AhaPdfState {
+  if (value === undefined) return { status: "missing", record: null };
+  if (!isReadablePdfRecord(value)) {
+    return { status: "unreadable", record: null };
+  }
+  return {
+    status: value.sourceRevision === aha.documentRevision ? "current" : "stale",
+    record: value,
+  };
+}
+
+export function hasRecordedCompletedUpdateSincePdf(
+  aha: Aha,
+  pdf: AhaPdfState,
+): boolean {
+  if (pdf.status === "current") return false;
+  const latestUpdate = aha.updatedAfterCompletionAt.at(-1);
+  if (!latestUpdate) return false;
+  if (!pdf.record) return true;
+  return Date.parse(latestUpdate) > Date.parse(pdf.record.generatedAt);
+}
+
+export async function storeAhaPdf(
+  aha: Aha,
+  filename: string,
+  bytes: Uint8Array,
+  generatedAt = new Date(),
+): Promise<AhaPdfRecord> {
+  if (!filename.trim() || !bytes.byteLength) {
+    throw new Error("A generated PDF filename and bytes are required");
+  }
+  const copiedBytes = bytes.slice();
+  const record: AhaPdfRecord = {
+    ahaId: aha.id,
+    filename,
+    bytes: copiedBytes.buffer as ArrayBuffer,
+    generatedAt: generatedAt.toISOString(),
+    sourceRevision: aha.documentRevision,
+  };
+  await ahaDatabase.ahaPdfs.put(record);
+  return record;
 }
 
 export async function persistEditedAha(aha: Aha): Promise<Aha> {
@@ -238,11 +356,24 @@ export async function replaceWithBlankAha(
     "rw",
     ahaDatabase.ahas,
     ahaDatabase.draftMetadata,
+    ahaDatabase.ahaPdfs,
     async () => {
-      await ahaDatabase.ahas.put(replacement);
-      await ahaDatabase.draftMetadata.put(metadata);
+      await writeBlankAhaReplacement(
+        {
+          putAha: (value) => ahaDatabase.ahas.put(value),
+          putMetadata: (value) => ahaDatabase.draftMetadata.put(value),
+          deletePdf: (value) => ahaDatabase.ahaPdfs.delete(value),
+        },
+        replacement,
+        metadata,
+      );
     },
   );
 
-  return { aha: replacement, job, metadata };
+  return {
+    aha: replacement,
+    job,
+    metadata,
+    pdf: { status: "missing", record: null },
+  };
 }

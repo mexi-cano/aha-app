@@ -5,6 +5,7 @@ import {
   ENERGY_CATEGORIES,
   MAX_CREW_MEMBERS,
   MAX_TASKS,
+  SAFETY_GATE_INSTRUCTION,
   SAFETY_GATE_QUESTION,
   WORKER_ACKNOWLEDGMENT,
   ahaSchema,
@@ -116,6 +117,10 @@ test("canonical form strings remain exact and ordered", () => {
     SAFETY_GATE_QUESTION,
     "Have all known hazards been identified and addressed using the Energy Wheel?",
   );
+  assert.equal(
+    SAFETY_GATE_INSTRUCTION,
+    'Do not proceed until you can answer "yes"',
+  );
 });
 
 test("AHA validation rejects non-canonical energy examples and date drift", () => {
@@ -206,6 +211,7 @@ test("blank first-day AHA uses job defaults and unsigned roster", () => {
   assert.equal(aha.header.location, job.defaults.location);
   assert.equal(aha.header.date, "2026-08-17");
   assert.equal(aha.header.rescuePlanRequired, null);
+  assert.equal(aha.personInChargeWorkerId, "worker-1");
   assert.deepEqual(aha.tasks, []);
   assert.deepEqual(
     aha.crew.map(({ workerId, signaturePng, signedAt }) => ({
@@ -233,6 +239,7 @@ test("Monday copy carries work forward but resets daily and signature state", ()
   assert.equal(copied.date, "2026-08-17");
   assert.equal(copied.header.date, copied.date);
   assert.equal(copied.header.rescuePlanRequired, true);
+  assert.equal(copied.personInChargeWorkerId, previous.personInChargeWorkerId);
   assert.equal(copied.description, previous.description);
   assert.equal(copied.meetingNotes, previous.meetingNotes);
   assert.equal(copied.tasks[0]?.id, "monday-task");
@@ -257,6 +264,43 @@ test("Monday copy carries work forward but resets daily and signature state", ()
   copied.energySelections[0]!.examples.length = 0;
   assert.notEqual(copied.tasks[0]!.controls, previous.tasks[0]!.controls);
   assert.equal(previous.energySelections[0]!.examples.length, 1);
+});
+
+test("stored AHA person-in-charge associations migrate without guessing duplicates", () => {
+  const current = previousAha();
+  assert.equal(
+    parseStoredAha({
+      ...current,
+      personInChargeWorkerId: "worker-2",
+    }).personInChargeWorkerId,
+    "worker-2",
+  );
+  const { personInChargeWorkerId: _association, ...legacy } = current;
+  assert.equal(parseStoredAha(legacy).personInChargeWorkerId, "worker-1");
+
+  const duplicatedLegacy = {
+    ...legacy,
+    crew: legacy.crew.map((member) => ({
+      ...member,
+      name: "Miguel Rodriguez",
+    })),
+  };
+  assert.equal(parseStoredAha(duplicatedLegacy).personInChargeWorkerId, null);
+
+  assert.equal(
+    parseStoredAha({
+      ...current,
+      personInChargeWorkerId: "missing-worker",
+    }).personInChargeWorkerId,
+    null,
+  );
+  assert.equal(
+    parseStoredAha({
+      ...current,
+      personInChargeWorkerId: null,
+    }).personInChargeWorkerId,
+    null,
+  );
 });
 
 test("most recent selection respects jobs, gaps, and today boundary", () => {

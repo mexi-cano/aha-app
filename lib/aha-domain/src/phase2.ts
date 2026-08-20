@@ -189,6 +189,64 @@ function energyChanged(current: Aha, next: Aha): boolean {
   });
 }
 
+function headerChanged(current: Aha, next: Aha): boolean {
+  const fields = [
+    "location",
+    "date",
+    "personInCharge",
+    "closestEmergencyCentre",
+    "emergencyNumber",
+    "musterPoint",
+    "workOrderPermit",
+    "jhaProcedureNumbers",
+    "rescuePlanRequired",
+  ] as const;
+  return fields.some((field) => current.header[field] !== next.header[field]);
+}
+
+function notApplicableChanged(current: Aha, next: Aha): boolean {
+  return (
+    current.notApplicable.workOrderPermit !==
+      next.notApplicable.workOrderPermit ||
+    current.notApplicable.jhaProcedureNumbers !==
+      next.notApplicable.jhaProcedureNumbers ||
+    current.notApplicable.meetingNotes !== next.notApplicable.meetingNotes
+  );
+}
+
+function printedCrewChanged(current: Aha, next: Aha): boolean {
+  if (current.crew.length !== next.crew.length) return true;
+  return current.crew.some((member, index) => {
+    const nextMember = next.crew[index];
+    return (
+      !nextMember ||
+      member.workerId !== nextMember.workerId ||
+      member.name !== nextMember.name ||
+      member.signaturePng !== nextMember.signaturePng
+    );
+  });
+}
+
+export function hasPdfSourceChanged(current: Aha, next: Aha): boolean {
+  return (
+    hasNonCrewPdfSourceChanged(current, next) ||
+    printedCrewChanged(current, next)
+  );
+}
+
+export function hasNonCrewPdfSourceChanged(current: Aha, next: Aha): boolean {
+  return (
+    current.date !== next.date ||
+    headerChanged(current, next) ||
+    current.description !== next.description ||
+    current.meetingNotes !== next.meetingNotes ||
+    notApplicableChanged(current, next) ||
+    tasksChanged(current, next) ||
+    energyChanged(current, next) ||
+    current.safetyCheck !== next.safetyCheck
+  );
+}
+
 export function hasSafetySensitiveContentChanged(
   current: Aha,
   next: Aha,
@@ -201,14 +259,46 @@ export function hasSafetySensitiveContentChanged(
 }
 
 export function applyInProgressEditRules(current: Aha, next: Aha): Aha {
+  return applyAhaMutationRules(current, next);
+}
+
+export interface AhaMutationRuleOptions {
+  recordCompletedUpdateAt?: Date;
+}
+
+export function applyAhaMutationRules(
+  current: Aha,
+  next: Aha,
+  options: AhaMutationRuleOptions = {},
+): Aha {
+  let adjusted = next;
   if (
-    current.status === "in_progress" &&
-    next.status === "in_progress" &&
+    (current.status === "in_progress" || current.status === "completed") &&
+    next.status === current.status &&
     hasSafetySensitiveContentChanged(current, next)
   ) {
-    return { ...next, safetyCheck: null };
+    adjusted = { ...adjusted, safetyCheck: null };
   }
-  return next;
+
+  const sourceChanged = hasPdfSourceChanged(current, adjusted);
+  if (!sourceChanged) return adjusted;
+
+  const shouldRecordCompletedUpdate =
+    current.status === "completed" &&
+    adjusted.status === "completed" &&
+    options.recordCompletedUpdateAt !== undefined &&
+    hasNonCrewPdfSourceChanged(current, adjusted);
+
+  return {
+    ...adjusted,
+    documentRevision: current.documentRevision + 1,
+    updatedAfterCompletionAt: shouldRecordCompletedUpdate
+      ? [
+          ...adjusted.updatedAfterCompletionAt,
+          options.recordCompletedUpdateAt!.toISOString(),
+        ]
+      : adjusted.updatedAfterCompletionAt,
+  };
 }
 
 export function getReviewReport(aha: Aha): ReviewReport {
@@ -413,6 +503,31 @@ function assertCrewEditable(aha: Aha): void {
   }
 }
 
+export function resolvePersonInChargeWorkerId(aha: Aha): string | null {
+  return aha.personInChargeWorkerId !== null &&
+    aha.crew.some(({ workerId }) => workerId === aha.personInChargeWorkerId)
+    ? aha.personInChargeWorkerId
+    : null;
+}
+
+export function selectPersonInChargeWorker(aha: Aha, workerId: string): Aha {
+  const worker = aha.crew.find((member) => member.workerId === workerId);
+  if (!worker) throw new Error("Crew member was not found");
+  return {
+    ...aha,
+    personInChargeWorkerId: worker.workerId,
+    header: { ...aha.header, personInCharge: worker.name },
+  };
+}
+
+export function enterCustomPersonInCharge(aha: Aha, name: string): Aha {
+  return {
+    ...aha,
+    personInChargeWorkerId: null,
+    header: { ...aha.header, personInCharge: name },
+  };
+}
+
 export function addCrewMember(aha: Aha, worker: JobWorker): Aha {
   assertCrewEditable(aha);
   if (aha.crew.some((member) => member.workerId === worker.id)) return aha;
@@ -430,6 +545,10 @@ export function removeCrewMember(aha: Aha, workerId: string): Aha {
   return {
     ...aha,
     crew: aha.crew.filter((member) => member.workerId !== workerId),
+    personInChargeWorkerId:
+      aha.personInChargeWorkerId === workerId
+        ? null
+        : aha.personInChargeWorkerId,
   };
 }
 
@@ -446,6 +565,10 @@ export function renameCrewMember(
   }
   return {
     ...aha,
+    header:
+      aha.personInChargeWorkerId === workerId
+        ? { ...aha.header, personInCharge: normalizedName }
+        : aha.header,
     crew: aha.crew.map((member) =>
       member.workerId === workerId
         ? {
@@ -508,6 +631,35 @@ export function addSignedCrewMember(
     signaturePng,
     now,
   );
+}
+
+export function addLateSignedCrewMember(
+  aha: Aha,
+  worker: JobWorker,
+  signaturePng: string,
+  now: Date,
+): Aha {
+  if (aha.status !== "completed") {
+    throw new Error("Late workers can only be added to a completed AHA");
+  }
+  if (aha.crew.some((member) => member.workerId === worker.id)) {
+    throw new Error("Crew member is already on this AHA");
+  }
+  if (aha.crew.length >= MAX_CREW_MEMBERS) {
+    throw new Error("This AHA already has 10 signature slots");
+  }
+  assertPngDataUrl(signaturePng);
+  return {
+    ...aha,
+    crew: [
+      ...aha.crew,
+      {
+        ...normalizedWorker(worker),
+        signaturePng,
+        signedAt: now.toISOString(),
+      },
+    ],
+  };
 }
 
 export function completeAha(aha: Aha, now: Date): Aha {

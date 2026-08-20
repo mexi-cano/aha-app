@@ -5,6 +5,7 @@ import {
   addCrewMember,
   removeCrewMember,
   renameCrewMember,
+  resolvePersonInChargeWorkerId,
   type Aha,
   type Job,
   type JobWorker,
@@ -21,6 +22,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { ForemanBadge } from "@/components/aha/foreman-badge";
 import {
   Dialog,
   DialogContent,
@@ -31,7 +33,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { createLocalId } from "@/data/aha-repository";
-import { getForemanWorkerId } from "@/features/aha-editor/crew-presentation";
 import { scrollToAndFocus } from "@/features/aha-editor/editor-navigation";
 import { cn } from "@/lib/utils";
 
@@ -39,7 +40,7 @@ interface CrewEditorProps {
   aha: Aha;
   job: Job;
   updateAha: (update: (current: Aha) => Aha) => void;
-  commitAha: (update: (current: Aha) => Aha) => Promise<boolean>;
+  commitAha: (update: (current: Aha) => Aha) => Promise<Aha | null>;
   focusCrew?: boolean;
   disabled?: boolean;
 }
@@ -79,10 +80,7 @@ export function CrewEditor({
     ({ workerId }) => workerId === pendingRemovalId,
   );
   const renameMember = aha.crew.find(({ workerId }) => workerId === renameId);
-  const foremanWorkerId = getForemanWorkerId(
-    aha.crew,
-    aha.header.personInCharge,
-  );
+  const foremanWorkerId = resolvePersonInChargeWorkerId(aha);
 
   useEffect(() => {
     if (focusCrew) setEditing(true);
@@ -207,11 +205,7 @@ export function CrewEditor({
               className="flex min-h-10 items-center gap-2 text-base font-medium"
             >
               {member.name}
-              {member.workerId === foremanWorkerId ? (
-                <span className="rounded-md bg-secondary px-2 py-0.5 text-xs font-bold text-primary">
-                  FOREMAN
-                </span>
-              ) : null}
+              {member.workerId === foremanWorkerId ? <ForemanBadge /> : null}
             </div>
           ))}
           {aha.crew.length === 0 ? (

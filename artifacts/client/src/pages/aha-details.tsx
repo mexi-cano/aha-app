@@ -9,13 +9,16 @@ import {
   TextField,
 } from "@/components/aha/form-field";
 import { PrefillBanner } from "@/components/aha/prefill-banner";
+import { PersonInChargeField } from "@/components/aha/person-in-charge-field";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import { formatLongDate } from "@/lib/date-format";
 import { cn } from "@/lib/utils";
 import { scrollToAndFocus } from "@/features/aha-editor/editor-navigation";
+import { shouldShowPrefillBanner } from "@/features/aha-editor/completed-update-grouping";
 
 export default function AhaDetails() {
-  const { aha, updateAha, navigateSafely } = useAhaEditor();
+  const { aha, updateAha, navigateSafely, editorBasePath, editorMode } =
+    useAhaEditor();
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
@@ -49,7 +52,7 @@ export default function AhaDetails() {
   return (
     <EditorShell>
       <div className="flex flex-col gap-5">
-        <PrefillBanner />
+        {shouldShowPrefillBanner(editorMode) ? <PrefillBanner /> : null}
         <header>
           <h1 className="text-[28px] font-bold">Details</h1>
           <p className="mt-1 text-base font-medium text-muted-foreground">
@@ -72,15 +75,7 @@ export default function AhaDetails() {
               value={aha.header.location}
               onChange={(event) => updateHeader("location", event.target.value)}
             />
-            <TextField
-              id="person-in-charge"
-              label="Person in charge"
-              requirement="required"
-              value={aha.header.personInCharge}
-              onChange={(event) =>
-                updateHeader("personInCharge", event.target.value)
-              }
-            />
+            <PersonInChargeField aha={aha} updateAha={updateAha} />
             <TextField
               id="closest-emergency-centre"
               label="Closest emergency centre"
@@ -128,7 +123,7 @@ export default function AhaDetails() {
               }
             />
             <fieldset className="flex flex-col gap-2" aria-required="true">
-              <legend className="text-base font-bold">
+              <legend className="mb-2 text-base font-bold">
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span>Is a rescue plan required?</span>
                   <FieldRequirementBadge requirement="required" />
@@ -183,7 +178,7 @@ export default function AhaDetails() {
 
         <EditorContinue
           next="2 Work"
-          onContinue={() => void navigateSafely(`/ahas/${aha.id}/work`)}
+          onContinue={() => void navigateSafely(`${editorBasePath}/work`)}
         />
       </div>
     </EditorShell>

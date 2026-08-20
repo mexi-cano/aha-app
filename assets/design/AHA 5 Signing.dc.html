@@ -22,8 +22,8 @@ a { color:#374B96; } a:hover { color:#2A3A78; }
     <div style="display:flex; align-items:center; gap:10px;">
       <div style="display:flex; background:#FFFFFF; border:1px solid #D9DDE7; border-radius:10px; padding:3px; gap:2px;">
         <button onClick="{{ setList }}" style="border:none; border-radius:8px; padding:9px 14px; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; white-space:nowrap; flex-shrink:0; cursor:pointer; background:{{ lBg }}; color:{{ lFg }};">Crew list</button>
-        <button onClick="{{ setSign }}" style="border:none; border-radius:8px; padding:9px 14px; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; white-space:nowrap; flex-shrink:0; cursor:pointer; background:{{ sBg }}; color:{{ sFg }};">Signature</button>
-        <button onClick="{{ setAha }}" style="border:none; border-radius:8px; padding:9px 14px; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; white-space:nowrap; flex-shrink:0; cursor:pointer; background:{{ aBg }}; color:{{ aFg }};">Read-only AHA</button>
+        <button onClick="{{ setSign }}" style="border:none; border-radius:8px; padding:9px 14px; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; white-space:nowrap; flex-shrink:0; cursor:pointer; background:{{ sBg }}; color:{{ sFg }};">Worker review &amp; sign</button>
+        <button onClick="{{ setAha }}" style="border:none; border-radius:8px; padding:9px 14px; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; white-space:nowrap; flex-shrink:0; cursor:pointer; background:{{ aBg }}; color:{{ aFg }};">Roster overview</button>
       </div>
       <button onClick="{{ resetDemo }}" style="border:1px solid #D9DDE7; border-radius:8px; padding:8px 14px; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; cursor:pointer; background:#FFFFFF; color:#59617A;" style-hover="color:#191D2B;">Reset demo</button>
     </div>
@@ -39,17 +39,17 @@ a { color:#374B96; } a:hover { color:#2A3A78; }
         </div>
       </div>
       <div style="display:flex; align-items:center; gap:16px; padding:10px 28px 8px;">
-        <button onClick="{{ askExit }}" style="border:none; background:transparent; padding:0 6px; height:48px; white-space:nowrap; flex-shrink:0; font-family:'Barlow',sans-serif; font-size:17px; font-weight:600; color:#374B96; cursor:pointer;" style-hover="color:#2A3A78;">‹ Exit signing</button>
-        <div style="flex:1; text-align:center; font-size:15px; font-weight:600; color:#59617A;">I-40 Utility Relocation — Friday, Aug 14</div>
+        <button onClick="{{ headerBack }}" style="border:none; background:transparent; padding:0 6px; height:48px; white-space:nowrap; flex-shrink:0; font-family:'Barlow',sans-serif; font-size:17px; font-weight:600; color:#374B96; cursor:pointer;" style-hover="color:#2A3A78;">{{ headerBackLabel }}</button>
+        <div style="flex:1; text-align:center; font-size:15px; font-weight:600; color:#59617A; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ headerTitle }}</div>
         <div style="font-size:15px; font-weight:700; color:#191D2B; min-width:110px; text-align:right;">{{ progressLabel }}</div>
       </div>
-      <div style="background:#374B96; color:#FFFFFF; text-align:center; padding:11px; font-size:15px; font-weight:700; letter-spacing:0.08em;">SIGNING MODE — HAND THE DEVICE TO EACH CREW MEMBER</div>
+      <div style="background:#374B96; color:#FFFFFF; text-align:center; padding:11px; font-size:15px; font-weight:700; letter-spacing:0.08em;">{{ signingBanner }}</div>
       <div style="flex:1; overflow-y:auto;">
         <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
           <div style="width:700px; margin:0 auto; display:flex; flex-direction:column; gap:14px; padding:24px 0 56px;">
             <div style="display:flex; flex-direction:column; gap:2px;">
               <div style="font-size:28px; font-weight:700;">Sign today's AHA</div>
-              <div style="font-size:17px; font-weight:500; color:#59617A;">Each crew member reads the AHA, then signs on this device</div>
+              <div style="font-size:17px; font-weight:500; color:#59617A;">Select each worker to review today's AHA and sign.</div>
             </div>
             <button onClick="{{ viewAhaFromList }}" style="width:100%; height:56px; border:1.5px solid #C6CDE8; border-radius:12px; background:#FFFFFF; color:#374B96; font-family:'Barlow',sans-serif; font-size:17px; font-weight:600; cursor:pointer;" style-hover="background:#EAEDF7;">View today's AHA</button>
             <div style="display:flex; flex-direction:column; gap:10px; padding-top:4px;">
@@ -63,7 +63,7 @@ a { color:#374B96; } a:hover { color:#2A3A78; }
                 <sc-if value="{{ m.unsigned }}" hint-placeholder-val="{{ false }}">
                   <button onClick="{{ m.sign }}" style="display:flex; align-items:center; gap:14px; min-height:64px; padding:0 20px; background:#FFFFFF; border:1.5px solid #C6CDE8; border-radius:12px; cursor:pointer; font-family:'Barlow',sans-serif; text-align:left; width:100%; box-sizing:border-box;" style-hover="background:#EAEDF7;">
                     <div style="flex:1; font-size:18px; font-weight:600; color:#191D2B;">{{ m.name }}</div>
-                    <div style="font-size:16px; font-weight:600; color:#374B96;">Tap to sign ›</div>
+                    <div style="font-size:16px; font-weight:600; color:#374B96;">Review &amp; sign ›</div>
                   </button>
                 </sc-if>
               </sc-for>
@@ -77,25 +77,63 @@ a { color:#374B96; } a:hover { color:#2A3A78; }
         </sc-if>
         <sc-if value="{{ isSign }}" hint-placeholder-val="{{ false }}">
           <div style="width:700px; margin:0 auto; display:flex; flex-direction:column; gap:16px; padding:16px 0 56px;">
-            <button onClick="{{ backToList }}" style="align-self:flex-start; border:none; background:transparent; padding:0 6px; height:48px; white-space:nowrap; flex-shrink:0; font-family:'Barlow',sans-serif; font-size:17px; font-weight:600; color:#374B96; cursor:pointer;" style-hover="color:#2A3A78;">‹ Back to crew list</button>
-            <sc-if value="{{ isMember }}" hint-placeholder-val="{{ true }}">
-              <div style="display:flex; flex-direction:column; gap:2px;">
-                <div style="font-size:30px; font-weight:700;">{{ signingName }}</div>
-                <div style="font-size:17px; font-weight:500; color:#59617A;">Signing for Friday, August 14</div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <div style="display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+                <div style="display:flex; align-items:center; flex-wrap:wrap; gap:10px;"><div style="font-size:30px; font-weight:700;">{{ signingName }}</div>
+                <sc-if value="{{ signingForeman }}" hint-placeholder-val="{{ false }}"><span style="font-size:13px; font-weight:700; color:#374B96; background:#EAEDF7; border-radius:6px; padding:3px 8px;">{{ foremanLabel }}</span></sc-if>
+                <span style="height:32px; display:flex; align-items:center; padding:0 12px; border:1.5px solid #C6CDE8; border-radius:8px; font-size:13px; font-weight:800; letter-spacing:0.08em; color:#374B96;">{{ readOnlyLabel }}</span></div>
+                <div style="min-height:48px; display:flex; align-items:center; gap:4px; padding:4px; border:1.5px solid #C6CDE8; border-radius:10px; background:#FFFFFF;"><button onClick="{{ setEnglish }}" style="height:40px; padding:0 12px; border:none; border-radius:7px; background:{{ enBg }}; color:{{ enFg }}; font-family:'Barlow',sans-serif; font-size:14px; font-weight:700; cursor:pointer;">English</button><button onClick="{{ setSpanish }}" style="height:40px; padding:0 12px; border:none; border-radius:7px; background:{{ esBg }}; color:{{ esFg }}; font-family:'Barlow',sans-serif; font-size:14px; font-weight:700; cursor:pointer;">Español</button></div>
               </div>
-            </sc-if>
+              <div style="font-size:17px; font-weight:500; color:#59617A;">{{ signingForLabel }}</div>
+            </div>
             <sc-if value="{{ isAdd }}" hint-placeholder-val="{{ false }}">
               <div style="display:flex; flex-direction:column; gap:8px;">
-                <div style="font-size:16px; font-weight:700;">Worker name <span style="font-weight:500; color:#59617A;">— joins today's crew</span></div>
-                <input type="text" value="{{ nameVal }}" onChange="{{ onName }}" placeholder="First and last name" style="width:100%; box-sizing:border-box; border:1.5px solid #D9DDE7; border-radius:10px; padding:14px 16px; font-family:'Barlow',sans-serif; font-size:20px; font-weight:600; color:#191D2B; background:#FFFFFF; outline:none;" style-focus="border-color:#374B96; box-shadow:0 0 0 3px #EAEDF7;">
-                <div style="font-size:17px; font-weight:500; color:#59617A;">Signing for Friday, August 14</div>
+                <div style="font-size:16px; font-weight:700;">{{ workerNameLabel }} <span style="font-weight:500; color:#59617A;">— {{ workerNameHelper }}</span></div>
+                <input type="text" value="{{ nameVal }}" onChange="{{ onName }}" placeholder="{{ workerNamePlaceholder }}" style="width:100%; box-sizing:border-box; border:1.5px solid #D9DDE7; border-radius:10px; padding:14px 16px; font-family:'Barlow',sans-serif; font-size:20px; font-weight:600; color:#191D2B; background:#FFFFFF; outline:none;" style-focus="border-color:#374B96; box-shadow:0 0 0 3px #EAEDF7;">
               </div>
             </sc-if>
-            <button onClick="{{ viewAhaFromSign }}" style="align-self:flex-start; height:48px; padding:0 4px; border:none; background:transparent; font-family:'Barlow',sans-serif; font-size:17px; font-weight:600; color:#374B96; cursor:pointer; text-decoration:underline; text-underline-offset:3px;" style-hover="color:#2A3A78;">Review the AHA ›</button>
-            <div style="background:#EAEDF7; border:1px solid #C6CDE8; border-radius:12px; padding:18px 20px; font-size:17px; font-weight:500; line-height:1.5;">I have reviewed all applicable documentation, site hazards, and my responsibilities to follow safe work plans to protect myself and others while on site.</div>
+            <div style="background:#EAEDF7; border:1px solid #C6CDE8; border-radius:12px; padding:16px 20px; font-size:16px; font-weight:600; line-height:1.5; color:#2A3A78;">{{ reviewNotice }}</div>
+
+            <div style="background:#FFFFFF; border:1px solid #D9DDE7; border-radius:14px; padding:20px 24px; display:flex; flex-direction:column; gap:14px;">
+              <div style="font-size:13px; font-weight:700; letter-spacing:0.1em; color:#59617A;">{{ detailsLabel }}</div>
+              <div style="font-size:18px; font-weight:700;">I-40 Utility Relocation — Raleigh, NC</div>
+              <div style="font-size:16px; font-weight:500; color:#59617A;">{{ detailDateLabel }}</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px 20px; border-top:1px solid #E7EAF2; padding-top:14px;">
+                <div><div style="font-size:14px; font-weight:700; color:#59617A;">{{ locationLabel }}</div><div style="font-size:16px; font-weight:500;">Eastbound shoulder near Exit 285</div></div>
+                <div><div style="font-size:14px; font-weight:700; color:#59617A;">{{ emergencyCentreLabel }}</div><div style="font-size:16px; font-weight:500;">WakeMed Raleigh Campus</div></div>
+                <div><div style="font-size:14px; font-weight:700; color:#59617A;">{{ emergencyNumberLabel }}</div><div style="font-size:16px; font-weight:500;">911 / Site safety: (919) 555-0182</div></div>
+                <div><div style="font-size:14px; font-weight:700; color:#59617A;">{{ musterPointLabel }}</div><div style="font-size:16px; font-weight:500;">North parking lot, gate 3</div></div>
+                <div><div style="font-size:14px; font-weight:700; color:#59617A;">{{ rescuePlanLabel }}</div><div style="font-size:16px; font-weight:500;">{{ yesLabel }}</div></div>
+                <div><div style="font-size:14px; font-weight:700; color:#59617A;">{{ workPermitLabel }}</div><div style="font-size:16px; font-weight:500;">WO-88213 / Permit E-4471</div></div>
+                <div><div style="font-size:14px; font-weight:700; color:#59617A;">{{ jhaLabel }}</div><div style="font-size:16px; font-weight:500;">JHA-2026-0147, SOP-114</div></div>
+              </div>
+              <div style="border-top:1px solid #E7EAF2; padding-top:14px;"><div style="font-size:14px; font-weight:700; color:#59617A;">{{ descriptionLabel }}</div><div style="font-size:16px; font-weight:500; line-height:1.45;">Excavation and directional bore for fiber conduit relocation along the eastbound shoulder; potholing existing utilities; loading and hauling spoils.</div></div>
+            </div>
+
+            <div style="background:#FFFFFF; border:1px solid #D9DDE7; border-radius:14px; padding:20px 24px; display:flex; flex-direction:column; gap:16px;">
+              <div style="font-size:13px; font-weight:700; letter-spacing:0.1em; color:#59617A;">{{ workLabel }}</div>
+              <div style="border-top:1px solid #E7EAF2; padding-top:14px; display:flex; flex-direction:column; gap:6px;"><div style="font-size:18px; font-weight:700;">Excavation around existing utility</div><div style="font-size:16px; font-weight:500;"><span style="font-weight:700; color:#59617A;">{{ hazardsLabel }}:</span> Mobile equipment, cave-in, slips/trips</div><div style="font-size:16px; font-weight:500;"><span style="font-weight:700; color:#59617A;">{{ controlsLabel }}:</span> Locates verified and marked. Spotter for all digging. Trench box below 5 ft.</div></div>
+              <div style="border-top:1px solid #E7EAF2; padding-top:14px; display:flex; flex-direction:column; gap:6px;"><div style="font-size:18px; font-weight:700;">Directional bore under roadway</div><div style="font-size:16px; font-weight:500;"><span style="font-weight:700; color:#59617A;">{{ hazardsLabel }}:</span> Rotating equipment, pinch points, traffic</div><div style="font-size:16px; font-weight:500;"><span style="font-weight:700; color:#59617A;">{{ controlsLabel }}:</span> Guards in place. No loose clothing near rotating parts. Work zone signage and flagger per traffic control plan.</div></div>
+              <div style="border-top:1px solid #E7EAF2; padding-top:14px; display:flex; flex-direction:column; gap:6px;"><div style="font-size:18px; font-weight:700;">Loading spoils</div><div style="font-size:16px; font-weight:500;"><span style="font-weight:700; color:#59617A;">{{ hazardsLabel }}:</span> Mobile equipment, overhead load</div><div style="font-size:16px; font-weight:500;"><span style="font-weight:700; color:#59617A;">{{ controlsLabel }}:</span> Never under a suspended load. Spotter when trucks reverse. Loads covered before leaving site.</div></div>
+            </div>
+
+            <div style="background:#FFFFFF; border:1px solid #D9DDE7; border-radius:14px; padding:20px 24px; display:flex; flex-direction:column; gap:12px;">
+              <div style="font-size:13px; font-weight:700; letter-spacing:0.1em; color:#59617A;">{{ energyLabel }}</div>
+              <div style="font-size:16px; font-weight:500;"><strong>{{ gravityLabel }}:</strong> {{ gravityExamples }}</div>
+              <div style="font-size:16px; font-weight:500;"><strong>{{ motionLabel }}:</strong> {{ motionExamples }}</div>
+              <div style="font-size:16px; font-weight:500;"><strong>{{ mechanicalLabel }}:</strong> {{ mechanicalExamples }}</div>
+              <div style="border-top:1px solid #E7EAF2; padding-top:12px; font-size:16px; font-weight:600;">{{ safetyLabel }}: <span style="color:#1E8E3E;">{{ yesLabel }} ✓</span></div>
+            </div>
+
+            <div style="background:#FFFFFF; border:1px solid #D9DDE7; border-radius:14px; padding:20px 24px; display:flex; flex-direction:column; gap:6px;"><div style="font-size:13px; font-weight:700; letter-spacing:0.1em; color:#59617A;">{{ meetingNotesLabel }}</div><div style="font-size:16px; font-weight:500; line-height:1.45;">Watch overhead lines near station 14+50. New crew member on site — pair with Jordan Reed.</div></div>
+
+            <div style="background:#FFFFFF; border:1px solid #D9DDE7; border-radius:14px; padding:20px 24px; display:flex; flex-direction:column; gap:16px;">
+              <div><div style="font-size:22px; font-weight:700;">{{ acknowledgmentLabel }}</div><div style="font-size:16px; font-weight:500; color:#59617A;">{{ acknowledgmentHelper }}</div></div>
+            <div style="background:#EAEDF7; border:1px solid #C6CDE8; border-radius:12px; padding:18px 20px; font-size:17px; font-weight:500; line-height:1.5;">{{ acknowledgmentText }}</div>
+            <div style="font-size:18px; font-weight:700;">{{ signAsLabel }} {{ signingName }}</div>
             <button onClick="{{ tapPad }}" style="position:relative; width:100%; height:250px; border:2px dashed {{ padBorder }}; border-radius:14px; background:#FFFFFF; cursor:pointer; display:block; padding:0;">
               <sc-if value="{{ noInk }}" hint-placeholder-val="{{ true }}">
-                <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:'Barlow',sans-serif; font-size:18px; font-weight:500; color:#8A93AC;">Sign here with your finger</div>
+                <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:'Barlow',sans-serif; font-size:18px; font-weight:500; color:#8A93AC;">{{ signHereLabel }}</div>
               </sc-if>
               <sc-if value="{{ hasInk }}" hint-placeholder-val="{{ false }}">
                 <svg viewBox="0 0 560 220" style="position:absolute; inset:0; width:100%; height:100%;"><path d="M 60 150 C 90 70, 120 190, 165 120 C 200 66, 230 150, 275 128 C 320 106, 330 170, 385 120 C 420 88, 460 140, 500 110" fill="none" stroke="#191D2B" stroke-width="3.5" stroke-linecap="round"></path></svg>
@@ -104,14 +142,14 @@ a { color:#374B96; } a:hover { color:#2A3A78; }
               <div style="position:absolute; left:32px; bottom:48px; font-family:'Barlow',sans-serif; font-size:20px; color:#8A93AC;">✕</div>
             </button>
             <div style="display:flex; gap:12px;">
-              <button onClick="{{ clearInk }}" style="height:64px; padding:0 26px; border:1.5px solid {{ clearBorder }}; border-radius:12px; background:#FFFFFF; color:{{ clearFg }}; font-family:'Barlow',sans-serif; font-size:17px; font-weight:600; cursor:{{ clearCursor }};">Clear</button>
-              <button onClick="{{ confirmSign }}" style="flex:1; height:64px; border:none; border-radius:12px; background:{{ confirmBg }}; color:{{ confirmFg }}; font-family:'Barlow',sans-serif; font-size:19px; font-weight:700; letter-spacing:0.04em; cursor:{{ confirmCursor }};">CONFIRM SIGNATURE</button>
+              <button onClick="{{ clearInk }}" style="height:64px; padding:0 26px; border:1.5px solid {{ clearBorder }}; border-radius:12px; background:#FFFFFF; color:{{ clearFg }}; font-family:'Barlow',sans-serif; font-size:17px; font-weight:600; cursor:{{ clearCursor }};">{{ clearLabel }}</button>
+              <button onClick="{{ confirmSign }}" style="flex:1; height:64px; border:none; border-radius:12px; background:{{ confirmBg }}; color:{{ confirmFg }}; font-family:'Barlow',sans-serif; font-size:19px; font-weight:700; letter-spacing:0.04em; cursor:{{ confirmCursor }};">{{ confirmLabel }}</button>
+            </div>
             </div>
           </div>
         </sc-if>
         <sc-if value="{{ isAha }}" hint-placeholder-val="{{ false }}">
           <div style="width:700px; margin:0 auto; display:flex; flex-direction:column; gap:16px; padding:16px 0 56px;">
-            <button onClick="{{ backToSigning }}" style="align-self:flex-start; border:none; background:transparent; padding:0 6px; height:48px; white-space:nowrap; flex-shrink:0; font-family:'Barlow',sans-serif; font-size:17px; font-weight:600; color:#374B96; cursor:pointer;" style-hover="color:#2A3A78;">‹ Back to signing</button>
             <div style="display:flex; align-items:center; gap:12px;">
               <div style="font-size:28px; font-weight:700;">Today's AHA</div>
               <div style="height:32px; display:flex; align-items:center; padding:0 12px; border:1.5px solid #C6CDE8; border-radius:8px; font-size:13px; font-weight:800; letter-spacing:0.08em; color:#374B96;">READ ONLY</div>
@@ -170,7 +208,6 @@ a { color:#374B96; } a:hover { color:#2A3A78; }
                 <div style="min-height:32px; display:flex; align-items:center; font-size:16px; font-weight:500;">Aaron Webb</div>
               </div>
             </div>
-            <button onClick="{{ backToSigning }}" style="border:none; width:100%; height:72px; border-radius:14px; background:#374B96; color:#FFFFFF; font-family:'Barlow',sans-serif; font-size:21px; font-weight:700; letter-spacing:0.05em; cursor:pointer;" style-hover="background:#31438C;" style-active="background:#2A3A78;">BACK TO SIGNING</button>
           </div>
         </sc-if>
       </div>
@@ -201,7 +238,7 @@ a { color:#374B96; } a:hover { color:#2A3A78; }
     </div>
   </div>
   <div style="width:874px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px; line-height:1.55; color:#59617A;">
-    <div>One device passes around the crew; rows ≥56px. “View today's AHA” / “Review the AHA” open the summary read-only — no Edit buttons, “Back to signing” returns where the reader came from; nothing in signing mode is editable. Acknowledgment is the official statement verbatim. Tap a signed row → re-sign dialog (replaces the earlier signature). “+ Add Worker”: name → acknowledgment → signature, appends to today's crew. CONFIRM needs ink (and a name when adding); Clear resets the pad. “‹ Exit signing” with unsigned crew → confirm dialog; the AHA stays In progress (Home shows CONTINUE SIGNING). FINISH enables when everyone has signed → Completed (Screen 6). Signatures are timestamped.</div>
+    <div>One device passes around the crew; rows ≥56px. “Review &amp; sign” opens one naturally scrolling, read-only page: worker identity → every safety-relevant AHA section except the crew roster → acknowledgment → signature. English/Español is transient and resets to English for each worker; Spanish translates fixed and canonical presentation while crew-entered daily content remains exactly as written. Switching preserves scroll, name, ink, errors, and in-flight state. The app presents the AHA but does not claim that scrolling proves every line was read. No scroll gate, checkbox, accordion, jump link, nested viewer, or automatic next worker. Successful normal, added-worker, late-worker, and replacement signatures return to the proper controller. The roster overview and PDF remain English.</div>
   </div>
 </div>
 </x-dc>
@@ -219,7 +256,7 @@ class Component extends DCLogic {
       { id: 8, name: 'Aaron Webb', time: null }
     ];
   }
-  state = { view: 'list', crew: this.initCrew(), signingId: null, ahaFrom: 'list', ink: false, addName: '', resignId: null, exitAsk: false };
+  state = { view: 'list', crew: this.initCrew(), signingId: null, ink: false, addName: '', resignId: null, exitAsk: false, language: 'en' };
   renderVals() {
     const v = this.state.view, crew = this.state.crew;
     const signedCount = crew.filter(m => m.time).length;
@@ -229,19 +266,23 @@ class Component extends DCLogic {
     const unsigned = crew.filter(m => !m.time).length;
     const ready = this.state.ink && (v !== 'add' || this.state.addName.trim().length > 0);
     const on = '#191D2B', off = 'transparent', onFg = '#FFFFFF', offFg = '#59617A';
+    const es = this.state.language === 'es';
     return {
       isList: v === 'list', isSign: v === 'sign' || v === 'add', isMember: v === 'sign', isAdd: v === 'add', isAha: v === 'aha',
-      progressLabel: signedCount + ' of ' + crew.length + ' signed',
+      progressLabel: (es && (v === 'sign' || v === 'add')) ? signedCount + ' de ' + crew.length + ' firmaron' : signedCount + ' of ' + crew.length + ' signed',
+      signingBanner: (es && (v === 'sign' || v === 'add')) ? 'MODO DE FIRMA — ENTREGUE EL DISPOSITIVO A CADA MIEMBRO DE LA CUADRILLA' : 'SIGNING MODE — HAND THE DEVICE TO EACH CREW MEMBER',
       crewRows: crew.map(m => ({
         name: m.name, isForeman: !!m.foreman, signed: !!m.time, unsigned: !m.time, time: m.time,
-        sign: () => this.setState({ view: 'sign', signingId: m.id, ink: false }),
+        sign: () => this.setState({ view: 'sign', signingId: m.id, ink: false, language: 'en' }),
         askResign: () => this.setState({ resignId: m.id })
       })),
-      signingName: signing ? signing.name : 'Crew member',
+      signingName: v === 'add' ? (this.state.addName.trim() || (es ? 'Agregar trabajador y firmar' : 'Add worker & sign')) : (signing ? signing.name : 'Crew member'),
+      signingForeman: !!(signing && signing.foreman),
+      headerBackLabel: v === 'list' ? '‹ Exit signing' : (es && (v === 'sign' || v === 'add') ? '‹ Volver a la cuadrilla' : '‹ Back to crew list'),
+      headerTitle: v === 'sign' ? (signing ? signing.name : 'Crew member') : (v === 'add' ? (this.state.addName.trim() || 'Add worker') : (v === 'aha' ? "Today's AHA" : 'I-40 Utility Relocation — Friday, Aug 14')),
+      headerBack: () => { if (v === 'list') { if (unsigned > 0) this.setState({ exitAsk: true }); } else this.setState({ view: 'list', ink: false }); },
       backToList: () => this.setState({ view: 'list', ink: false }),
-      viewAhaFromList: () => this.setState({ view: 'aha', ahaFrom: 'list' }),
-      viewAhaFromSign: () => this.setState(s => ({ view: 'aha', ahaFrom: s.view })),
-      backToSigning: () => this.setState(s => ({ view: s.ahaFrom })),
+      viewAhaFromList: () => this.setState({ view: 'aha' }),
       tapPad: () => this.setState({ ink: true }),
       clearInk: () => this.setState({ ink: false }),
       hasInk: this.state.ink, noInk: !this.state.ink,
@@ -261,13 +302,13 @@ class Component extends DCLogic {
           this.setState(s => ({ crew: s.crew.map(m => m.id === s.signingId ? { ...m, time: '7:52 AM' } : m), view: 'list', ink: false, signingId: null }));
         }
       },
-      addWorker: () => this.setState({ view: 'add', addName: '', ink: false }),
+      addWorker: () => this.setState({ view: 'add', addName: '', ink: false, language: 'en' }),
       nameVal: this.state.addName,
       onName: (e) => this.setState({ addName: e.target.value }),
       hasResign: this.state.resignId != null,
       resignName: resignM ? resignM.name : '', resignTime: resignM ? resignM.time : '',
       cancelResign: () => this.setState({ resignId: null }),
-      confirmResign: () => this.setState(s => ({ view: 'sign', signingId: s.resignId, resignId: null, ink: false })),
+      confirmResign: () => this.setState(s => ({ view: 'sign', signingId: s.resignId, resignId: null, ink: false, language: 'en' })),
       unsignedLabel: unsigned === 1 ? "1 crew member hasn't signed" : unsigned + " crew members haven't signed",
       askExit: () => { if (unsigned > 0) this.setState({ exitAsk: true }); },
       hasExit: this.state.exitAsk,
@@ -276,12 +317,22 @@ class Component extends DCLogic {
       finishBg: all ? '#374B96' : '#D9DDE7', finishFg: all ? '#FFFFFF' : '#8A93AC', finishCursor: all ? 'pointer' : 'default',
       finishHelper: all ? "All signatures in — this completes today's AHA" : 'Enables when everyone has signed',
       setList: () => this.setState({ view: 'list' }),
-      setSign: () => this.setState(s => { const first = s.crew.find(m => !m.time) || s.crew[0]; return { view: 'sign', signingId: first.id, ink: false }; }),
-      setAha: () => this.setState({ view: 'aha', ahaFrom: 'list' }),
+      setSign: () => this.setState(s => { const first = s.crew.find(m => !m.time) || s.crew[0]; return { view: 'sign', signingId: first.id, ink: false, language: 'en' }; }),
+      setAha: () => this.setState({ view: 'aha' }),
       lBg: v === 'list' ? on : off, lFg: v === 'list' ? onFg : offFg,
-      sBg: v === 'sign' ? on : off, sFg: v === 'sign' ? onFg : offFg,
+      sBg: v === 'sign' || v === 'add' ? on : off, sFg: v === 'sign' || v === 'add' ? onFg : offFg,
       aBg: v === 'aha' ? on : off, aFg: v === 'aha' ? onFg : offFg,
-      resetDemo: () => this.setState({ view: 'list', crew: this.initCrew(), signingId: null, ahaFrom: 'list', ink: false, addName: '', resignId: null, exitAsk: false })
+      foremanLabel: es ? 'CAPATAZ' : 'FOREMAN', readOnlyLabel: es ? 'SOLO LECTURA' : 'READ ONLY',
+      signingForLabel: es ? 'Firma correspondiente al viernes, 14 de agosto' : 'Signing for Friday, August 14',
+      workerNameLabel: es ? 'Nombre del trabajador' : 'Worker name', workerNameHelper: es ? 'se agrega a la cuadrilla de hoy' : "joins today's crew", workerNamePlaceholder: es ? 'Nombre y apellido' : 'First and last name',
+      reviewNotice: es ? 'Lea el AHA de hoy a continuación. Los detalles específicos del trabajo aparecen exactamente como fueron escritos y no se traducen automáticamente. Antes de firmar, pida a la persona a cargo que le explique cualquier punto que no comprenda.' : "Read today's AHA below. Ask the Person in charge about anything unclear before signing.",
+      detailsLabel: es ? 'DETALLES' : 'DETAILS', detailDateLabel: es ? 'viernes, 14 de agosto · Persona a cargo: Miguel Rodriguez' : 'Friday, August 14 · Person in charge: Miguel Rodriguez',
+      locationLabel: es ? 'Ubicación' : 'Location', emergencyCentreLabel: es ? 'Centro de emergencias más cercano' : 'Closest emergency centre', emergencyNumberLabel: es ? 'Número de emergencia' : 'Emergency number', musterPointLabel: es ? 'Punto de reunión' : 'Muster point', rescuePlanLabel: es ? 'Se requiere un plan de rescate' : 'Rescue plan required', workPermitLabel: es ? 'Número de orden de trabajo / permiso' : 'Work order / permit number', jhaLabel: es ? 'Números de JHA / procedimientos' : 'JHA / procedure numbers',
+      descriptionLabel: es ? 'DESCRIPCIÓN DEL TRABAJO' : 'DESCRIPTION OF WORK', workLabel: es ? 'TRABAJO — 3 TAREAS' : 'WORK — 3 TASKS', hazardsLabel: es ? 'Peligros' : 'Hazards', controlsLabel: es ? 'Controles' : 'Controls',
+      energyLabel: es ? 'ENERGÍA — 3 DE 11' : 'ENERGY — 3 OF 11', gravityLabel: es ? 'Gravedad' : 'Gravity', gravityExamples: es ? 'Derrumbe de excavación, Materiales u objetos que caen o se deslizan, Resbalones, tropiezos y caídas' : 'Excavation cave-in, Falling or sliding materials/objects, Slips/trips/falls', motionLabel: es ? 'Movimiento' : 'Motion', motionExamples: es ? 'Viento, Ergonomía, Vehículos, embarcaciones o equipo móvil' : 'Wind, Ergonomics, Vehicles/vessels/mobile equipment', mechanicalLabel: es ? 'Mecánica' : 'Mechanical', mechanicalExamples: es ? 'Puntos de atrapamiento o pellizco de herramientas o equipos, Equipo giratorio' : 'Tool/equipment nip points/pinch points, Rotating equipment', safetyLabel: es ? 'Verificación de seguridad' : 'Safety check', yesLabel: es ? 'Sí' : 'Yes', meetingNotesLabel: es ? 'NOTAS DE LA REUNIÓN EN EL SITIO' : 'ON-SITE MEETING NOTES',
+      acknowledgmentLabel: es ? 'Reconocimiento y firma' : 'Acknowledgment and signature', acknowledgmentHelper: es ? 'Revise la declaración y luego firme a continuación.' : 'Review the statement, then sign below.', acknowledgmentText: es ? 'He revisado toda la documentación aplicable, los peligros del sitio y mis responsabilidades de seguir los planes de trabajo seguro para protegerme a mí mismo y a los demás mientras esté en el sitio.' : 'I have reviewed all applicable documentation, site hazards, and my responsibilities to follow safe work plans to protect myself and others while on site.', signAsLabel: es ? 'Firmar como' : 'Sign as', signHereLabel: es ? 'Firme aquí con el dedo' : 'Sign here with your finger', clearLabel: es ? 'Borrar' : 'Clear', confirmLabel: es ? 'CONFIRMAR FIRMA' : 'CONFIRM SIGNATURE',
+      setEnglish: () => this.setState({ language: 'en' }), setSpanish: () => this.setState({ language: 'es' }), enBg: es ? 'transparent' : '#374B96', enFg: es ? '#374B96' : '#FFFFFF', esBg: es ? '#374B96' : 'transparent', esFg: es ? '#FFFFFF' : '#374B96',
+      resetDemo: () => this.setState({ view: 'list', crew: this.initCrew(), signingId: null, ink: false, addName: '', resignId: null, exitAsk: false, language: 'en' })
     };
   }
 }

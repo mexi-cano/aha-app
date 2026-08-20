@@ -58,6 +58,47 @@ const fixtureJob: Job = jobSchema.parse({
   ],
 });
 
+export function shouldCreateDevSourceAha(
+  hasRecordWithSourceId: boolean,
+  hasRecordForJobDate: boolean,
+): boolean {
+  return !hasRecordWithSourceId && !hasRecordForJobDate;
+}
+
+function errorName(error: unknown): string | null {
+  return typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    typeof error.name === "string"
+    ? error.name
+    : null;
+}
+
+function isConfirmedConstraintError(error: unknown): boolean {
+  if (errorName(error) === "ConstraintError") return true;
+  if (errorName(error) !== "AbortError") return false;
+  if (typeof error !== "object" || error === null || !("inner" in error)) {
+    return false;
+  }
+  return errorName(error.inner) === "ConstraintError";
+}
+
+export async function ignoreConfirmedConstraint(
+  operation: () => Promise<void>,
+  constraintNowExists: () => Promise<boolean>,
+): Promise<void> {
+  try {
+    await operation();
+  } catch (error) {
+    if (
+      !isConfirmedConstraintError(error) ||
+      !(await constraintNowExists())
+    ) {
+      throw error;
+    }
+  }
+}
+
 export async function ensureDevFixture(
   database: typeof ahaDatabase,
   today: LocalDate,
@@ -65,102 +106,135 @@ export async function ensureDevFixture(
   const sourceDate = previousWorkday(today);
   const sourceAhaId = `${DEV_FIXTURE_PREFIX}aha:${sourceDate}`;
 
-  await database.transaction(
-    "rw",
-    database.jobs,
-    database.ahas,
-    database.settings,
-    database.draftMetadata,
-    async () => {
-      if (!(await database.jobs.get(fixtureJob.id))) {
-        await database.jobs.add(fixtureJob);
-      }
+  await ignoreConfirmedConstraint(
+    () =>
+      database.transaction("rw", database.jobs, async () => {
+        if (!(await database.jobs.get(fixtureJob.id))) {
+          await database.jobs.add(fixtureJob);
+        }
+      }),
+    async () => Boolean(await database.jobs.get(fixtureJob.id)),
+  );
 
-      if (!(await database.ahas.get(sourceAhaId))) {
-        let generatedId = 0;
-        const completedAt = `${sourceDate}T17:00:00.000Z`;
-        const blank = createBlankAha(fixtureJob, sourceDate, {
-          createId: () =>
-            generatedId++ === 0
-              ? sourceAhaId
-              : `${DEV_FIXTURE_PREFIX}task:${sourceDate}:${generatedId}`,
-          now: () => new Date(completedAt),
-        });
+  await ignoreConfirmedConstraint(
+    () =>
+      database.transaction(
+        "rw",
+        database.ahas,
+        database.draftMetadata,
+        async () => {
+          const [existingById, existingByJobDate] = await Promise.all([
+            database.ahas.get(sourceAhaId),
+            database.ahas
+              .where("[jobId+date]")
+              .equals([fixtureJob.id, sourceDate])
+              .first(),
+          ]);
+          if (
+            shouldCreateDevSourceAha(
+              Boolean(existingById),
+              Boolean(existingByJobDate),
+            )
+          ) {
+            let generatedId = 0;
+            const completedAt = `${sourceDate}T17:00:00.000Z`;
+            const blank = createBlankAha(fixtureJob, sourceDate, {
+              createId: () =>
+                generatedId++ === 0
+                  ? sourceAhaId
+                  : `${DEV_FIXTURE_PREFIX}task:${sourceDate}:${generatedId}`,
+              now: () => new Date(completedAt),
+            });
 
-        const sourceAha = ahaSchema.parse({
-          ...blank,
-          status: "completed",
-          header: { ...blank.header, rescuePlanRequired: true },
-          description:
-            "Excavation and directional bore for fiber conduit relocation along the eastbound shoulder; potholing existing utilities; loading and hauling spoils.",
-          meetingNotes:
-            "Reviewed lane closure timing and coordinated truck access with the adjacent paving crew.",
-          tasks: [
-            {
-              id: `${DEV_FIXTURE_PREFIX}task:excavation`,
-              task: "Excavation around existing utility",
-              hazards: "Mobile equipment, cave-in, slips/trips",
-              controls:
-                "Locates verified and marked. Spotter for all digging. Trench box below 5 ft. Daily excavation inspection.",
-            },
-            {
-              id: `${DEV_FIXTURE_PREFIX}task:bore`,
-              task: "Directional bore under roadway",
-              hazards: "Rotating equipment, pinch points, traffic",
-              controls:
-                "Guards in place. No loose clothing near rotating parts. Work zone signage and flagger per traffic control plan.",
-            },
-            {
-              id: `${DEV_FIXTURE_PREFIX}task:spoils`,
-              task: "Loading spoils",
-              hazards: "Mobile equipment, overhead load",
-              controls:
-                "Never under a suspended load. Spotter when trucks reverse. Loads covered before leaving site.",
-            },
-          ],
-          energySelections: [
-            {
-              category: "Gravity",
-              examples: [
-                "Excavation cave-in",
-                "Falling or sliding materials/objects",
-                "Slips/trips/falls",
+            const sourceAha = ahaSchema.parse({
+              ...blank,
+              status: "completed",
+              header: { ...blank.header, rescuePlanRequired: true },
+              description:
+                "Excavation and directional bore for fiber conduit relocation along the eastbound shoulder; potholing existing utilities; loading and hauling spoils.",
+              meetingNotes:
+                "Reviewed lane closure timing and coordinated truck access with the adjacent paving crew.",
+              tasks: [
+                {
+                  id: `${DEV_FIXTURE_PREFIX}task:excavation`,
+                  task: "Excavation around existing utility",
+                  hazards: "Mobile equipment, cave-in, slips/trips",
+                  controls:
+                    "Locates verified and marked. Spotter for all digging. Trench box below 5 ft. Daily excavation inspection.",
+                },
+                {
+                  id: `${DEV_FIXTURE_PREFIX}task:bore`,
+                  task: "Directional bore under roadway",
+                  hazards: "Rotating equipment, pinch points, traffic",
+                  controls:
+                    "Guards in place. No loose clothing near rotating parts. Work zone signage and flagger per traffic control plan.",
+                },
+                {
+                  id: `${DEV_FIXTURE_PREFIX}task:spoils`,
+                  task: "Loading spoils",
+                  hazards: "Mobile equipment, overhead load",
+                  controls:
+                    "Never under a suspended load. Spotter when trucks reverse. Loads covered before leaving site.",
+                },
               ],
-            },
-            {
-              category: "Motion",
-              examples: [
-                "Wind",
-                "Ergonomics",
-                "Vehicles/vessels/mobile equipment",
+              energySelections: [
+                {
+                  category: "Gravity",
+                  examples: [
+                    "Excavation cave-in",
+                    "Falling or sliding materials/objects",
+                    "Slips/trips/falls",
+                  ],
+                },
+                {
+                  category: "Motion",
+                  examples: [
+                    "Wind",
+                    "Ergonomics",
+                    "Vehicles/vessels/mobile equipment",
+                  ],
+                },
+                {
+                  category: "Mechanical",
+                  examples: [
+                    "Tool/equipment nip points/pinch points",
+                    "Rotating equipment",
+                  ],
+                },
               ],
-            },
-            {
-              category: "Mechanical",
-              examples: [
-                "Tool/equipment nip points/pinch points",
-                "Rotating equipment",
-              ],
-            },
-          ],
-          safetyCheck: "yes",
-          completedAt,
-        });
+              safetyCheck: "yes",
+              completedAt,
+            });
 
-        await database.ahas.add(sourceAha);
-        await database.draftMetadata.put(
-          createBlankDraftMetadata(sourceAha.id),
-        );
-      }
+            await database.ahas.add(sourceAha);
+            await database.draftMetadata.put(
+              createBlankDraftMetadata(sourceAha.id),
+            );
+          }
+        },
+      ),
+    async () =>
+      Boolean(
+        (await database.ahas.get(sourceAhaId)) ??
+        (await database.ahas
+          .where("[jobId+date]")
+          .equals([fixtureJob.id, sourceDate])
+          .first()),
+      ),
+  );
 
-      const activeSetting = await database.settings.get(ACTIVE_JOB_SETTING);
-      if (!activeSetting) {
-        const setting: AppSetting = {
-          key: ACTIVE_JOB_SETTING,
-          value: fixtureJob.id,
-        };
-        await database.settings.put(setting);
-      }
-    },
+  await ignoreConfirmedConstraint(
+    () =>
+      database.transaction("rw", database.settings, async () => {
+        const activeSetting = await database.settings.get(ACTIVE_JOB_SETTING);
+        if (!activeSetting) {
+          const setting: AppSetting = {
+            key: ACTIVE_JOB_SETTING,
+            value: fixtureJob.id,
+          };
+          await database.settings.add(setting);
+        }
+      }),
+    async () => Boolean(await database.settings.get(ACTIVE_JOB_SETTING)),
   );
 }

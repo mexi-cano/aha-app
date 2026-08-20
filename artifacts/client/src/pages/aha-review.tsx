@@ -1,32 +1,46 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import {
   beginSigning,
   getReviewReport,
+  resolvePersonInChargeWorkerId,
   type ReviewIssue,
 } from "@workspace/aha-domain";
 
 import { AhaSummary } from "@/components/aha/aha-summary";
+import { ForemanBadge } from "@/components/aha/foreman-badge";
 import { CrewEditor } from "@/components/aha/crew-editor";
 import { EditorShell } from "@/components/aha/editor-shell";
 import { Button } from "@/components/ui/button";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import { reviewTargetPath } from "@/features/aha-editor/editor-navigation";
+import { saveAhaAndGeneratePdf, type PdfFitIssue } from "@/pdf";
 
 export default function AhaReview() {
-  const { aha, job, updateAha, commitAha, navigateSafely } = useAhaEditor();
+  const {
+    aha,
+    job,
+    updateAha,
+    commitAha,
+    navigateSafely,
+    editorMode,
+    editorBasePath,
+  } = useAhaEditor();
   const [searchParams] = useSearchParams();
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  const [fitIssues, setFitIssues] = useState<PdfFitIssue[]>([]);
   const report = useMemo(() => getReviewReport(aha), [aha]);
   const focusCrew = searchParams.get("focus") === "crew";
-
-  useEffect(() => {
-    if (aha.status === "completed") void navigateSafely("/");
-  }, [aha.status, navigateSafely]);
+  const foremanWorkerId = resolvePersonInChargeWorkerId(aha);
 
   const fixIssue = (issue: ReviewIssue) => {
-    void navigateSafely(reviewTargetPath(aha.id, issue.target));
+    const initialPath = reviewTargetPath(aha.id, issue.target);
+    void navigateSafely(
+      editorMode === "completed_update"
+        ? initialPath.replace(`/ahas/${aha.id}`, editorBasePath)
+        : initialPath,
+    );
   };
 
   const markNotApplicable = (
@@ -43,6 +57,28 @@ export default function AhaReview() {
     if (!report.canStartSigning || isStarting) return;
     setIsStarting(true);
     setStartError(null);
+    setFitIssues([]);
+    if (editorMode === "completed_update") {
+      try {
+        const result = await saveAhaAndGeneratePdf({
+          commitAha,
+          update: (current) => current,
+          job,
+        });
+        if (result.status === "save_failed") {
+          setStartError(
+            "We couldn't save these updates. The last saved PDF is unchanged. Try again.",
+          );
+        } else if (result.status === "fit_failed") {
+          setFitIssues(result.issues);
+        } else {
+          await navigateSafely(`/ahas/${result.savedAha.id}/completed`);
+        }
+      } finally {
+        setIsStarting(false);
+      }
+      return;
+    }
     const saved = await commitAha((current) => beginSigning(current));
     setIsStarting(false);
     if (saved) {
@@ -55,7 +91,7 @@ export default function AhaReview() {
   };
 
   const editSection = (section: "details" | "work" | "energy") => {
-    void navigateSafely(`/ahas/${aha.id}/${section}`);
+    void navigateSafely(`${editorBasePath}/${section}`);
   };
 
   return (
@@ -64,7 +100,9 @@ export default function AhaReview() {
         <header>
           <h1 className="text-[28px] font-bold">Review</h1>
           <p className="mt-1 text-base font-medium text-muted-foreground sm:text-[17px]">
-            Read the full AHA before anyone signs
+            {editorMode === "completed_update"
+              ? "Confirm the updates before replacing the saved PDF"
+              : "Read the full AHA before anyone signs"}
           </p>
         </header>
 
@@ -78,14 +116,38 @@ export default function AhaReview() {
           onNotApplicable={markNotApplicable}
           disabled={isStarting}
           crewContent={
-            <CrewEditor
-              aha={aha}
-              job={job}
-              updateAha={updateAha}
-              commitAha={commitAha}
-              focusCrew={focusCrew}
-              disabled={isStarting}
-            />
+            editorMode === "completed_update" ? (
+              <div className="flex flex-col gap-2">
+                <p className="text-[13px] font-bold tracking-[0.1em] text-muted-foreground">
+                  SAVED CREW — SIGNATURES REMAIN SAVED
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {aha.crew.map((member) => (
+                    <p
+                      key={member.workerId}
+                      className="flex min-h-10 items-center gap-2 text-base font-medium"
+                    >
+                      {member.name}
+                      {member.workerId === foremanWorkerId ? (
+                        <ForemanBadge />
+                      ) : null}
+                      {member.signaturePng ? (
+                        <span className="font-bold text-success">✓</span>
+                      ) : null}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <CrewEditor
+                aha={aha}
+                job={job}
+                updateAha={updateAha}
+                commitAha={commitAha}
+                focusCrew={focusCrew}
+                disabled={isStarting}
+              />
+            )
           }
         />
 
@@ -113,18 +175,39 @@ export default function AhaReview() {
               {startError}
             </div>
           ) : null}
+          {fitIssues.length > 0 ? (
+            <div
+              className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-warning-foreground"
+              role="alert"
+            >
+              <p className="font-bold">
+                The updated PDF needs shorter content:
+              </p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm font-semibold">
+                {fitIssues.map((issue) => (
+                  <li key={`${issue.fieldPath}-${issue.code}`}>
+                    {issue.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <Button
             className="min-h-[72px] w-full rounded-[14px] text-xl font-bold tracking-wide"
             disabled={!report.canStartSigning || isStarting}
             onClick={() => void startSigning()}
           >
             {isStarting
-              ? "STARTING…"
-              : aha.status === "in_progress"
-                ? "CONTINUE SIGNING"
-                : "START SIGNING"}
+              ? editorMode === "completed_update"
+                ? "CREATING PDF…"
+                : "STARTING…"
+              : editorMode === "completed_update"
+                ? "REGENERATE PDF"
+                : aha.status === "in_progress"
+                  ? "CONTINUE SIGNING"
+                  : "START SIGNING"}
           </Button>
-          {report.canStartSigning ? (
+          {report.canStartSigning && editorMode === "initial" ? (
             <p className="text-center text-[15px] font-medium text-muted-foreground">
               Next: 5 Sign — the whole crew signs on this device
             </p>

@@ -8,7 +8,7 @@
     "generate:auth-token-secret": "node --import tsx ./src/generate-auth-token-secret.ts",
     "validate:pwa": "node --import tsx ./src/validate-pwa-build.ts",
     "hello": "tsx ./src/hello.ts",
-    "test": "TSX_TSCONFIG_PATH=../artifacts/client/tsconfig.test.json node --import tsx --test ../artifacts/api-server/src/*.test.ts ../artifacts/client/src/data/*.test.ts ../artifacts/client/src/features/aha-editor/*.test.ts ../artifacts/client/src/pdf/*.test.ts ../lib/aha-domain/test/*.test.ts",
+    "test": "TSX_TSCONFIG_PATH=../artifacts/client/tsconfig.test.json node --import tsx --test ../artifacts/api-server/src/*.test.ts ../artifacts/client/src/data/*.test.ts ../artifacts/client/src/features/aha-editor/*.test.ts ../artifacts/client/src/pdf/*.test.ts ../lib/aha-domain/test/*.test.ts ../lib/db/*.test.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

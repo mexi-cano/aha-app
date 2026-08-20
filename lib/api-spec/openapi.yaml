@@ -58,6 +58,7 @@ paths:
               schema: { $ref: "#/components/schemas/AuthResponse" }
         "401": { $ref: "#/components/responses/Problem" }
         "429": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
   /jobs:
     get:
       operationId: listJobs
@@ -73,6 +74,7 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/JobBackupRecord" }
         "401": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
     post:
       operationId: backupJob
       tags: [jobs]
@@ -91,6 +93,7 @@ paths:
               schema: { $ref: "#/components/schemas/JobWriteResult" }
         "400": { $ref: "#/components/responses/Problem" }
         "401": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
   /ahas:
     get:
       operationId: listAhas
@@ -112,6 +115,7 @@ paths:
               schema: { $ref: "#/components/schemas/AhaPage" }
         "400": { $ref: "#/components/responses/Problem" }
         "401": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
     post:
       operationId: backupAha
       tags: [ahas]
@@ -131,6 +135,7 @@ paths:
         "400": { $ref: "#/components/responses/Problem" }
         "401": { $ref: "#/components/responses/Problem" }
         "409": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
   /ahas/{ahaId}:
     put:
       operationId: updateAhaBackup
@@ -153,6 +158,7 @@ paths:
         "400": { $ref: "#/components/responses/Problem" }
         "401": { $ref: "#/components/responses/Problem" }
         "409": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
   /ahas/{ahaId}/pdf:
     get:
       operationId: getAhaPdfBackup
@@ -175,6 +181,7 @@ paths:
               schema: { type: string, format: binary }
         "401": { $ref: "#/components/responses/Problem" }
         "404": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
     put:
       operationId: backupAhaPdf
       tags: [ahas]
@@ -208,6 +215,7 @@ paths:
         "400": { $ref: "#/components/responses/Problem" }
         "401": { $ref: "#/components/responses/Problem" }
         "409": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
 components:
   securitySchemes:
     bearerAuth:

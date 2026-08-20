@@ -47,11 +47,19 @@ test("data routes require bearer auth and auth errors redact secrets", async () 
         headers: { Authorization: `bearer ${token.token}` },
       });
       assert.equal(lowercaseBearer.status, 400);
+      assert.equal(
+        ((await lowercaseBearer.json()) as { code: string }).code,
+        "invalid-restore-page",
+      );
 
       const tabBearer = await fetch(`${baseUrl}/api/ahas?limit=0`, {
         headers: { Authorization: `BEARER\t${token.token}` },
       });
       assert.equal(tabBearer.status, 400);
+      assert.equal(
+        ((await tabBearer.json()) as { code: string }).code,
+        "invalid-restore-page",
+      );
 
       for (const authorization of [
         "Bearer",

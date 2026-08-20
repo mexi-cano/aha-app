@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import type { AddressInfo } from "node:net";
 import test from "node:test";
-import app from "./app";
+import { createApp } from "./app";
 
 test("GET /api/healthz returns the skeleton health contract", async (t) => {
+  const app = createApp({ NODE_ENV: "test" });
   const server = app.listen(0, "127.0.0.1");
 
   t.after(async () => {

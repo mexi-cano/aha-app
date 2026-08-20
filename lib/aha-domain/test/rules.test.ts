@@ -227,6 +227,23 @@ test("blank first-day AHA uses job defaults and unsigned roster", () => {
   );
 });
 
+test("blank AHAs honor an explicit stored Person-in-charge worker ID", () => {
+  const explicitlyAssignedJob = jobSchema.parse({
+    ...job,
+    defaultPersonInChargeWorkerId: "worker-2",
+  });
+  const aha = createBlankAha(
+    explicitlyAssignedJob,
+    "2026-08-17",
+    dependencies(["explicit-person-in-charge"]),
+  );
+  assert.equal(aha.personInChargeWorkerId, "worker-2");
+  assert.equal(
+    parseStoredJob(explicitlyAssignedJob).defaultPersonInChargeWorkerId,
+    "worker-2",
+  );
+});
+
 test("Monday copy carries work forward but resets daily and signature state", () => {
   const previous = previousAha();
   const copied = copyAhaForNewDay(

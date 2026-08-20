@@ -16,6 +16,7 @@ import { getHomeSnapshot, startToday } from "@/data/aha-repository";
 import { createPdfNavigationState } from "@/features/aha-editor/pdf-navigation";
 import { useToday } from "@/hooks/use-today";
 import { formatLongDate, formatShortDate } from "@/lib/date-format";
+import { cn } from "@/lib/utils";
 
 const RECENT_AHA_STATUS_LABELS = {
   completed: "Completed",
@@ -142,18 +143,18 @@ export default function Home() {
               >
                 {snapshot.recentAhas.map((aha) => {
                   const statusLabel = RECENT_AHA_STATUS_LABELS[aha.status];
+                  const opensCurrentPdf =
+                    aha.status === "completed" &&
+                    snapshot.recentAhaPdfStatuses[aha.id] === "current";
                   return (
                     <li key={aha.id}>
                       {aha.status === "completed" ? (
                         <button
                           type="button"
                           className="flex min-h-12 w-full items-center justify-between gap-4 rounded-lg py-2 text-left text-base font-semibold outline-none focus-visible:ring-4 focus-visible:ring-secondary"
-                          aria-label={`${formatShortDate(aha.date)}, ${statusLabel}, view PDF`}
+                          aria-label={`${formatShortDate(aha.date)}, ${statusLabel}, ${opensCurrentPdf ? "view PDF" : "open AHA history"}`}
                           onClick={() => {
-                            if (
-                              snapshot.recentAhaPdfStatuses[aha.id] ===
-                              "current"
-                            ) {
+                            if (opensCurrentPdf) {
                               navigate(`/ahas/${aha.id}/pdf`, {
                                 state: createPdfNavigationState("home"),
                               });
@@ -179,10 +180,7 @@ export default function Home() {
                           </span>
                         </button>
                       ) : (
-                        <div
-                          className="flex min-h-12 items-center justify-between gap-4 py-2 text-base font-semibold"
-                          aria-label={`${formatShortDate(aha.date)}, ${statusLabel}`}
-                        >
+                        <div className="flex min-h-12 items-center justify-between gap-4 py-2 text-base font-semibold">
                           <time dateTime={aha.date}>
                             {formatShortDate(aha.date)}
                           </time>
@@ -195,21 +193,15 @@ export default function Home() {
                   );
                 })}
               </ul>
-              {snapshot.completedAhaCount ? (
-                <Button
-                  variant="ghost"
-                  className="mt-2 min-h-12 w-full justify-between px-0 text-base text-primary"
-                  onClick={() => navigate("/history")}
-                >
-                  View all completed AHAs
-                  <ChevronRight className="size-5" aria-hidden="true" />
-                </Button>
-              ) : null}
             </div>
-          ) : snapshot.completedAhaCount ? (
+          ) : null}
+          {snapshot.completedAhaCount ? (
             <Button
               variant="ghost"
-              className="mt-4 min-h-12 w-full justify-between px-0 text-base text-primary"
+              className={cn(
+                snapshot.recentAhas.length ? "mt-2" : "mt-4",
+                "min-h-12 w-full justify-between px-0 text-base text-primary",
+              )}
               onClick={() => navigate("/history")}
             >
               View all completed AHAs

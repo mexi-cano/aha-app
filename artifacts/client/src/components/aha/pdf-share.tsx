@@ -128,7 +128,7 @@ export function PdfShareFeedback({
         )}
         role="status"
       >
-        File sharing is not available here, so the PDF download was started.
+        The PDF download was started.
       </p>
     );
   }

@@ -440,7 +440,7 @@ components:
           items: { $ref: "#/components/schemas/EnergySelection" }
         safetyCheck:
           type: [string, "null"]
-          enum: [yes, no, null]
+          enum: ["yes", "no", null]
         crew:
           type: array
           maxItems: 10

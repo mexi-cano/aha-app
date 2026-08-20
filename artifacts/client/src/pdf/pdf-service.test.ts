@@ -70,4 +70,16 @@ test("unsupported sharing downloads and native cancellation stays silent", async
     createFile: (value) => new File([], value.filename),
   });
   assert.deepEqual(cancelled, { status: "cancelled" });
+
+  const nonDomCancellation = await shareOrDownloadPdf(record, {
+    navigator: {
+      canShare: () => true,
+      share: async () => {
+        throw { name: "AbortError" };
+      },
+    },
+    download: () => assert.fail("download should not run"),
+    createFile: (value) => new File([], value.filename),
+  });
+  assert.deepEqual(nonDomCancellation, { status: "cancelled" });
 });

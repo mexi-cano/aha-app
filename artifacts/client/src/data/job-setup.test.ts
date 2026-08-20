@@ -53,3 +53,53 @@ test("duplicate roster names retain an exact selected worker ID", () => {
   assert.equal(job.defaultPersonInChargeWorkerId, "worker-b");
   assert.equal(job.defaults.personInCharge, "Jordan Lee");
 });
+
+test("invalid setup cannot be built", () => {
+  assert.throws(
+    () => buildJobConfiguration(createEmptyJobSetupDraft()),
+    /incomplete/,
+  );
+});
+
+test("job setup rejects roster limits and duplicate worker IDs", () => {
+  const tooManyWorkers = {
+    ...requiredDraft(),
+    roster: Array.from({ length: 11 }, (_, index) => ({
+      id: `worker-${index}`,
+      name: `Worker ${index + 1}`,
+    })),
+  };
+  assert.ok(
+    validateJobSetup(tooManyWorkers).some(
+      ({ field, message }) =>
+        field === "roster" && message.includes("up to 10"),
+    ),
+  );
+  assert.throws(() => buildJobConfiguration(tooManyWorkers), /incomplete/);
+
+  const duplicateIds = {
+    ...requiredDraft(),
+    roster: [
+      { id: "worker-1", name: "Alex Morgan" },
+      { id: "worker-1", name: "Sam Rivera" },
+    ],
+  };
+  assert.ok(
+    validateJobSetup(duplicateIds).some(
+      ({ field, message }) =>
+        field === "roster" && message === "Worker IDs must be unique.",
+    ),
+  );
+  assert.throws(() => buildJobConfiguration(duplicateIds), /incomplete/);
+});
+
+test("job setup preserves valid user-entered values exactly", () => {
+  const draft = {
+    ...requiredDraft(),
+    name: "  North Pump Station  ",
+    location: " Gate 2 — south entrance ",
+  };
+  const job = buildJobConfiguration(draft);
+  assert.equal(job.name, draft.name);
+  assert.equal(job.defaults.location, draft.location);
+});

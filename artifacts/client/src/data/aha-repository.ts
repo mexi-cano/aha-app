@@ -27,8 +27,7 @@ import {
 } from "./draft-metadata";
 import { isDevFixtureId } from "./dev-fixture";
 import { openLocalDataWithRecovery } from "./local-data-initialization";
-import { partitionReadableAhas } from "./stored-records";
-import { partitionReadableJobs } from "./stored-records";
+import { partitionReadableAhas, partitionReadableJobs } from "./stored-records";
 
 export interface HomeSnapshot {
   job: Job | null;
@@ -184,7 +183,9 @@ export async function getHomeSnapshot(today: LocalDate): Promise<HomeSnapshot> {
     await Promise.all(
       recentAhas
         .filter((aha) => aha.status === "completed")
-        .map(async (aha) => [aha.id, (await getAhaPdfState(aha)).status]),
+        .map(
+          async (aha) => [aha.id, (await getAhaPdfState(aha)).status] as const,
+        ),
     ),
   );
   return {

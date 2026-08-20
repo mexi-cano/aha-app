@@ -54,6 +54,36 @@ interface RestoreCursor {
   id: string;
 }
 
+const BACKUP_CONSTRAINT_CODES = new Set(["23503", "23505"]);
+
+export class BackupConstraintError extends Error {
+  readonly name = "BackupConstraintError";
+
+  constructor(cause: unknown) {
+    super("The backup conflicts with an existing record.", { cause });
+  }
+}
+
+function readPostgresErrorCode(error: unknown): string | null {
+  let current = error;
+  const seen = new Set<unknown>();
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (!current || typeof current !== "object" || seen.has(current)) break;
+    seen.add(current);
+    const candidate = current as { code?: unknown; cause?: unknown };
+    if (typeof candidate.code === "string") return candidate.code;
+    current = candidate.cause;
+  }
+  return null;
+}
+
+export function translateBackupStoreError(error: unknown): unknown {
+  const code = readPostgresErrorCode(error);
+  return code && BACKUP_CONSTRAINT_CODES.has(code)
+    ? new BackupConstraintError(error)
+    : error;
+}
+
 function encodeCursor(cursor: RestoreCursor): string {
   return Buffer.from(JSON.stringify(cursor)).toString("base64url");
 }
@@ -192,31 +222,36 @@ export function createNeonBackupStore(): BackupStore {
         ...parsedAha,
         sync: { ...parsedAha.sync, backedUpAt: acceptedAt },
       });
-      const rows = await db
-        .insert(ahasTable)
-        .values({
-          id: acceptedRecord.id,
-          jobId: acceptedRecord.jobId,
-          ahaDate: acceptedRecord.date,
-          payload: acceptedRecord,
-          clientUpdatedAt: acceptedRecord.sync.savedLocallyAt,
-          backedUpAt: acceptedAt,
-        })
-        .onConflictDoUpdate({
-          target: ahasTable.id,
-          set: {
+      let rows;
+      try {
+        rows = await db
+          .insert(ahasTable)
+          .values({
+            id: acceptedRecord.id,
             jobId: acceptedRecord.jobId,
             ahaDate: acceptedRecord.date,
             payload: acceptedRecord,
             clientUpdatedAt: acceptedRecord.sync.savedLocallyAt,
             backedUpAt: acceptedAt,
-          },
-          setWhere: lte(
-            ahasTable.clientUpdatedAt,
-            acceptedRecord.sync.savedLocallyAt,
-          ),
-        })
-        .returning();
+          })
+          .onConflictDoUpdate({
+            target: ahasTable.id,
+            set: {
+              jobId: acceptedRecord.jobId,
+              ahaDate: acceptedRecord.date,
+              payload: acceptedRecord,
+              clientUpdatedAt: acceptedRecord.sync.savedLocallyAt,
+              backedUpAt: acceptedAt,
+            },
+            setWhere: lte(
+              ahasTable.clientUpdatedAt,
+              acceptedRecord.sync.savedLocallyAt,
+            ),
+          })
+          .returning();
+      } catch (error) {
+        throw translateBackupStoreError(error);
+      }
       const accepted = rows.length > 0;
       const row =
         rows[0] ??
@@ -245,21 +280,12 @@ export function createNeonBackupStore(): BackupStore {
     async putPdf(input) {
       const { db, ahaPdfsTable } = await import("@workspace/db");
       const acceptedAt = new Date().toISOString();
-      const rows = await db
-        .insert(ahaPdfsTable)
-        .values({
-          ahaId: input.ahaId,
-          filename: input.filename,
-          sourceRevision: input.sourceRevision,
-          generatedAt: input.generatedAt,
-          bytes: input.bytes,
-          byteLength: input.bytes.byteLength,
-          sha256: input.sha256,
-          backedUpAt: acceptedAt,
-        })
-        .onConflictDoUpdate({
-          target: ahaPdfsTable.ahaId,
-          set: {
+      let rows;
+      try {
+        rows = await db
+          .insert(ahaPdfsTable)
+          .values({
+            ahaId: input.ahaId,
             filename: input.filename,
             sourceRevision: input.sourceRevision,
             generatedAt: input.generatedAt,
@@ -267,10 +293,24 @@ export function createNeonBackupStore(): BackupStore {
             byteLength: input.bytes.byteLength,
             sha256: input.sha256,
             backedUpAt: acceptedAt,
-          },
-          setWhere: lte(ahaPdfsTable.generatedAt, input.generatedAt),
-        })
-        .returning();
+          })
+          .onConflictDoUpdate({
+            target: ahaPdfsTable.ahaId,
+            set: {
+              filename: input.filename,
+              sourceRevision: input.sourceRevision,
+              generatedAt: input.generatedAt,
+              bytes: input.bytes,
+              byteLength: input.bytes.byteLength,
+              sha256: input.sha256,
+              backedUpAt: acceptedAt,
+            },
+            setWhere: lte(ahaPdfsTable.generatedAt, input.generatedAt),
+          })
+          .returning();
+      } catch (error) {
+        throw translateBackupStoreError(error);
+      }
       const accepted = rows.length > 0;
       const row =
         rows[0] ??

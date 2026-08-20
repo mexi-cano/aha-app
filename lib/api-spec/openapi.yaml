@@ -130,6 +130,7 @@ paths:
               schema: { $ref: "#/components/schemas/AhaWriteResult" }
         "400": { $ref: "#/components/responses/Problem" }
         "401": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
   /ahas/{ahaId}:
     put:
       operationId: updateAhaBackup
@@ -151,6 +152,7 @@ paths:
               schema: { $ref: "#/components/schemas/AhaWriteResult" }
         "400": { $ref: "#/components/responses/Problem" }
         "401": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
   /ahas/{ahaId}/pdf:
     get:
       operationId: getAhaPdfBackup
@@ -205,6 +207,7 @@ paths:
               schema: { $ref: "#/components/schemas/PdfWriteResult" }
         "400": { $ref: "#/components/responses/Problem" }
         "401": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
 components:
   securitySchemes:
     bearerAuth:

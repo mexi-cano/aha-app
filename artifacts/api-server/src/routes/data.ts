@@ -4,6 +4,7 @@ import { ahaSchema, jobSchema } from "@workspace/aha-domain";
 import { z } from "zod";
 
 import {
+  BackupConstraintError,
   createNeonBackupStore,
   decodeCursor,
   type BackupStore,
@@ -49,6 +50,36 @@ function pdfMetadata(record: {
     sha256: record.sha256,
     backedUpAt: record.backedUpAt,
   };
+}
+
+function sendBackupWriteFailure(
+  request: Request,
+  response: Response,
+  error: unknown,
+  logMessage: string,
+  fallbackDetail: string,
+): void {
+  if (error instanceof BackupConstraintError) {
+    sendProblem(
+      response,
+      409,
+      "backup-conflict",
+      "Backup needs support",
+      "The backup conflicts with an existing record and was not applied.",
+    );
+    return;
+  }
+  request.log.error(
+    { err: error instanceof Error ? { name: error.name } : undefined },
+    logMessage,
+  );
+  sendProblem(
+    response,
+    503,
+    "backup-unavailable",
+    "Backup unavailable",
+    fallbackDetail,
+  );
 }
 
 export function createDataRouter(
@@ -166,15 +197,11 @@ export function createDataRouter(
     try {
       response.json(await store.putAha(parsed.data));
     } catch (error) {
-      request.log.error(
-        { err: error instanceof Error ? { name: error.name } : undefined },
-        "AHA backup failed",
-      );
-      sendProblem(
+      sendBackupWriteFailure(
+        request,
         response,
-        503,
-        "backup-unavailable",
-        "Backup unavailable",
+        error,
+        "AHA backup failed",
         "The AHA remains saved on the iPad. Try again later.",
       );
     }
@@ -253,15 +280,11 @@ export function createDataRouter(
         record: pdfMetadata(result.record),
       });
     } catch (error) {
-      request.log.error(
-        { err: error instanceof Error ? { name: error.name } : undefined },
-        "PDF backup failed",
-      );
-      sendProblem(
+      sendBackupWriteFailure(
+        request,
         response,
-        503,
-        "backup-unavailable",
-        "Backup unavailable",
+        error,
+        "PDF backup failed",
         "The PDF remains saved on the iPad. Try again later.",
       );
     }

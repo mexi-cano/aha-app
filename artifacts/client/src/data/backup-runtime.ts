@@ -51,6 +51,14 @@ export function calculateRetryDelay(
   return Math.min(MAX_RETRY_MS, Math.round(base * (0.5 + random)));
 }
 
+export function classifyBackupFailure(
+  status: number | null,
+): "retryable" | "rejected" {
+  return status === null || status === 408 || status === 429 || status >= 500
+    ? "retryable"
+    : "rejected";
+}
+
 const kindOrder: Record<BackupEntityKind, number> = {
   job: 0,
   aha: 1,
@@ -259,13 +267,8 @@ async function run(): Promise<void> {
           return;
         }
         const status = error instanceof ApiError ? error.status : null;
-        const retryable =
-          status === null || status === 408 || status === 429 || status >= 500;
-        const scheduledAt = await retainFailure(
-          item,
-          retryable ? "retryable" : "rejected",
-          status,
-        );
+        const failure = classifyBackupFailure(status);
+        const scheduledAt = await retainFailure(item, failure, status);
         if (scheduledAt) scheduleRetry(scheduledAt);
         return;
       }

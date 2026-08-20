@@ -61,7 +61,10 @@ export function RestoreGate({ children }: { children: ReactNode }) {
     setError(null);
     try {
       if (!offer.isResume) {
-        await beginRestore(offer.jobs.filter((job) => selected.has(job.id)));
+        const selectedJobs = offer.jobs.filter((job) => selected.has(job.id));
+        await beginRestore(selectedJobs);
+        setOffer({ jobs: selectedJobs, isResume: true });
+        setSelected(new Set(selectedJobs.map((job) => job.id)));
       }
       await resumeRestore(setMessage);
       setFinished(true);

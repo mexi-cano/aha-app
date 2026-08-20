@@ -4,7 +4,11 @@ import {
   type Aha,
   type Job,
 } from "@workspace/aha-domain";
-import { customFetch } from "@workspace/api-client-react";
+import {
+  customFetch,
+  listJobs,
+  type JobBackupRecord,
+} from "@workspace/api-client-react";
 
 import { getStoredAuthToken } from "./auth-storage";
 import {
@@ -14,12 +18,6 @@ import {
 } from "./database";
 
 export const AUTHORIZATION_REQUIRED_EVENT = "aha-authorization-required";
-
-interface RemoteJobRecord {
-  job: Job;
-  clientUpdatedAt: string;
-  backedUpAt: string;
-}
 
 export interface RestoreProgress {
   version: 1;
@@ -63,15 +61,14 @@ export async function getRestoreProgress(): Promise<RestoreProgress | null> {
   return setting ? parseProgress(setting.value) : null;
 }
 
-export async function listRemoteJobs(): Promise<RemoteJobRecord[]> {
-  const records = await customFetch<unknown[]>("/api/jobs", {
-    responseType: "json",
-  });
-  return records.map((value) => {
-    const record = value as Partial<RemoteJobRecord>;
+export async function listRemoteJobs(): Promise<JobBackupRecord[]> {
+  const records = await listJobs();
+  return records.map((record) => {
     if (
       typeof record.clientUpdatedAt !== "string" ||
-      typeof record.backedUpAt !== "string"
+      Number.isNaN(Date.parse(record.clientUpdatedAt)) ||
+      typeof record.backedUpAt !== "string" ||
+      Number.isNaN(Date.parse(record.backedUpAt))
     ) {
       throw new Error("A remote job record is invalid.");
     }
@@ -113,32 +110,61 @@ async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
   ).join("");
 }
 
-async function restorePdf(ahaId: string): Promise<void> {
-  const response = await authenticatedPdfFetch(ahaId);
-  if (response.status === 404) return;
-  if (!response.ok) throw new Error("A saved PDF could not be restored.");
-  const bytes = await response.arrayBuffer();
-  const expectedChecksum = response.headers.get("X-Content-SHA256");
-  if (!expectedChecksum || (await sha256Hex(bytes)) !== expectedChecksum) {
+export function parseRestoredPdfMetadata(
+  headers: Headers,
+  computedChecksum: string,
+): {
+  filename: string;
+  sourceRevision: number;
+  generatedAt: string;
+} {
+  const expectedChecksum = headers.get("X-Content-SHA256")?.trim();
+  if (
+    !expectedChecksum ||
+    !/^[a-f0-9]{64}$/i.test(expectedChecksum) ||
+    computedChecksum.toLowerCase() !== expectedChecksum.toLowerCase()
+  ) {
     throw new Error("A restored PDF did not pass its checksum check.");
   }
-  const filenameHeader = response.headers.get("X-AHA-Filename");
-  const revision = Number(response.headers.get("X-AHA-Source-Revision"));
-  const generatedAt = response.headers.get("X-AHA-Generated-At");
+
+  const filenameHeader = headers.get("X-AHA-Filename");
+  const revisionHeader = headers.get("X-AHA-Source-Revision");
+  const generatedAt = headers.get("X-AHA-Generated-At");
+  const sourceRevision =
+    revisionHeader === null ? Number.NaN : Number(revisionHeader);
   if (
     !filenameHeader ||
-    !Number.isInteger(revision) ||
-    revision < 0 ||
+    !Number.isInteger(sourceRevision) ||
+    sourceRevision < 0 ||
     !generatedAt ||
     Number.isNaN(Date.parse(generatedAt))
   ) {
     throw new Error("A restored PDF has invalid metadata.");
   }
+
+  let filename: string;
+  try {
+    filename = decodeURIComponent(filenameHeader);
+  } catch {
+    throw new Error("A restored PDF has invalid metadata.");
+  }
+  if (!filename) throw new Error("A restored PDF has invalid metadata.");
+
+  return { filename, sourceRevision, generatedAt };
+}
+
+async function restorePdf(ahaId: string): Promise<void> {
+  const response = await authenticatedPdfFetch(ahaId);
+  if (response.status === 404) return;
+  if (!response.ok) throw new Error("A saved PDF could not be restored.");
+  const bytes = await response.arrayBuffer();
+  const metadata = parseRestoredPdfMetadata(
+    response.headers,
+    await sha256Hex(bytes),
+  );
   await ahaDatabase.ahaPdfs.put({
     ahaId,
-    filename: decodeURIComponent(filenameHeader),
-    sourceRevision: revision,
-    generatedAt,
+    ...metadata,
     bytes,
   });
 }

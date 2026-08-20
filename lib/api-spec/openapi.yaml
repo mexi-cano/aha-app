@@ -2,64 +2,500 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 0.2.0
+  description: ITS AHA backup and recovery API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: auth
+  - name: jobs
+  - name: ahas
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
-      summary: Health check
-      description: Returns server health status
+      summary: Application liveness
       responses:
         "200":
           description: Healthy
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/HealthStatus"
+              schema: { $ref: "#/components/schemas/HealthStatus" }
   /health:
     get:
       operationId: healthCheckDb
       tags: [health]
-      summary: Health check with database connectivity
-      description: Returns server health and verifies database connectivity with `select 1`
+      summary: Database connectivity
       responses:
         "200":
           description: Healthy
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/DbHealthStatus"
+              schema: { $ref: "#/components/schemas/DbHealthStatus" }
         "500":
-          description: Database unreachable
+          description: Database unavailable
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DbHealthStatus" }
+  /auth:
+    post:
+      operationId: authenticate
+      tags: [auth]
+      summary: Exchange the shared crew access code for a device token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AuthRequest" }
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResponse" }
+        "401": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
+  /jobs:
+    get:
+      operationId: listJobs
+      tags: [jobs]
+      security: [{ bearerAuth: [] }]
+      summary: List backed-up jobs for empty-device restore
+      responses:
+        "200":
+          description: Job backups
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DbHealthStatus"
+                type: array
+                items: { $ref: "#/components/schemas/JobBackupRecord" }
+        "401": { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: backupJob
+      tags: [jobs]
+      security: [{ bearerAuth: [] }]
+      summary: Idempotently back up a job using timestamp last-write-wins
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JobBackupRequest" }
+      responses:
+        "200":
+          description: Stored winner
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JobWriteResult" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+  /ahas:
+    get:
+      operationId: listAhas
+      tags: [ahas]
+      security: [{ bearerAuth: [] }]
+      summary: List AHA backups for empty-device restore
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 25 }
+      responses:
+        "200":
+          description: AHA backup page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AhaPage" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: backupAha
+      tags: [ahas]
+      security: [{ bearerAuth: [] }]
+      summary: Idempotently create or back up an AHA
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Aha" }
+      responses:
+        "200":
+          description: Stored winner
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AhaWriteResult" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+  /ahas/{ahaId}:
+    put:
+      operationId: updateAhaBackup
+      tags: [ahas]
+      security: [{ bearerAuth: [] }]
+      summary: Idempotently update an AHA backup
+      parameters:
+        - $ref: "#/components/parameters/AhaId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Aha" }
+      responses:
+        "200":
+          description: Stored winner
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AhaWriteResult" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+  /ahas/{ahaId}/pdf:
+    get:
+      operationId: getAhaPdfBackup
+      tags: [ahas]
+      security: [{ bearerAuth: [] }]
+      summary: Download a finished PDF for empty-device restore
+      parameters:
+        - $ref: "#/components/parameters/AhaId"
+      responses:
+        "200":
+          description: PDF backup
+          headers:
+            X-AHA-Filename: { schema: { type: string } }
+            X-AHA-Source-Revision: { schema: { type: integer } }
+            X-AHA-Generated-At:
+              schema: { type: string, format: date-time }
+            X-Content-SHA256: { schema: { type: string } }
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+    put:
+      operationId: backupAhaPdf
+      tags: [ahas]
+      security: [{ bearerAuth: [] }]
+      summary: Idempotently back up a finished PDF
+      parameters:
+        - $ref: "#/components/parameters/AhaId"
+        - name: filename
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 240 }
+        - name: sourceRevision
+          in: query
+          required: true
+          schema: { type: integer, minimum: 0 }
+        - name: generatedAt
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+      requestBody:
+        required: true
+        content:
+          application/pdf:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: Stored winner metadata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PdfWriteResult" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    AhaId:
+      name: ahaId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+  responses:
+    Problem:
+      description: Request failed
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
-        status:
-          type: string
-      required:
-        - status
+        status: { type: string }
     DbHealthStatus:
       type: object
+      required: [status, database]
       properties:
-        status:
-          type: string
-        database:
-          type: string
+        status: { type: string }
+        database: { type: string }
+    Problem:
+      type: object
+      required: [type, title, status, detail, code]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code: { type: string }
+    AuthRequest:
+      type: object
+      additionalProperties: false
+      required: [accessCode]
+      properties:
+        accessCode: { type: string, minLength: 1, maxLength: 128 }
+    AuthResponse:
+      type: object
+      required: [token, expiresAt]
+      properties:
+        token: { type: string }
+        expiresAt: { type: string, format: date-time }
+    JobWorker:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id: { type: string, minLength: 1 }
+        name: { type: string }
+    JobDefaults:
+      type: object
+      additionalProperties: false
       required:
-        - status
-        - database
-
+        [
+          location,
+          personInCharge,
+          closestEmergencyCentre,
+          emergencyNumber,
+          musterPoint,
+          workOrderPermit,
+          jhaProcedureNumbers,
+        ]
+      properties:
+        location: { type: string }
+        personInCharge: { type: string }
+        closestEmergencyCentre: { type: string }
+        emergencyNumber: { type: string }
+        musterPoint: { type: string }
+        workOrderPermit: { type: string }
+        jhaProcedureNumbers: { type: string }
+    Job:
+      type: object
+      additionalProperties: false
+      required:
+        [id, name, cityLabel, defaults, roster, defaultPersonInChargeWorkerId]
+      properties:
+        id: { type: string, minLength: 1 }
+        name: { type: string }
+        cityLabel: { type: string }
+        defaults: { $ref: "#/components/schemas/JobDefaults" }
+        roster:
+          type: array
+          maxItems: 10
+          items: { $ref: "#/components/schemas/JobWorker" }
+        defaultPersonInChargeWorkerId:
+          type: [string, "null"]
+    JobBackupRequest:
+      type: object
+      additionalProperties: false
+      required: [job, clientUpdatedAt]
+      properties:
+        job: { $ref: "#/components/schemas/Job" }
+        clientUpdatedAt: { type: string, format: date-time }
+    JobBackupRecord:
+      allOf:
+        - $ref: "#/components/schemas/JobBackupRequest"
+        - type: object
+          required: [backedUpAt]
+          properties:
+            backedUpAt: { type: string, format: date-time }
+    JobWriteResult:
+      type: object
+      required: [accepted, record]
+      properties:
+        accepted: { type: boolean }
+        record: { $ref: "#/components/schemas/JobBackupRecord" }
+    AhaHeader:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          location,
+          date,
+          personInCharge,
+          closestEmergencyCentre,
+          emergencyNumber,
+          musterPoint,
+          workOrderPermit,
+          jhaProcedureNumbers,
+          rescuePlanRequired,
+        ]
+      properties:
+        location: { type: string }
+        date: { type: string, format: date }
+        personInCharge: { type: string }
+        closestEmergencyCentre: { type: string }
+        emergencyNumber: { type: string }
+        musterPoint: { type: string }
+        workOrderPermit: { type: string }
+        jhaProcedureNumbers: { type: string }
+        rescuePlanRequired: { type: [boolean, "null"] }
+    AhaTask:
+      type: object
+      additionalProperties: false
+      required: [id, task, hazards, controls]
+      properties:
+        id: { type: string, minLength: 1 }
+        task: { type: string }
+        hazards: { type: string }
+        controls: { type: string }
+    EnergySelection:
+      type: object
+      additionalProperties: false
+      required: [category, examples]
+      properties:
+        category:
+          type: string
+          enum:
+            [
+              Gravity,
+              Motion,
+              Mechanical,
+              Electrical,
+              Pressure,
+              Sound,
+              Radiation,
+              Biological,
+              Chemical,
+              Temperature,
+              Human factors,
+            ]
+        examples:
+          type: array
+          items: { type: string }
+    AhaCrewMember:
+      type: object
+      additionalProperties: false
+      required: [workerId, name, signaturePng, signedAt]
+      properties:
+        workerId: { type: string, minLength: 1 }
+        name: { type: string }
+        signaturePng: { type: [string, "null"] }
+        signedAt:
+          type: [string, "null"]
+          format: date-time
+    Aha:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          jobId,
+          date,
+          status,
+          header,
+          description,
+          meetingNotes,
+          notApplicable,
+          tasks,
+          energySelections,
+          safetyCheck,
+          crew,
+          personInChargeWorkerId,
+          documentRevision,
+          completedAt,
+          updatedAfterCompletionAt,
+          sync,
+        ]
+      properties:
+        id: { type: string, minLength: 1 }
+        jobId: { type: string, minLength: 1 }
+        date: { type: string, format: date }
+        status: { type: string, enum: [draft, in_progress, completed] }
+        header: { $ref: "#/components/schemas/AhaHeader" }
+        description: { type: string }
+        meetingNotes: { type: string }
+        notApplicable:
+          type: object
+          additionalProperties: false
+          required: [workOrderPermit, jhaProcedureNumbers, meetingNotes]
+          properties:
+            workOrderPermit: { type: boolean }
+            jhaProcedureNumbers: { type: boolean }
+            meetingNotes: { type: boolean }
+        tasks:
+          type: array
+          maxItems: 15
+          items: { $ref: "#/components/schemas/AhaTask" }
+        energySelections:
+          type: array
+          maxItems: 11
+          items: { $ref: "#/components/schemas/EnergySelection" }
+        safetyCheck:
+          type: [string, "null"]
+          enum: [yes, no, null]
+        crew:
+          type: array
+          maxItems: 10
+          items: { $ref: "#/components/schemas/AhaCrewMember" }
+        personInChargeWorkerId: { type: [string, "null"] }
+        documentRevision: { type: integer, minimum: 0 }
+        completedAt:
+          type: [string, "null"]
+          format: date-time
+        updatedAfterCompletionAt:
+          type: array
+          items: { type: string, format: date-time }
+        sync:
+          type: object
+          additionalProperties: false
+          required: [savedLocallyAt, backedUpAt]
+          properties:
+            savedLocallyAt: { type: string, format: date-time }
+            backedUpAt:
+              type: [string, "null"]
+              format: date-time
+    AhaWriteResult:
+      type: object
+      required: [accepted, record]
+      properties:
+        accepted: { type: boolean }
+        record: { $ref: "#/components/schemas/Aha" }
+    AhaPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Aha" }
+        nextCursor: { type: [string, "null"] }
+    PdfBackupMetadata:
+      type: object
+      required:
+        [
+          ahaId,
+          filename,
+          sourceRevision,
+          generatedAt,
+          byteLength,
+          sha256,
+          backedUpAt,
+        ]
+      properties:
+        ahaId: { type: string }
+        filename: { type: string }
+        sourceRevision: { type: integer, minimum: 0 }
+        generatedAt: { type: string, format: date-time }
+        byteLength: { type: integer, minimum: 1 }
+        sha256: { type: string }
+        backedUpAt: { type: string, format: date-time }
+    PdfWriteResult:
+      type: object
+      required: [accepted, record]
+      properties:
+        accepted: { type: boolean }
+        record: { $ref: "#/components/schemas/PdfBackupMetadata" }

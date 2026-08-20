@@ -104,6 +104,9 @@ importers:
 
   artifacts/api-server:
     dependencies:
+      '@workspace/aha-domain':
+        specifier: workspace:*
+        version: link:../../lib/aha-domain
       '@workspace/api-zod':
         specifier: workspace:*
         version: link:../../lib/api-zod

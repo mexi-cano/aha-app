@@ -16,6 +16,7 @@ import {
   jobSchema,
   localDateSchema,
   parseStoredAha,
+  parseStoredJob,
   planStartToday,
   selectMostRecentAha,
   toLocalDate,
@@ -301,6 +302,27 @@ test("stored AHA person-in-charge associations migrate without guessing duplicat
     }).personInChargeWorkerId,
     null,
   );
+});
+
+test("legacy jobs infer only an unambiguous default Person in charge", () => {
+  const legacy = {
+    ...job,
+    defaults: { ...job.defaults, personInCharge: "Miguel Rodriguez" },
+  } as Record<string, unknown>;
+  delete legacy.defaultPersonInChargeWorkerId;
+  assert.equal(
+    parseStoredJob(legacy).defaultPersonInChargeWorkerId,
+    "worker-1",
+  );
+
+  const duplicate = {
+    ...legacy,
+    roster: [
+      { id: "worker-1", name: "Miguel Rodriguez" },
+      { id: "worker-3", name: "Miguel Rodriguez" },
+    ],
+  };
+  assert.equal(parseStoredJob(duplicate).defaultPersonInChargeWorkerId, null);
 });
 
 test("most recent selection respects jobs, gaps, and today boundary", () => {

@@ -20,7 +20,10 @@ router.get("/health", async (req, res) => {
     });
     res.json(data);
   } catch (err) {
-    req.log.error({ err }, "Database health check failed");
+    req.log.error(
+      { err: err instanceof Error ? { name: err.name } : undefined },
+      "Database health check failed",
+    );
     const data = HealthCheckDbResponse.parse({
       status: "error",
       database: "unreachable",

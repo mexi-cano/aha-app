@@ -6,9 +6,17 @@ multi-device collaboration or automatic pull service.
 
 ## Environments and secrets
 
-Use separate Neon branches/databases for preview validation and the controlled
-pilot. Never point the managed schema-push hook at the pilot database. Configure
-these Replit Secrets independently in each environment:
+Use separate Neon projects/branches for preview validation and permanent
+production. The controlled pilot is the first rollout stage of production, not
+a disposable database: every real pilot AHA remains in the same production
+database when access expands. Never copy preview fixtures into production, and
+never point the managed schema-push hook at production. Keep these environments
+separate:
+
+- Replit Project Editor and preview testing: `its-aha-preview`
+- Published app, beginning with the controlled pilot: `its-aha-production`
+
+Configure these Replit Secrets independently in each environment:
 
 - `DATABASE_URL` — that environment's external Neon connection string
 - `ACCESS_CODE_HASH` — output of `pnpm --filter @workspace/scripts run generate:access-code-hash`
@@ -35,10 +43,23 @@ pnpm --filter @workspace/db run migrate
 ```
 
 The second run validates the already-migrated/idempotent state. Inspect the
-three tables and exercise backup/restore before pilot approval. After the Phase
-4 PR merges, a human operator sets `DATABASE_URL` to the pilot branch, applies
-the same checked-in migration once, deploys merged `main`, and runs the smoke
-test. Do not use `push` against pilot or production.
+three tables and exercise backup/restore before pilot approval.
+
+After the Phase 4 PR merges, create the permanent `its-aha-production` Neon
+project with its own root branch. Keep the Replit Project Editor connected to
+preview. To migrate production without replacing the preview connection, add a
+temporary Project Editor secret named `PRODUCTION_DATABASE_URL`, run both
+verified migration passes, and then remove that temporary secret:
+
+```sh
+DATABASE_URL="$PRODUCTION_DATABASE_URL" pnpm --filter @workspace/db run migrate
+DATABASE_URL="$PRODUCTION_DATABASE_URL" pnpm --filter @workspace/db run migrate
+```
+
+Set the published app's `DATABASE_URL` secret to the permanent production
+connection string, deploy merged `main`, and run the smoke test. Later rollout
+stages keep this database and require no pilot-to-production data migration.
+Do not use `push` against production.
 
 The repository-owned `migrate` runner resolves the checked-in migration folder
 from its own module location rather than the shell working directory. It exits
@@ -46,6 +67,15 @@ successfully only after verifying that the non-empty journal is represented in
 `drizzle.__drizzle_migrations` and that `jobs`, `ahas`, and `aha_pdfs` exist.
 Treat any other result as a failed migration; do not rely on a CLI success
 message without this verification.
+
+## Production recovery points
+
+Enable the longest practical Neon point-in-time recovery window and scheduled
+snapshots available for the production plan. Capture a recovery point after the
+verified migrations and another after the production smoke test. Prove recovery
+by restoring to an isolated verification branch; never overwrite the active
+production branch merely to test the procedure. Record the result without
+including connection strings, access codes, tokens, PDF bytes, or AHA payloads.
 
 ## Repository validation
 
@@ -82,7 +112,7 @@ Record evidence, not secrets or payloads, for:
   Home acceptance, stale-cache recovery, and preservation of all local state;
 - 393 px and 834 px layout, keyboard/focus behavior, 48 px targets, Add to Home
   Screen airplane-mode completion, and physical iPad termination tests;
-- Replit preview/pilot environment separation, production smoke output,
+- Replit preview/permanent-production separation, controlled-pilot smoke output,
   CodeRabbit findings resolved or dispositioned, and the two expected non-fatal
   client-build warnings.
 

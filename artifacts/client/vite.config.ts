@@ -49,7 +49,11 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,ttf}"],
         // Manifest icons are added by vite-plugin-pwa, so exclude their public
         // copies from the glob to keep each precache URL unique.
-        globIgnores: ["pwa-192.png", "pwa-512.png"],
+        globIgnores: [
+          "its-pwa-192.png",
+          "its-pwa-512.png",
+          "its-pwa-maskable-512.png",
+        ],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         cleanupOutdatedCaches: true,
         navigateFallback: "index.html",
@@ -82,10 +86,18 @@ export default defineConfig({
         scope: manifestBasePath,
         start_url: manifestBasePath,
         icons: [
-          { src: "pwa-192.png", sizes: "192x192", type: "image/png" },
-          { src: "pwa-512.png", sizes: "512x512", type: "image/png" },
           {
-            src: "pwa-512.png",
+            src: "its-pwa-192.png",
+            sizes: "192x192",
+            type: "image/png",
+          },
+          {
+            src: "its-pwa-512.png",
+            sizes: "512x512",
+            type: "image/png",
+          },
+          {
+            src: "its-pwa-maskable-512.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "maskable",

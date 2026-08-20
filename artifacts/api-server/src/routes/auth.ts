@@ -80,5 +80,3 @@ export function createAuthRouter(
 
   return router;
 }
-
-export default createAuthRouter();

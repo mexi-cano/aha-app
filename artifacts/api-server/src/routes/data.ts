@@ -6,11 +6,12 @@ import { z } from "zod";
 import {
   BackupConstraintError,
   createNeonBackupStore,
-  decodeCursor,
+  InvalidCursorError,
   type BackupStore,
 } from "../lib/backup-store";
 import { sendProblem } from "../lib/problem";
 import { requireBearerToken } from "../middlewares/auth";
+import type { AuthConfig } from "../lib/auth";
 
 const jobRequestSchema = z
   .object({
@@ -84,9 +85,10 @@ function sendBackupWriteFailure(
 
 export function createDataRouter(
   store: BackupStore = createNeonBackupStore(),
+  getAuthConfig?: () => AuthConfig,
 ): IRouter {
   const router: IRouter = Router();
-  router.use(requireBearerToken());
+  router.use(["/jobs", "/ahas"], requireBearerToken(getAuthConfig));
 
   router.get("/jobs", async (request, response) => {
     try {
@@ -150,12 +152,11 @@ export function createDataRouter(
       return;
     }
     try {
-      if (parsed.data.cursor) decodeCursor(parsed.data.cursor);
       response.json(
         await store.listAhas(parsed.data.cursor ?? null, parsed.data.limit),
       );
     } catch (error) {
-      if (error instanceof Error && error.message.includes("cursor")) {
+      if (error instanceof InvalidCursorError) {
         sendProblem(
           response,
           400,
@@ -292,5 +293,3 @@ export function createDataRouter(
 
   return router;
 }
-
-export default createDataRouter();

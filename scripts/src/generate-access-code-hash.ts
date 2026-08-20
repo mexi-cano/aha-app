@@ -1,5 +1,7 @@
 import { randomBytes, scrypt } from "node:crypto";
 
+const SCRYPT_OPTIONS = { N: 16_384, r: 8, p: 1 } as const;
+
 function readSecret(): Promise<string> {
   return new Promise((resolve, reject) => {
     const input = process.stdin;
@@ -55,7 +57,7 @@ function readSecret(): Promise<string> {
 
 function derive(value: string, salt: Buffer): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    scrypt(value, salt, 32, (error, key) => {
+    scrypt(value, salt, 32, SCRYPT_OPTIONS, (error, key) => {
       if (error) reject(error);
       else resolve(key);
     });

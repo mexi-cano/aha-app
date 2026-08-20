@@ -10,6 +10,7 @@ const ACCESS_HASH_PREFIX = "scrypt:v1";
 const TOKEN_PREFIX = "v1";
 const TOKEN_LIFETIME_MS = 30 * 24 * 60 * 60 * 1_000;
 const SCRYPT_KEY_LENGTH = 32;
+const SCRYPT_OPTIONS = { N: 16_384, r: 8, p: 1 } as const;
 
 export interface AuthConfig {
   accessCodeHash: string;
@@ -25,10 +26,16 @@ interface TokenPayload {
 
 function scryptAsync(value: string, salt: Buffer): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    scrypt(value, salt, SCRYPT_KEY_LENGTH, (error, derivedKey) => {
-      if (error) reject(error);
-      else resolve(derivedKey);
-    });
+    scrypt(
+      value,
+      salt,
+      SCRYPT_KEY_LENGTH,
+      SCRYPT_OPTIONS,
+      (error, derivedKey) => {
+        if (error) reject(error);
+        else resolve(derivedKey);
+      },
+    );
   });
 }
 

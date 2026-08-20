@@ -11,10 +11,8 @@ export function requireBearerToken(
   getConfig: () => AuthConfig = getAuthConfigFromEnv,
 ): RequestHandler {
   return (request, response, next) => {
-    const authorization = request.get("authorization");
-    const token = authorization?.startsWith("Bearer ")
-      ? authorization.slice("Bearer ".length)
-      : null;
+    const authorization = request.get("authorization") ?? "";
+    const token = /^Bearer[\t ]+([^\t ]+)[\t ]*$/i.exec(authorization)?.[1];
     try {
       if (!token || !verifyAccessToken(token, getConfig())) {
         sendProblem(

@@ -19,6 +19,13 @@ test("access codes use salted versioned scrypt hashes", async () => {
   assert.equal(await verifyAccessCode("wrong-code", first), false);
 });
 
+test("existing scrypt v1 hashes remain compatible with pinned costs", async () => {
+  const legacyHash =
+    "scrypt:v1:AAAAAAAAAAAAAAAAAAAAAA:2xWTaw7Ejgk7rKDYx0YwgZitTI9MNB0EUbnQFlTWcLQ";
+  assert.equal(await verifyAccessCode("legacy-code", legacyHash), true);
+  assert.equal(await verifyAccessCode("wrong-code", legacyHash), false);
+});
+
 test("bearer tokens reject tampering, expiry, and access-code rotation", async () => {
   const now = new Date("2026-08-20T12:00:00.000Z");
   const config: AuthConfig = {

@@ -88,23 +88,32 @@ function encodeCursor(cursor: RestoreCursor): string {
   return Buffer.from(JSON.stringify(cursor)).toString("base64url");
 }
 
+export class InvalidCursorError extends Error {
+  readonly name = "InvalidCursorError";
+
+  constructor(cause?: unknown) {
+    super("The restore cursor is invalid.", { cause });
+  }
+}
+
 export function decodeCursor(value: string): RestoreCursor {
+  let parsed: Partial<RestoreCursor>;
   try {
-    const parsed = JSON.parse(
+    parsed = JSON.parse(
       Buffer.from(value, "base64url").toString("utf8"),
     ) as Partial<RestoreCursor>;
-    if (
-      typeof parsed.clientUpdatedAt !== "string" ||
-      Number.isNaN(Date.parse(parsed.clientUpdatedAt)) ||
-      typeof parsed.id !== "string" ||
-      !parsed.id
-    ) {
-      throw new Error("Invalid cursor payload");
-    }
-    return { clientUpdatedAt: parsed.clientUpdatedAt, id: parsed.id };
   } catch (cause) {
-    throw new Error("The restore cursor is invalid.", { cause });
+    throw new InvalidCursorError(cause);
   }
+  if (
+    typeof parsed.clientUpdatedAt !== "string" ||
+    Number.isNaN(Date.parse(parsed.clientUpdatedAt)) ||
+    typeof parsed.id !== "string" ||
+    !parsed.id
+  ) {
+    throw new InvalidCursorError();
+  }
+  return { clientUpdatedAt: parsed.clientUpdatedAt, id: parsed.id };
 }
 
 function asPdfRecord(row: {

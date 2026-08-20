@@ -1,6 +1,6 @@
 # Phase 3 Spanish Worker Review — Product-Owner Approval Record
 
-Status: **Draft — product-owner approval required before PR #11 merges.**
+Status: **Approved by product owner on August 19, 2026.**
 
 This is a neutral US Spanish presentation aid for fixed worker-review content. It is not a certified translation. Daily job details entered by the crew are deliberately left as written. Canonical English AHA values and the official PDF do not change.
 
@@ -11,6 +11,7 @@ The implementation source of truth is `artifacts/client/src/features/aha-editor/
 | English | Español |
 | --- | --- |
 | Worker review language | Idioma de revisión del trabajador |
+| Language changed to English. | El idioma cambió a español. |
 | Add worker & sign | Agregar trabajador y firmar |
 | FOREMAN | CAPATAZ |
 | READ ONLY | SOLO LECTURA |
@@ -162,7 +163,7 @@ The implementation source of truth is `artifacts/client/src/features/aha-editor/
 
 ## Approval
 
-- Product owner: _pending_
-- Approval date: _pending_
-- Requested changes: _pending_
+- Product owner: Carlos Cano
+- Approval date: August 19, 2026
+- Requested changes: none
 - Bilingual safety review: strongly recommended before the controlled pilot

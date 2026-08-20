@@ -31,6 +31,19 @@ export interface BackupSnapshot {
   pendingCount: number;
 }
 
+export class LocalBackupRecordError extends Error {
+  readonly name = "LocalBackupRecordError";
+
+  constructor(kind: "job" | "aha", cause: unknown) {
+    super(`A saved ${kind} could not be prepared for backup.`, { cause });
+  }
+}
+
+export interface ClassifiedBackupFailure {
+  failure: "retryable" | "rejected";
+  status: number | null;
+}
+
 let running = false;
 let retryTimer: number | null = null;
 
@@ -59,19 +72,85 @@ export function classifyBackupFailure(
     : "rejected";
 }
 
+export function classifyBackupError(error: unknown): ClassifiedBackupFailure {
+  const status = error instanceof ApiError ? error.status : null;
+  return {
+    failure:
+      error instanceof LocalBackupRecordError
+        ? "rejected"
+        : classifyBackupFailure(status),
+    status,
+  };
+}
+
 const kindOrder: Record<BackupEntityKind, number> = {
   job: 0,
   aha: 1,
   pdf: 2,
 };
 
-function ordered(items: BackupQueueItem[]): BackupQueueItem[] {
-  return items.sort(
+function ordered(items: readonly BackupQueueItem[]): BackupQueueItem[] {
+  return [...items].sort(
     (left, right) =>
       kindOrder[left.kind] - kindOrder[right.kind] ||
       left.clientUpdatedAt.localeCompare(right.clientUpdatedAt) ||
       left.key.localeCompare(right.key),
   );
+}
+
+export async function selectNextBackupItem(
+  items: readonly BackupQueueItem[],
+  resolveAhaJobId: (ahaId: string) => Promise<string | null>,
+): Promise<BackupQueueItem | null> {
+  const rejectedJobIds = new Set(
+    items
+      .filter(
+        (item) => item.kind === "job" && item.lastFailure === "rejected",
+      )
+      .map((item) => item.entityId),
+  );
+  const rejectedAhaIds = new Set(
+    items
+      .filter(
+        (item) => item.kind === "aha" && item.lastFailure === "rejected",
+      )
+      .map((item) => item.entityId),
+  );
+
+  for (const item of ordered(items)) {
+    if (item.lastFailure === "rejected") continue;
+    if (item.kind === "pdf" && rejectedAhaIds.has(item.entityId)) continue;
+    if (item.kind !== "job" && rejectedJobIds.size > 0) {
+      const jobId = await resolveAhaJobId(item.entityId);
+      if (jobId && rejectedJobIds.has(jobId)) continue;
+    }
+    return item;
+  }
+
+  return null;
+}
+
+function parseQueuedJob(value: unknown) {
+  try {
+    return parseStoredJob(value);
+  } catch (error) {
+    throw new LocalBackupRecordError("job", error);
+  }
+}
+
+function parseQueuedAha(value: unknown) {
+  try {
+    return parseStoredAha(value);
+  } catch (error) {
+    throw new LocalBackupRecordError("aha", error);
+  }
+}
+
+async function getRawAhaJobId(ahaId: string): Promise<string | null> {
+  const value: unknown = await ahaDatabase.ahas.get(ahaId);
+  if (!value || typeof value !== "object") return null;
+  const jobId = (value as { jobId?: unknown }).jobId;
+  return typeof jobId === "string" ? jobId : null;
 }
 
 export async function getBackupSnapshot(): Promise<BackupSnapshot> {
@@ -115,7 +194,7 @@ async function upload(item: BackupQueueItem): Promise<{
       method: "POST",
       responseType: "json",
       body: JSON.stringify({
-        job: parseStoredJob(value),
+        job: parseQueuedJob(value),
         clientUpdatedAt: item.clientUpdatedAt,
       }),
     });
@@ -131,7 +210,7 @@ async function upload(item: BackupQueueItem): Promise<{
     }>(`/api/ahas/${encodeURIComponent(item.entityId)}`, {
       method: "PUT",
       responseType: "json",
-      body: JSON.stringify(parseStoredAha(value)),
+      body: JSON.stringify(parseQueuedAha(value)),
     });
     return {
       accepted: result.accepted,
@@ -175,7 +254,7 @@ async function acknowledge(
       if (captured.kind === "aha") {
         const local = await ahaDatabase.ahas.get(captured.entityId);
         if (local) {
-          const parsed = parseStoredAha(local);
+          const parsed = parseQueuedAha(local);
           if (parsed.sync.savedLocallyAt === captured.clientUpdatedAt) {
             await ahaDatabase.ahas.put(
               ahaSchema.parse({
@@ -244,9 +323,9 @@ async function run(): Promise<void> {
     ]);
     if (!token || paused) return;
     while (navigator.onLine) {
-      const items = ordered(await ahaDatabase.backupQueue.toArray());
-      const item = items[0];
-      if (!item || item.lastFailure === "rejected") return;
+      const items = await ahaDatabase.backupQueue.toArray();
+      const item = await selectNextBackupItem(items, getRawAhaJobId);
+      if (!item) return;
       if (Date.parse(item.nextAttemptAt) > Date.now()) {
         scheduleRetry(item.nextAttemptAt);
         return;
@@ -255,7 +334,7 @@ async function run(): Promise<void> {
         const result = await upload(item);
         if (!result.accepted) {
           await retainFailure(item, "rejected", 409);
-          return;
+          continue;
         }
         await acknowledge(item, result.backedUpAt);
       } catch (error) {
@@ -266,11 +345,12 @@ async function run(): Promise<void> {
           });
           return;
         }
-        const status = error instanceof ApiError ? error.status : null;
-        const failure = classifyBackupFailure(status);
+        const { failure, status } = classifyBackupError(error);
         const scheduledAt = await retainFailure(item, failure, status);
-        if (scheduledAt) scheduleRetry(scheduledAt);
-        return;
+        if (failure === "retryable" && scheduledAt) {
+          scheduleRetry(scheduledAt);
+          return;
+        }
       }
     }
   } finally {

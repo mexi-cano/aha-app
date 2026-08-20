@@ -56,6 +56,7 @@ const fixtureJob: Job = jobSchema.parse({
     { id: `${DEV_FIXTURE_PREFIX}worker:luis`, name: "Luis Ortega" },
     { id: `${DEV_FIXTURE_PREFIX}worker:aaron`, name: "Aaron Webb" },
   ],
+  defaultPersonInChargeWorkerId: `${DEV_FIXTURE_PREFIX}worker:miguel`,
 });
 
 export function shouldCreateDevSourceAha(
@@ -90,10 +91,7 @@ export async function ignoreConfirmedConstraint(
   try {
     await operation();
   } catch (error) {
-    if (
-      !isConfirmedConstraintError(error) ||
-      !(await constraintNowExists())
-    ) {
+    if (!isConfirmedConstraintError(error) || !(await constraintNowExists())) {
       throw error;
     }
   }

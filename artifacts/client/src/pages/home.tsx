@@ -9,7 +9,9 @@ import {
 } from "@workspace/aha-domain";
 
 import { AppLogo } from "@/components/aha/app-logo";
+import { BackupStatus } from "@/components/aha/backup-status";
 import { HomeStateCard } from "@/components/aha/home-state-card";
+import { Button } from "@/components/ui/button";
 import { getHomeSnapshot, startToday } from "@/data/aha-repository";
 import { useToday } from "@/hooks/use-today";
 import { formatLongDate, formatShortDate } from "@/lib/date-format";
@@ -20,18 +22,35 @@ const RECENT_AHA_STATUS_LABELS = {
   in_progress: "Signing",
 } as const satisfies Record<Aha["status"], string>;
 
-function EmptyJobState() {
+function EmptyJobState({
+  hasJobs,
+  onSetup,
+  onChoose,
+}: {
+  hasJobs: boolean;
+  onSetup: () => void;
+  onChoose: () => void;
+}) {
   return (
     <main className="min-h-screen bg-background px-5 py-12">
       <section className="mx-auto max-w-lg rounded-2xl border border-card-border bg-card p-8 text-center shadow-sm">
         <div className="flex justify-center">
           <AppLogo />
         </div>
-        <h1 className="mt-8 text-2xl font-bold">No job is set up yet</h1>
+        <h1 className="mt-8 text-2xl font-bold">
+          {hasJobs ? "Choose the restored job" : "No job is set up yet"}
+        </h1>
         <p className="mt-3 text-base font-medium leading-relaxed text-muted-foreground">
-          No job has been set up on this iPad. Your existing local data has not
-          been changed.
+          {hasJobs
+            ? "Recovery is complete. Choose the job to open; the app will not guess for you."
+            : "No job has been set up on this iPad. Your existing local data has not been changed."}
         </p>
+        <Button
+          className="mt-7 min-h-14 w-full text-base font-bold"
+          onClick={hasJobs ? onChoose : onSetup}
+        >
+          {hasJobs ? "CHOOSE A JOB" : "SET UP A JOB"}
+        </Button>
       </section>
     </main>
   );
@@ -55,7 +74,13 @@ export default function Home() {
   }
 
   if (!snapshot.job) {
-    return <EmptyJobState />;
+    return (
+      <EmptyJobState
+        hasJobs={snapshot.jobCount > 0}
+        onSetup={() => navigate("/setup")}
+        onChoose={() => navigate("/jobs")}
+      />
+    );
   }
   const job = snapshot.job;
 
@@ -81,9 +106,12 @@ export default function Home() {
       <div className="mx-auto flex max-w-[700px] flex-col gap-6">
         <header className="flex items-center gap-4">
           <AppLogo />
-          <p className="ml-auto text-right text-base font-semibold text-muted-foreground sm:text-lg">
-            {formatLongDate(today)}
-          </p>
+          <div className="ml-auto text-right">
+            <p className="text-base font-semibold text-muted-foreground sm:text-lg">
+              {formatLongDate(today)}
+            </p>
+            <BackupStatus className="justify-end" />
+          </div>
         </header>
 
         <section className="rounded-[14px] border border-card-border bg-card px-5 py-6 sm:px-7">
@@ -94,6 +122,13 @@ export default function Home() {
           <p className="mt-1 text-lg font-medium text-muted-foreground">
             {job.cityLabel}
           </p>
+          <Button
+            variant="ghost"
+            className="mt-3 min-h-12 px-0 text-base text-primary"
+            onClick={() => navigate("/jobs")}
+          >
+            Change job or update defaults
+          </Button>
 
           {snapshot.recentAhas.length ? (
             <div className="mt-5 border-t border-border pt-4">

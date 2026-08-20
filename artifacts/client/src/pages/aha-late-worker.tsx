@@ -19,6 +19,11 @@ import { Button } from "@/components/ui/button";
 import { createLocalId } from "@/data/aha-repository";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import {
+  getWorkerReviewCopy,
+  type WorkerReviewErrorKey,
+  type WorkerReviewLanguage,
+} from "@/features/aha-editor/worker-review-copy";
+import {
   analyzeAhaPdfFit,
   navigateAfterPersistedPdfOperation,
   saveAhaAndGeneratePdf,
@@ -32,11 +37,13 @@ export default function AhaLateWorker() {
   const [hasInk, setHasInk] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [discardAsk, setDiscardAsk] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<WorkerReviewErrorKey | null>(null);
+  const [language, setLanguage] = useState<WorkerReviewLanguage>("en");
   const [fitIssues, setFitIssues] = useState<PdfFitIssue[]>([]);
   const saveInFlightRef = useRef(false);
 
   const completedPath = `/ahas/${aha.id}/completed`;
+  const copy = getWorkerReviewCopy(language);
   const hasStagedEntry = Boolean(name.trim() || hasInk);
 
   const requestBack = () => {
@@ -61,20 +68,17 @@ export default function AhaLateWorker() {
           now,
         );
       } catch (cause) {
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : "This worker could not be added.",
-        );
+        if (import.meta.env.DEV) {
+          console.error("Late worker domain operation failed", cause);
+        }
+        setError("worker_add");
         return;
       }
       let fit;
       try {
         fit = await analyzeAhaPdfFit(candidate, job);
       } catch {
-        setError(
-          "We couldn't check the official PDF. The new signature has not been saved. Try again.",
-        );
+        setError("pdf_check");
         return;
       }
       if (fit.issues.length > 0) {
@@ -93,9 +97,7 @@ export default function AhaLateWorker() {
         job,
       });
       if (result.status === "save_failed") {
-        setError(
-          "We couldn't save this signature. It is still on this screen. Try again.",
-        );
+        setError("save_signature");
         return;
       }
       await navigateAfterPersistedPdfOperation(result, navigateSafely);
@@ -129,11 +131,15 @@ export default function AhaLateWorker() {
           className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-warning-foreground"
           role="alert"
         >
-          {fitIssues.map((issue) => (
-            <p key={issue.fieldPath} className="font-semibold">
-              {issue.message}
-            </p>
-          ))}
+          {language === "es" ? (
+            <p className="font-semibold">{copy.errors.fit}</p>
+          ) : (
+            fitIssues.map((issue) => (
+              <p key={issue.fieldPath} className="font-semibold">
+                {issue.message}
+              </p>
+            ))
+          )}
         </div>
       ) : null}
       {error ? (
@@ -141,7 +147,7 @@ export default function AhaLateWorker() {
           className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 font-semibold text-warning-foreground"
           role="alert"
         >
-          {error}
+          {copy.errors[error]}
         </p>
       ) : null}
     </>
@@ -157,17 +163,17 @@ export default function AhaLateWorker() {
             disabled={isSaving}
             onClick={requestBack}
           >
-            ‹ Completed
+            {copy.backToCompleted}
           </button>
           <p className="min-w-0 flex-1 truncate text-center text-sm font-semibold text-muted-foreground sm:text-base">
-            {name.trim() || "Add worker"}
+            {name.trim() || copy.addWorkerTitle}
           </p>
           <p className="min-w-[92px] text-right text-sm font-bold sm:min-w-[120px] sm:text-base">
-            {aha.crew.length} signed
+            {copy.signedCount(aha.crew.length)}
           </p>
         </div>
         <div className="bg-primary px-3 py-2.5 text-center text-xs font-bold leading-snug tracking-[0.07em] text-primary-foreground sm:px-4 sm:py-3 sm:text-[15px] sm:tracking-[0.08em]">
-          SIGNING MODE — HAND THE DEVICE TO EACH CREW MEMBER
+          {copy.signingBanner}
         </div>
       </header>
 
@@ -179,11 +185,12 @@ export default function AhaLateWorker() {
           nameInput={{
             value: name,
             onChange: setName,
-            helper: "joins today's crew",
           }}
           disabled={isSaving}
           confirmDisabled={!name.trim()}
-          confirmLabel={isSaving ? "SAVING…" : "CONFIRM SIGNATURE"}
+          confirmLabel={isSaving ? copy.saving : copy.confirmSignature}
+          language={language}
+          onLanguageChange={setLanguage}
           feedback={feedback}
           onInkChange={setHasInk}
           onConfirm={confirm}
@@ -194,22 +201,21 @@ export default function AhaLateWorker() {
         <AlertDialogContent className="max-w-md rounded-2xl bg-card">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-bold">
-              Discard this worker and signature?
+              {copy.discardAddedTitle}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-base font-medium">
-              The worker has not been added. Entered name and signature ink will
-              be cleared.
+              {copy.discardAddedBody}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2">
             <AlertDialogCancel className="min-h-12 text-base">
-              Keep signing
+              {copy.keepSigning}
             </AlertDialogCancel>
             <AlertDialogAction
               className="min-h-12 bg-foreground px-6 text-base text-background"
               onClick={() => void navigateSafely(completedPath)}
             >
-              Discard and return
+              {copy.discardAndReturn}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

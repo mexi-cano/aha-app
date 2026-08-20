@@ -1,10 +1,6 @@
 import type { LocalDate } from "@workspace/aha-domain";
 
-const longDateFormatter = new Intl.DateTimeFormat("en-US", {
-  weekday: "long",
-  month: "long",
-  day: "numeric",
-});
+const longDateFormatters = new Map<string, Intl.DateTimeFormat>();
 
 const shortDateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -27,8 +23,17 @@ export function dateFromLocalDate(value: LocalDate): Date {
   return new Date(year!, month! - 1, day!);
 }
 
-export function formatLongDate(value: LocalDate): string {
-  return longDateFormatter.format(dateFromLocalDate(value));
+export function formatLongDate(value: LocalDate, locale = "en-US"): string {
+  let formatter = longDateFormatters.get(locale);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    });
+    longDateFormatters.set(locale, formatter);
+  }
+  return formatter.format(dateFromLocalDate(value));
 }
 
 export function formatShortDate(value: LocalDate): string {

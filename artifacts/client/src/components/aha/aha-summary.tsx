@@ -16,6 +16,12 @@ import {
   groupReviewIssues,
   type ReviewIssueGroup,
 } from "@/features/aha-editor/review-presentation";
+import {
+  getWorkerReviewCopy,
+  workerReviewEnergyCategory,
+  workerReviewEnergyExample,
+  type WorkerReviewLanguage,
+} from "@/features/aha-editor/worker-review-copy";
 import { formatLongDate } from "@/lib/date-format";
 
 type EditableSection = "details" | "work" | "energy";
@@ -31,6 +37,7 @@ interface AhaSummaryProps {
   onFix?: (issue: ReviewIssue) => void;
   onNotApplicable?: (issue: Extract<ReviewIssue, { tier: "warning" }>) => void;
   disabled?: boolean;
+  workerReviewLanguage?: WorkerReviewLanguage;
 }
 
 function SectionHeader({
@@ -62,8 +69,16 @@ function SectionHeader({
   );
 }
 
-function SummaryField({ label, value }: { label: string; value: string }) {
-  const displayValue = value.trim() ? value : "Not entered";
+function SummaryField({
+  label,
+  value,
+  emptyValue,
+}: {
+  label: string;
+  value: string;
+  emptyValue: string;
+}) {
+  const displayValue = value.trim() ? value : emptyValue;
   return (
     <div>
       <dt className="text-sm font-bold text-muted-foreground">{label}</dt>
@@ -109,7 +124,9 @@ export function AhaSummary({
   onFix,
   onNotApplicable,
   disabled = false,
+  workerReviewLanguage = "en",
 }: AhaSummaryProps) {
+  const copy = getWorkerReviewCopy(workerReviewLanguage);
   const editable = mode === "review";
   const foremanWorkerId = resolvePersonInChargeWorkerId(aha);
   const issues =
@@ -154,7 +171,7 @@ export function AhaSummary({
   );
 
   const optionalValue = (value: string, notApplicable: boolean): string => {
-    if (notApplicable) return "Not applicable";
+    if (notApplicable) return copy.notApplicable;
     return value.trim() ? value : "";
   };
   const information = (code: ReviewReport["information"][number]["code"]) =>
@@ -164,7 +181,7 @@ export function AhaSummary({
     <div className="flex flex-col gap-[18px]">
       <section className="flex flex-col gap-4 rounded-[14px] border border-card-border bg-card px-5 py-5 sm:px-6">
         <SectionHeader
-          label="DETAILS"
+          label={copy.details}
           onEdit={editable && onEdit ? () => onEdit("details") : undefined}
           disabled={disabled}
         />
@@ -173,54 +190,67 @@ export function AhaSummary({
             {job.name} — {job.cityLabel}
           </h3>
           <p className="mt-1 text-base font-medium text-muted-foreground">
-            {formatLongDate(aha.date)} · Person in charge:{" "}
+            {formatLongDate(aha.date, copy.locale)} · {copy.personInCharge}:{" "}
             {aha.header.personInCharge.trim()
               ? aha.header.personInCharge
-              : "Not entered"}
+              : copy.notEntered}
           </p>
         </div>
         <dl className="grid gap-x-6 gap-y-4 border-t border-border pt-4 sm:grid-cols-2">
-          <SummaryField label="Location" value={aha.header.location} />
           <SummaryField
-            label="Closest emergency centre"
+            label={copy.location}
+            value={aha.header.location}
+            emptyValue={copy.notEntered}
+          />
+          <SummaryField
+            label={copy.closestEmergencyCentre}
             value={aha.header.closestEmergencyCentre}
+            emptyValue={copy.notEntered}
           />
           <SummaryField
-            label="Emergency number"
+            label={copy.emergencyNumber}
             value={aha.header.emergencyNumber}
+            emptyValue={copy.notEntered}
           />
-          <SummaryField label="Muster point" value={aha.header.musterPoint} />
           <SummaryField
-            label="Rescue plan required"
+            label={copy.musterPoint}
+            value={aha.header.musterPoint}
+            emptyValue={copy.notEntered}
+          />
+          <SummaryField
+            label={copy.rescuePlanRequired}
             value={
               aha.header.rescuePlanRequired === null
-                ? "Not answered"
+                ? copy.notAnswered
                 : aha.header.rescuePlanRequired
-                  ? "Yes"
-                  : "No"
+                  ? copy.yes
+                  : copy.no
             }
+            emptyValue={copy.notAnswered}
           />
           <SummaryField
-            label="Work order / permit number"
+            label={copy.workOrderPermit}
             value={optionalValue(
               aha.header.workOrderPermit,
               aha.notApplicable.workOrderPermit,
             )}
+            emptyValue={copy.notEntered}
           />
           <SummaryField
-            label="JHA / procedure numbers"
+            label={copy.jhaProcedureNumbers}
             value={optionalValue(
               aha.header.jhaProcedureNumbers,
               aha.notApplicable.jhaProcedureNumbers,
             )}
+            emptyValue={copy.notEntered}
           />
         </dl>
         <div className="border-t border-border pt-4">
           <h3 className="text-sm font-bold text-muted-foreground">
-            DESCRIPTION OF WORK
+            {copy.descriptionOfWork}
           </h3>
           <p className="mt-1 whitespace-pre-wrap text-base font-medium leading-6">
-            {aha.description.trim() ? aha.description : "Not entered"}
+            {aha.description.trim() ? aha.description : copy.notEntered}
           </p>
         </div>
         {detailsIssueGroups.map(renderIssueGroup)}
@@ -228,9 +258,7 @@ export function AhaSummary({
 
       <section className="flex flex-col gap-4 rounded-[14px] border border-card-border bg-card px-5 py-5 sm:px-6">
         <SectionHeader
-          label={`WORK — ${aha.tasks.length} ${
-            aha.tasks.length === 1 ? "TASK" : "TASKS"
-          }`}
+          label={copy.workLabel(aha.tasks.length)}
           onEdit={editable && onEdit ? () => onEdit("work") : undefined}
           disabled={disabled}
         />
@@ -251,19 +279,19 @@ export function AhaSummary({
               className="flex flex-col gap-2 border-t border-border pt-4 first:border-t-0 first:pt-0"
             >
               <h3 className="text-lg font-bold">
-                {task.task.trim() ? task.task : "Untitled task"}
+                {task.task.trim() ? task.task : copy.untitledTask}
               </h3>
               <p className="whitespace-pre-wrap text-base font-medium leading-6">
                 <span className="font-bold text-muted-foreground">
-                  Hazards:
+                  {copy.hazards}:
                 </span>{" "}
-                {task.hazards.trim() ? task.hazards : "Not entered"}
+                {task.hazards.trim() ? task.hazards : copy.notEntered}
               </p>
               <p className="whitespace-pre-wrap text-base font-medium leading-6">
                 <span className="font-bold text-muted-foreground">
-                  Controls:
+                  {copy.controls}:
                 </span>{" "}
-                {task.controls.trim() ? task.controls : "Not entered"}
+                {task.controls.trim() ? task.controls : copy.notEntered}
               </p>
               {taskIssueGroups.map(renderIssueGroup)}
             </article>
@@ -271,14 +299,17 @@ export function AhaSummary({
         })}
         {aha.tasks.length === 0 ? (
           <p className="text-base font-medium text-muted-foreground">
-            No task rows entered.
+            {copy.noTasks}
           </p>
         ) : null}
       </section>
 
       <section className="flex flex-col gap-4 rounded-[14px] border border-card-border bg-card px-5 py-5 sm:px-6">
         <SectionHeader
-          label={`ENERGY — ${aha.energySelections.length} OF ${ENERGY_CATEGORY_NAMES.length}`}
+          label={copy.energyLabel(
+            aha.energySelections.length,
+            ENERGY_CATEGORY_NAMES.length,
+          )}
           onEdit={editable && onEdit ? () => onEdit("energy") : undefined}
           disabled={disabled}
         />
@@ -293,34 +324,43 @@ export function AhaSummary({
               className="flex flex-col items-start gap-2 sm:flex-row sm:items-center"
             >
               <span className="inline-flex min-h-10 shrink-0 items-center rounded-full border border-[#C6CDE8] bg-secondary px-3.5 text-[15px] font-semibold text-secondary-foreground">
-                {category}
+                {workerReviewEnergyCategory(category, workerReviewLanguage)}
               </span>
               <span
                 className={`text-base font-medium ${
                   examples.length ? "" : "text-muted-foreground"
                 }`}
               >
-                {examples.length ? examples.join(", ") : "No examples marked"}
+                {examples.length
+                  ? examples
+                      .map((example) =>
+                        workerReviewEnergyExample(
+                          example,
+                          workerReviewLanguage,
+                        ),
+                      )
+                      .join(", ")
+                  : copy.noExamples}
               </span>
             </div>
           ))}
           {aha.energySelections.length === 0 ? (
             <p className="text-base font-medium text-muted-foreground">
-              No energy categories marked.
+              {copy.noEnergy}
             </p>
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4 text-base font-semibold">
-          Safety check:{" "}
+          {copy.safetyCheck}:{" "}
           {aha.safetyCheck === "yes" ? (
             <span className="inline-flex items-center gap-1 text-success">
-              Yes{" "}
+              {copy.yes}{" "}
               <Check className="size-5" strokeWidth={3} aria-hidden="true" />
             </span>
           ) : aha.safetyCheck === "no" ? (
-            <span>No</span>
+            <span>{copy.no}</span>
           ) : (
-            <span className="text-muted-foreground">Not answered</span>
+            <span className="text-muted-foreground">{copy.notAnswered}</span>
           )}
         </div>
         {energyIssueGroups.map(renderIssueGroup)}
@@ -328,13 +368,13 @@ export function AhaSummary({
 
       <section className="flex flex-col gap-4 rounded-[14px] border border-card-border bg-card px-5 py-5 sm:px-6">
         <SectionHeader
-          label="ON-SITE MEETING NOTES"
+          label={copy.meetingNotes}
           onEdit={editable && onEdit ? () => onEdit("work") : undefined}
           disabled={disabled}
         />
         <p className="whitespace-pre-wrap text-base font-medium leading-6">
           {optionalValue(aha.meetingNotes, aha.notApplicable.meetingNotes) ||
-            "Not entered"}
+            copy.notEntered}
         </p>
         {meetingIssueGroups.map(renderIssueGroup)}
       </section>

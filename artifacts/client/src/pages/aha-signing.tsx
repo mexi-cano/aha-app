@@ -33,6 +33,11 @@ import {
 } from "@/components/ui/dialog";
 import { createLocalId } from "@/data/aha-repository";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
+import {
+  getWorkerReviewCopy,
+  type WorkerReviewErrorKey,
+  type WorkerReviewLanguage,
+} from "@/features/aha-editor/worker-review-copy";
 import { formatEditorDate, formatTime } from "@/lib/date-format";
 import {
   analyzeAhaPdfFit,
@@ -59,6 +64,10 @@ export default function AhaSigning() {
   const [hasInk, setHasInk] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
   const [operationError, setOperationError] = useState<string | null>(null);
+  const [workerError, setWorkerError] =
+    useState<WorkerReviewErrorKey | null>(null);
+  const [workerLanguage, setWorkerLanguage] =
+    useState<WorkerReviewLanguage>("en");
   const [savedNotice, setSavedNotice] = useState<"signature" | "ready" | null>(
     null,
   );
@@ -89,11 +98,13 @@ export default function AhaSigning() {
   const hasStagedEntry =
     hasInk || (view.kind === "add" && addName.trim().length > 0);
   const foremanWorkerId = resolvePersonInChargeWorkerId(aha);
+  const workerCopy = getWorkerReviewCopy(workerLanguage);
+  const isWorkerView = view.kind === "member" || view.kind === "add";
   const headerTitle =
     view.kind === "member"
       ? (signingMember?.name ?? "Crew member")
       : view.kind === "add"
-        ? addName.trim() || "Add worker"
+        ? addName.trim() || workerCopy.addWorkerTitle
         : view.kind === "review"
           ? "Today's AHA"
           : `${job.name} — ${formatEditorDate(aha.date)}`;
@@ -112,6 +123,7 @@ export default function AhaSigning() {
     if (view.kind === "member" && !signingMember) {
       setView({ kind: "list" });
       setHasInk(false);
+      setWorkerLanguage("en");
     }
   }, [signingMember, view.kind]);
 
@@ -149,10 +161,12 @@ export default function AhaSigning() {
   const resetSigningDraft = () => {
     setHasInk(false);
     setOperationError(null);
+    setWorkerError(null);
   };
 
   const openMember = (workerId: string) => {
     resetSigningDraft();
+    setWorkerLanguage("en");
     setView({ kind: "member", workerId });
   };
 
@@ -164,6 +178,7 @@ export default function AhaSigning() {
     resetSigningDraft();
     setLimitMessage(false);
     setAddName("");
+    setWorkerLanguage("en");
     setAddWorkerId(createLocalId());
     setView({ kind: "add" });
   };
@@ -183,6 +198,7 @@ export default function AhaSigning() {
     signatureInFlightRef.current = true;
     setIsCommitting(true);
     setOperationError(null);
+    setWorkerError(null);
     try {
       const saved = await commitAha((current) =>
         view.kind === "add"
@@ -195,9 +211,7 @@ export default function AhaSigning() {
           : recordSignature(current, view.workerId, signaturePng, new Date()),
       );
       if (!saved) {
-        setOperationError(
-          "We couldn't save this signature. It is still on this screen. Try again.",
-        );
+        setWorkerError("save_signature");
         return;
       }
 
@@ -215,8 +229,8 @@ export default function AhaSigning() {
   const requestBackToList = () => {
     if (hasStagedEntry) setDiscardAsk(true);
     else {
-      setHasInk(false);
-      setOperationError(null);
+      resetSigningDraft();
+      setWorkerLanguage("en");
       setView({ kind: "list" });
     }
   };
@@ -281,22 +295,31 @@ export default function AhaSigning() {
                   : requestBackToList
             }
           >
-            {view.kind === "list" ? "‹ Exit signing" : "‹ Back to crew list"}
+            {view.kind === "list"
+              ? "‹ Exit signing"
+              : isWorkerView
+                ? workerCopy.backToCrew
+                : "‹ Back to crew list"}
           </button>
           <p className="min-w-0 flex-1 truncate text-center text-sm font-semibold text-muted-foreground sm:text-base">
             {headerTitle}
           </p>
           <p className="min-w-[92px] text-right text-sm font-bold sm:min-w-[120px] sm:text-base">
-            {signedCount} of {aha.crew.length} signed
+            {isWorkerView
+              ? workerCopy.signedCount(signedCount, aha.crew.length)
+              : `${signedCount} of ${aha.crew.length} signed`}
           </p>
         </div>
         <div className="bg-primary px-3 py-2.5 text-center text-xs font-bold leading-snug tracking-[0.07em] text-primary-foreground sm:px-4 sm:py-3 sm:text-[15px] sm:tracking-[0.08em]">
-          SIGNING MODE — HAND THE DEVICE TO EACH CREW MEMBER
+          {isWorkerView
+            ? workerCopy.signingBanner
+            : "SIGNING MODE — HAND THE DEVICE TO EACH CREW MEMBER"}
         </div>
         {!isOnline ? (
           <p className="bg-secondary px-4 py-2 text-center text-sm font-semibold text-secondary-foreground">
-            You're offline. Your AHA is saved on this iPad and you can keep
-            working.
+            {isWorkerView
+              ? workerCopy.offline
+              : "You're offline. Your AHA is saved on this iPad and you can keep working."}
           </p>
         ) : null}
       </header>
@@ -455,31 +478,33 @@ export default function AhaSigning() {
                 ? {
                     value: addName,
                     onChange: setAddName,
-                    helper: "joins today's crew",
                   }
                 : undefined
             }
             disabled={isCommitting}
             confirmDisabled={view.kind === "add" && !addName.trim()}
-            confirmLabel={isCommitting ? "SAVING…" : "CONFIRM SIGNATURE"}
+            confirmLabel={
+              isCommitting ? workerCopy.saving : workerCopy.confirmSignature
+            }
+            language={workerLanguage}
+            onLanguageChange={setWorkerLanguage}
             feedback={
-              operationError || limitMessage ? (
+              workerError || limitMessage ? (
                 <div className="flex flex-col gap-3">
                   {limitMessage ? (
                     <p
                       className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-base font-semibold text-warning-foreground"
                       role="alert"
                     >
-                      This won't fit on the ITS sheet. Remove an absent worker
-                      before adding someone else.
+                      {workerCopy.errors.capacity}
                     </p>
                   ) : null}
-                  {operationError ? (
+                  {workerError ? (
                     <p
                       className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-base font-semibold text-warning-foreground"
                       role="alert"
                     >
-                      {operationError}
+                      {workerCopy.errors[workerError]}
                     </p>
                   ) : null}
                 </div>
@@ -609,28 +634,29 @@ export default function AhaSigning() {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-bold">
               {view.kind === "add"
-                ? "Discard this worker and signature?"
-                : "Discard this unsigned signature?"}
+                ? workerCopy.discardAddedTitle
+                : workerCopy.discardSignatureTitle}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-base font-medium">
               {view.kind === "add"
-                ? "The worker has not been added. Entered name and signature ink will be cleared."
-                : "This can't be undone."}
+                ? workerCopy.discardAddedBody
+                : workerCopy.discardSignatureBody}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2">
             <AlertDialogCancel className="min-h-12 text-base">
-              Cancel
+              {workerCopy.cancel}
             </AlertDialogCancel>
             <AlertDialogAction
               className="min-h-12 bg-foreground px-6 text-base text-background"
               onClick={() => {
                 resetSigningDraft();
                 setAddName("");
+                setWorkerLanguage("en");
                 setView({ kind: "list" });
               }}
             >
-              Discard
+              {workerCopy.discard}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

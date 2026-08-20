@@ -106,6 +106,7 @@ export function AhaEditorLayout() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<EditorLoadError | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("saved");
+  const [resetAnnouncement, setResetAnnouncement] = useState("");
   const [persistSerially] = useState(() =>
     createSerializedPersistence(persistEditedAha),
   );
@@ -419,6 +420,9 @@ export function AhaEditorLayout() {
         draftRef.current = replacement.aha;
         sourcePdfStateRef.current = replacement.pdf;
         setSnapshot(replacement);
+        setResetAnnouncement(
+          "Started with saved job details and crew. Previous work was removed.",
+        );
       } catch {
         rememberFailure(operation);
         return false;
@@ -499,6 +503,9 @@ export function AhaEditorLayout() {
       draftRef.current = replacement.aha;
       sourcePdfStateRef.current = replacement.pdf;
       setSnapshot(replacement);
+      setResetAnnouncement(
+        "Started with saved job details and crew. Previous work was removed.",
+      );
       setSaveState("saved");
       return true;
     } catch {
@@ -561,6 +568,9 @@ export function AhaEditorLayout() {
 
   return (
     <EditorContext.Provider value={contextValue}>
+      <p className="sr-only" role="status" aria-live="polite">
+        {resetAnnouncement}
+      </p>
       <Outlet />
     </EditorContext.Provider>
   );

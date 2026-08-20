@@ -1,6 +1,12 @@
 import { cn } from "@/lib/utils";
 
-export function ForemanBadge({ className }: { className?: string }) {
+export function ForemanBadge({
+  className,
+  label = "FOREMAN",
+}: {
+  className?: string;
+  label?: string;
+}) {
   return (
     <span
       className={cn(
@@ -8,7 +14,7 @@ export function ForemanBadge({ className }: { className?: string }) {
         className,
       )}
     >
-      FOREMAN
+      {label}
     </span>
   );
 }

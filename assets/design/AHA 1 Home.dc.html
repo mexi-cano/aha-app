@@ -99,7 +99,7 @@ a { color:#374B96; } a:hover { color:#2A3A78; }
     </div>
   </div>
   <div style="width:874px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px; line-height:1.55; color:#59617A;">
-    <sc-if value="{{ isA }}" hint-placeholder-val="{{ true }}"><div>Tap START → editor, pre-filled, with dismissible banner: “Started from Aug 13. Review anything that changed today. — Start blank instead.” First day of a job starts blank, no banner.</div></sc-if>
+    <sc-if value="{{ isA }}" hint-placeholder-val="{{ true }}"><div>Tap START → editor, pre-filled, with dismissible banner: “Started from Aug 13. Review anything that changed today. — Start without previous work.” The reset keeps configured job details and unsigned crew while removing copied daily work. First day of a job starts from job defaults, no banner.</div></sc-if>
     <sc-if value="{{ isD }}" hint-placeholder-val="{{ false }}"><div>CONTINUE TODAY'S AHA → editor. Draft = started or edited, signing not begun; also the crash-recovery landing.</div></sc-if>
     <sc-if value="{{ isB }}" hint-placeholder-val="{{ false }}"><div>CONTINUE SIGNING → Signing Mode (Screen 5). Open editor → five-step editor. Exiting Signing Mode early leaves the AHA In progress.</div></sc-if>
     <sc-if value="{{ isC }}" hint-placeholder-val="{{ false }}"><div>View AHA → Completed AHA (Screen 6). Update today's AHA → editor; if work content changes, the safety check clears and must be re-answered. Signatures remain.</div></sc-if>

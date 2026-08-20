@@ -20,20 +20,25 @@ export interface SignatureCanvasHandle {
 }
 
 interface SignatureCanvasProps {
+  ariaLabel?: string;
   disabled?: boolean;
   initialData?: readonly PointGroup[];
   onInkChange?: (hasInk: boolean) => void;
+  placeholder?: string;
 }
 
 export const SignatureCanvas = forwardRef<
   SignatureCanvasHandle,
   SignatureCanvasProps
->(({ disabled = false, initialData = [], onInkChange }, ref) => {
+>(({ ariaLabel, disabled = false, initialData = [], onInkChange, placeholder }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const padRef = useRef<SignaturePad | null>(null);
   const dimensionsRef = useRef({ width: 0, height: 0 });
   const onInkChangeRef = useRef(onInkChange);
   const [hasInk, setHasInk] = useState(false);
+  const canvasAriaLabel =
+    ariaLabel ?? "Signature drawing area. Sign here with your finger.";
+  const canvasPlaceholder = placeholder ?? "Sign here with your finger";
   onInkChangeRef.current = onInkChange;
 
   const updateInkState = (value: boolean) => {
@@ -135,12 +140,12 @@ export const SignatureCanvas = forwardRef<
       <canvas
         ref={canvasRef}
         className="size-full touch-none"
-        aria-label="Signature drawing area. Sign here with your finger."
+        aria-label={canvasAriaLabel}
         aria-disabled={disabled}
       />
       {!hasInk ? (
         <span className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-lg font-medium text-[#8A93AC]">
-          Sign here with your finger
+          {canvasPlaceholder}
         </span>
       ) : null}
       <span

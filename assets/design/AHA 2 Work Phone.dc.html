@@ -54,7 +54,7 @@ a { color:#374B96; } a:hover { color:#2A3A78; }
             <div style="display:flex; flex-direction:column; gap:10px; background:#EAEDF7; border:1px solid #C6CDE8; border-radius:12px; padding:14px;">
               <div style="font-size:14.5px; font-weight:500; color:#191D2B; line-height:1.4;"><strong>Started from Aug 13.</strong> Review anything that changed today.</div>
               <div style="display:flex; gap:8px;">
-                <button onClick="{{ startBlank }}" style="flex:1; height:44px; border:1.5px solid #C6CDE8; border-radius:10px; background:#FFFFFF; color:#374B96; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; cursor:pointer;" style-hover="background:#F5F6F9;">Start blank instead</button>
+                <button onClick="{{ startBlank }}" style="flex:1; min-height:48px; padding:8px 10px; border:1.5px solid #C6CDE8; border-radius:10px; background:#FFFFFF; color:#374B96; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; cursor:pointer;" style-hover="background:#F5F6F9;">Start without previous work</button>
                 <button onClick="{{ dismissBanner }}" style="height:44px; padding:0 14px; border:none; border-radius:10px; background:transparent; color:#59617A; font-family:'Barlow',sans-serif; font-size:14px; font-weight:600; cursor:pointer;" style-hover="background:rgba(255,255,255,0.7); color:#191D2B;">✕ Dismiss</button>
               </div>
             </div>
@@ -128,7 +128,7 @@ a { color:#374B96; } a:hover { color:#2A3A78; }
     </div>
   </div>
   <div style="width:417px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px; line-height:1.55; color:#59617A;">
-    <div>Phone variant of Screen 2 — same content and rules as iPad: prefill banner (confirm on “Start blank instead” only if edits exist), inline task editing with autosave, neutral “Controls not entered,” delete confirm, official meeting-notes field. Step bar compacts to numbers; active step shows its label. All hit targets ≥44px.</div>
+    <div>Phone variant of Screen 2 — same content and rules as iPad: prefill banner (confirm on “Start without previous work” only if edits exist; retain saved job details and crew), inline task editing with autosave, neutral “Controls not entered,” delete confirm, official meeting-notes field. Step bar compacts to numbers; active step shows its label. All hit targets ≥48px.</div>
   </div>
 </div>
 </x-dc>

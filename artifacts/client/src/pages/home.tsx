@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Check } from "lucide-react";
+import { Check, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router";
 import {
   canStartSigning,
@@ -9,10 +9,14 @@ import {
 } from "@workspace/aha-domain";
 
 import { AppLogo } from "@/components/aha/app-logo";
+import { BackupStatus } from "@/components/aha/backup-status";
 import { HomeStateCard } from "@/components/aha/home-state-card";
+import { Button } from "@/components/ui/button";
 import { getHomeSnapshot, startToday } from "@/data/aha-repository";
+import { createPdfNavigationState } from "@/features/aha-editor/pdf-navigation";
 import { useToday } from "@/hooks/use-today";
 import { formatLongDate, formatShortDate } from "@/lib/date-format";
+import { cn } from "@/lib/utils";
 
 const RECENT_AHA_STATUS_LABELS = {
   completed: "Completed",
@@ -20,18 +24,35 @@ const RECENT_AHA_STATUS_LABELS = {
   in_progress: "Signing",
 } as const satisfies Record<Aha["status"], string>;
 
-function EmptyJobState() {
+function EmptyJobState({
+  hasJobs,
+  onSetup,
+  onChoose,
+}: {
+  hasJobs: boolean;
+  onSetup: () => void;
+  onChoose: () => void;
+}) {
   return (
     <main className="min-h-screen bg-background px-5 py-12">
       <section className="mx-auto max-w-lg rounded-2xl border border-card-border bg-card p-8 text-center shadow-sm">
         <div className="flex justify-center">
           <AppLogo />
         </div>
-        <h1 className="mt-8 text-2xl font-bold">No job is set up yet</h1>
+        <h1 className="mt-8 text-2xl font-bold">
+          {hasJobs ? "Choose the restored job" : "No job is set up yet"}
+        </h1>
         <p className="mt-3 text-base font-medium leading-relaxed text-muted-foreground">
-          No job has been set up on this iPad. Your existing local data has not
-          been changed.
+          {hasJobs
+            ? "Recovery is complete. Choose the job to open; the app will not guess for you."
+            : "No job has been set up on this iPad. Your existing local data has not been changed."}
         </p>
+        <Button
+          className="mt-7 min-h-14 w-full text-base font-bold"
+          onClick={hasJobs ? onChoose : onSetup}
+        >
+          {hasJobs ? "CHOOSE A JOB" : "SET UP A JOB"}
+        </Button>
       </section>
     </main>
   );
@@ -55,7 +76,13 @@ export default function Home() {
   }
 
   if (!snapshot.job) {
-    return <EmptyJobState />;
+    return (
+      <EmptyJobState
+        hasJobs={snapshot.jobCount > 0}
+        onSetup={() => navigate("/setup")}
+        onChoose={() => navigate("/jobs")}
+      />
+    );
   }
   const job = snapshot.job;
 
@@ -81,9 +108,12 @@ export default function Home() {
       <div className="mx-auto flex max-w-[700px] flex-col gap-6">
         <header className="flex items-center gap-4">
           <AppLogo />
-          <p className="ml-auto text-right text-base font-semibold text-muted-foreground sm:text-lg">
-            {formatLongDate(today)}
-          </p>
+          <div className="ml-auto text-right">
+            <p className="text-base font-semibold text-muted-foreground sm:text-lg">
+              {formatLongDate(today)}
+            </p>
+            <BackupStatus className="justify-end" />
+          </div>
         </header>
 
         <section className="rounded-[14px] border border-card-border bg-card px-5 py-6 sm:px-7">
@@ -94,6 +124,13 @@ export default function Home() {
           <p className="mt-1 text-lg font-medium text-muted-foreground">
             {job.cityLabel}
           </p>
+          <Button
+            variant="ghost"
+            className="mt-3 min-h-12 px-0 text-base text-primary"
+            onClick={() => navigate("/jobs")}
+          >
+            Change job or update defaults
+          </Button>
 
           {snapshot.recentAhas.length ? (
             <div className="mt-5 border-t border-border pt-4">
@@ -106,34 +143,70 @@ export default function Home() {
               >
                 {snapshot.recentAhas.map((aha) => {
                   const statusLabel = RECENT_AHA_STATUS_LABELS[aha.status];
+                  const opensCurrentPdf =
+                    aha.status === "completed" &&
+                    snapshot.recentAhaPdfStatuses[aha.id] === "current";
                   return (
-                    <li
-                      key={aha.id}
-                      className="flex min-h-12 items-center justify-between gap-4 py-2 text-base font-semibold"
-                      aria-label={`${formatShortDate(aha.date)}, ${statusLabel}`}
-                    >
-                      <time dateTime={aha.date}>
-                        {formatShortDate(aha.date)}
-                      </time>
+                    <li key={aha.id}>
                       {aha.status === "completed" ? (
-                        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-success">
-                          <Check
-                            className="size-5"
-                            strokeWidth={3}
-                            aria-hidden="true"
-                          />
-                          {statusLabel}
-                        </span>
+                        <button
+                          type="button"
+                          className="flex min-h-12 w-full items-center justify-between gap-4 rounded-lg py-2 text-left text-base font-semibold outline-none focus-visible:ring-4 focus-visible:ring-secondary"
+                          aria-label={`${formatShortDate(aha.date)}, ${statusLabel}, ${opensCurrentPdf ? "view PDF" : "open AHA history"}`}
+                          onClick={() => {
+                            if (opensCurrentPdf) {
+                              navigate(`/ahas/${aha.id}/pdf`, {
+                                state: createPdfNavigationState("home"),
+                              });
+                            } else {
+                              navigate("/history");
+                            }
+                          }}
+                        >
+                          <time dateTime={aha.date}>
+                            {formatShortDate(aha.date)}
+                          </time>
+                          <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-success">
+                            <Check
+                              className="size-5"
+                              strokeWidth={3}
+                              aria-hidden="true"
+                            />
+                            {statusLabel}
+                            <ChevronRight
+                              className="size-5 text-primary"
+                              aria-hidden="true"
+                            />
+                          </span>
+                        </button>
                       ) : (
-                        <span className="text-sm text-muted-foreground">
-                          {statusLabel}
-                        </span>
+                        <div className="flex min-h-12 items-center justify-between gap-4 py-2 text-base font-semibold">
+                          <time dateTime={aha.date}>
+                            {formatShortDate(aha.date)}
+                          </time>
+                          <span className="text-sm text-muted-foreground">
+                            {statusLabel}
+                          </span>
+                        </div>
                       )}
                     </li>
                   );
                 })}
               </ul>
             </div>
+          ) : null}
+          {snapshot.completedAhaCount ? (
+            <Button
+              variant="ghost"
+              className={cn(
+                snapshot.recentAhas.length ? "mt-2" : "mt-4",
+                "min-h-12 w-full justify-between px-0 text-base text-primary",
+              )}
+              onClick={() => navigate("/history")}
+            >
+              View all completed AHAs
+              <ChevronRight className="size-5" aria-hidden="true" />
+            </Button>
           ) : null}
         </section>
 
@@ -176,13 +249,17 @@ export default function Home() {
           }}
           onViewCompleted={() => {
             if (!snapshot.todayAha) return;
-            navigate(
-              snapshot.todayPdfStatus === "current"
-                ? `/ahas/${snapshot.todayAha.id}/pdf`
-                : !getReviewReport(snapshot.todayAha).canStartSigning
+            if (snapshot.todayPdfStatus === "current") {
+              navigate(`/ahas/${snapshot.todayAha.id}/pdf`, {
+                state: createPdfNavigationState("home"),
+              });
+            } else {
+              navigate(
+                !getReviewReport(snapshot.todayAha).canStartSigning
                   ? `/ahas/${snapshot.todayAha.id}/update/review`
                   : `/ahas/${snapshot.todayAha.id}/completed`,
-            );
+              );
+            }
           }}
           onUpdateCompleted={() => {
             if (!snapshot.todayAha) return;

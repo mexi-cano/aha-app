@@ -1,48 +1,79 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import { Download, ExternalLink } from "lucide-react";
+import { useLocation } from "react-router";
 
+import {
+  PdfShareButton,
+  PdfShareFeedback,
+  usePdfShare,
+} from "@/components/aha/pdf-share";
 import { Button } from "@/components/ui/button";
 import { getAhaPdfState } from "@/data/aha-repository";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
+import { resolvePdfReturnNavigation } from "@/features/aha-editor/pdf-navigation";
+import { useToday } from "@/hooks/use-today";
 import { downloadPdf, getCurrentPdfOpenMode, usePdfObjectUrl } from "@/pdf";
 
 export default function AhaPdfView() {
   const { aha, navigateSafely } = useAhaEditor();
+  const location = useLocation();
+  const today = useToday();
   const pdf = useLiveQuery(
     () => getAhaPdfState(aha),
     [aha.id, aha.documentRevision],
   );
   const url = usePdfObjectUrl(pdf?.status === "current" ? pdf.record : null);
   const pdfOpenMode = getCurrentPdfOpenMode();
+  const currentRecord = pdf?.status === "current" ? pdf.record : null;
+  const shareController = usePdfShare(currentRecord);
+  const returnNavigation = resolvePdfReturnNavigation(
+    location.state,
+    aha.id,
+    aha.date,
+    today,
+  );
 
   return (
     <main className="flex min-h-screen flex-col bg-background text-foreground">
       <header className="border-b border-border bg-card px-4 py-3">
-        <div className="mx-auto flex max-w-[834px] items-center gap-3">
+        <div className="mx-auto grid max-w-[834px] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
           <button
             type="button"
-            className="min-h-12 rounded-lg px-2 text-base font-semibold text-primary"
-            onClick={() => void navigateSafely(`/ahas/${aha.id}/completed`)}
+            className="min-h-12 justify-self-start rounded-lg px-2 text-base font-semibold text-primary"
+            onClick={() => void navigateSafely(returnNavigation.path)}
           >
-            ‹ Completed
+            ‹ {returnNavigation.label}
           </button>
-          <h1 className="min-w-0 flex-1 truncate text-center text-lg font-bold">
-            Completed AHA PDF
+          <h1 className="min-w-0 truncate text-center text-lg font-bold">
+            <span className="sm:hidden">AHA PDF</span>
+            <span className="hidden sm:inline">Completed AHA PDF</span>
           </h1>
-          {pdf?.status === "current" && pdf.record ? (
-            <Button
-              variant="outline"
-              className="min-h-12"
-              onClick={() => downloadPdf(pdf.record!)}
-            >
-              <Download className="size-5 sm:mr-2" aria-hidden="true" />
-              <span className="hidden sm:inline">Download</span>
-            </Button>
+          {currentRecord ? (
+            <div className="flex shrink-0 items-center justify-self-end gap-2">
+              <PdfShareButton
+                controller={shareController}
+                responsiveLabel
+                className="text-primary"
+              />
+              <Button
+                variant="outline"
+                className="min-h-12 min-w-12"
+                aria-label="Download PDF"
+                onClick={() => downloadPdf(currentRecord)}
+              >
+                <Download className="size-5 sm:mr-2" aria-hidden="true" />
+                <span className="hidden sm:inline">Download</span>
+              </Button>
+            </div>
           ) : (
-            <span className="w-12" />
+            <span className="w-12 justify-self-end" />
           )}
         </div>
       </header>
+      <PdfShareFeedback
+        controller={shareController}
+        className="mx-5 mt-4 sm:mx-auto sm:w-full sm:max-w-[700px]"
+      />
       {pdf === undefined || (pdf?.status === "current" && !url) ? (
         <section
           className="mx-auto my-10 max-w-lg px-5 text-center"
@@ -72,7 +103,7 @@ export default function AhaPdfView() {
               <Button
                 variant="outline"
                 className="mt-3 min-h-12 w-full text-base"
-                onClick={() => downloadPdf(pdf.record!)}
+                onClick={() => downloadPdf(pdf.record)}
               >
                 <Download className="mr-2 size-5" aria-hidden="true" />
                 Download PDF
@@ -80,9 +111,9 @@ export default function AhaPdfView() {
               <Button
                 variant="ghost"
                 className="mt-3 min-h-12 w-full text-base text-primary"
-                onClick={() => void navigateSafely(`/ahas/${aha.id}/completed`)}
+                onClick={() => void navigateSafely(returnNavigation.path)}
               >
-                Back to Completed
+                Back to {returnNavigation.label}
               </Button>
             </div>
           </section>
@@ -101,14 +132,14 @@ export default function AhaPdfView() {
             The current PDF is not available.
           </h2>
           <p className="mt-2 text-base font-medium text-muted-foreground">
-            Return to Completed to create it again. Any older or unreadable copy
-            remains saved.
+            Return to {returnNavigation.label} to create it again. Any older or
+            unreadable copy remains saved.
           </p>
           <Button
             className="mt-5 min-h-12"
-            onClick={() => void navigateSafely(`/ahas/${aha.id}/completed`)}
+            onClick={() => void navigateSafely(returnNavigation.path)}
           >
-            Return to Completed
+            Return to {returnNavigation.label}
           </Button>
         </section>
       )}

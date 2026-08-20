@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { createBlankAha, jobSchema } from "@workspace/aha-domain";
 
-import { partitionReadableAhas } from "./stored-records";
+import { partitionReadableAhas, partitionReadableJobs } from "./stored-records";
 
 const job = jobSchema.parse({
   id: "job-1",
@@ -36,6 +36,20 @@ test("unreadable AHAs do not hide valid local records", () => {
   assert.deepEqual(
     partition.records.map(({ id }) => id),
     ["valid-aha"],
+  );
+  assert.equal(partition.unreadableCount, 2);
+});
+
+test("unreadable jobs do not hide valid local jobs", () => {
+  const partition = partitionReadableJobs([
+    { id: "corrupt-job" },
+    job,
+    { ...job, id: "invalid-job", defaults: {} },
+  ]);
+
+  assert.deepEqual(
+    partition.records.map(({ id }) => id),
+    ["job-1"],
   );
   assert.equal(partition.unreadableCount, 2);
 });

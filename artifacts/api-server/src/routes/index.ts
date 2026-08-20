@@ -1,8 +1,14 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import { createAuthRouter } from "./auth";
+import { createDataRouter } from "./data";
 
-const router: IRouter = Router();
+export function createApiRouter(): IRouter {
+  const router: IRouter = Router();
 
-router.use(healthRouter);
+  router.use(healthRouter);
+  router.use(createAuthRouter());
+  router.use(createDataRouter());
 
-export default router;
+  return router;
+}

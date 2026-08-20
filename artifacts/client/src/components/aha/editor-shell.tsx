@@ -7,6 +7,7 @@ import {
 } from "@workspace/aha-domain";
 
 import { AutosaveStatus } from "./autosave-status";
+import { BackupStatus } from "./backup-status";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import { formatEditorDate } from "@/lib/date-format";
 import { cn } from "@/lib/utils";
@@ -54,7 +55,10 @@ export function EditorShell({ children }: { children: ReactNode }) {
             {job.name} — {formatEditorDate(aha.date)}
           </p>
           <div className="flex min-w-[96px] justify-end sm:min-w-[190px]">
-            <AutosaveStatus />
+            <div className="text-right">
+              <AutosaveStatus />
+              <BackupStatus className="hidden justify-end sm:inline-flex" />
+            </div>
           </div>
         </div>
         <nav
@@ -108,6 +112,9 @@ export function EditorShell({ children }: { children: ReactNode }) {
             changes must pass the safety check again.
           </p>
         ) : null}
+        <div className="border-t border-border px-4 text-center sm:hidden">
+          <BackupStatus />
+        </div>
       </header>
       <div className="mx-auto max-w-[748px] px-5 py-5 sm:px-6 sm:py-7">
         {children}

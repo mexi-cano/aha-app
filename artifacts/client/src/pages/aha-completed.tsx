@@ -1,22 +1,25 @@
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Check, Download, Home as HomeIcon, Printer } from "lucide-react";
+import { Check, Home as HomeIcon } from "lucide-react";
 import { useLocation } from "react-router";
 import { getReviewReport } from "@workspace/aha-domain";
 
 import { Button } from "@/components/ui/button";
+import {
+  PdfShareButton,
+  PdfShareFeedback,
+  usePdfShare,
+} from "@/components/aha/pdf-share";
 import { getAhaPdfState } from "@/data/aha-repository";
 import type { AhaPdfRecord } from "@/data/database";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import { formatEditorDate, formatTime } from "@/lib/date-format";
 import {
   PDF_FAILURE_MESSAGE,
-  downloadPdf,
   getCurrentPdfOpenMode,
   parseCompletedPdfRecoveryState,
   pdfFitIssueUpdatePath,
   saveAhaAndGeneratePdf,
-  shareOrDownloadPdf,
   usePdfObjectUrl,
   type PdfFitIssue,
 } from "@/pdf";
@@ -29,15 +32,12 @@ export default function AhaCompleted() {
     [aha.id, aha.documentRevision],
   );
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
-  const [freshlyStoredPdf, setFreshlyStoredPdf] =
-    useState<AhaPdfRecord | null>(null);
+  const [freshlyStoredPdf, setFreshlyStoredPdf] = useState<AhaPdfRecord | null>(
+    null,
+  );
   const [fitIssues, setFitIssues] = useState<PdfFitIssue[]>(
     () => parseCompletedPdfRecoveryState(location.state)?.issues ?? [],
   );
-  const [shareFailed, setShareFailed] = useState(false);
-  const [downloadStarted, setDownloadStarted] = useState(false);
-  const [shareIsTakingLong, setShareIsTakingLong] = useState(false);
   const pdfOpenMode = getCurrentPdfOpenMode();
   const currentPdfRecord =
     pdf?.status === "current"
@@ -46,6 +46,7 @@ export default function AhaCompleted() {
         ? freshlyStoredPdf
         : null;
   const nativePdfUrl = usePdfObjectUrl(currentPdfRecord);
+  const shareController = usePdfShare(currentPdfRecord);
 
   const regenerate = async () => {
     if (isGenerating) return;
@@ -71,34 +72,6 @@ export default function AhaCompleted() {
     } finally {
       setIsGenerating(false);
     }
-  };
-
-  const share = async () => {
-    if (!currentPdfRecord || isSharing) return;
-    setIsSharing(true);
-    setShareFailed(false);
-    setDownloadStarted(false);
-    setShareIsTakingLong(false);
-    const takingLongTimer = window.setTimeout(
-      () => setShareIsTakingLong(true),
-      1_500,
-    );
-    try {
-      const result = await shareOrDownloadPdf(currentPdfRecord);
-      if (result.status === "failed") setShareFailed(true);
-      if (result.status === "downloaded") setDownloadStarted(true);
-    } finally {
-      window.clearTimeout(takingLongTimer);
-      setShareIsTakingLong(false);
-      setIsSharing(false);
-    }
-  };
-
-  const downloadStoredPdf = () => {
-    if (!currentPdfRecord) return;
-    downloadPdf(currentPdfRecord);
-    setShareFailed(false);
-    setDownloadStarted(true);
   };
 
   if (aha.status !== "completed") {
@@ -276,59 +249,17 @@ export default function AhaCompleted() {
           </div>
         ) : null}
 
-        <Button
-          variant="outline"
-          className="min-h-14 w-full border-[#C6CDE8] text-[17px] text-primary"
-          disabled={!pdfCurrent || isSharing}
-          onClick={() => void share()}
-        >
-          <Printer className="mr-2 size-5" aria-hidden="true" />
-          {isSharing ? "OPENING…" : "Print / Share"}
-        </Button>
-        {downloadStarted ? (
-          <p
-            className="rounded-xl border border-card-border bg-card px-4 py-3 text-center text-sm font-semibold text-muted-foreground"
-            role="status"
-          >
-            Sharing is not available here, so the PDF download was started.
+        <div>
+          <PdfShareButton
+            controller={shareController}
+            disabled={!pdfCurrent}
+            className="min-h-14 w-full border-[#C6CDE8] text-[17px] text-primary"
+          />
+          <p className="mt-2 text-center text-sm font-medium text-muted-foreground">
+            Choose Mail, Messages, AirDrop, or another app.
           </p>
-        ) : null}
-        {isSharing && shareIsTakingLong && currentPdfRecord ? (
-          <div
-            className="rounded-xl border border-card-border bg-card p-4"
-            role="status"
-          >
-            <p className="text-sm font-semibold text-muted-foreground">
-              If the share window did not open, download the saved PDF instead.
-            </p>
-            <Button
-              variant="outline"
-              className="mt-3 min-h-12 w-full"
-              onClick={downloadStoredPdf}
-            >
-              <Download className="mr-2 size-5" aria-hidden="true" /> Download
-              PDF
-            </Button>
-          </div>
-        ) : null}
-        {shareFailed && currentPdfRecord ? (
-          <div
-            className="rounded-xl border border-warning/30 bg-warning/10 p-4"
-            role="alert"
-          >
-            <p className="text-sm font-semibold text-warning-foreground">
-              We couldn't open sharing. The PDF is still saved.
-            </p>
-            <Button
-              variant="outline"
-              className="mt-3 min-h-12 w-full"
-              onClick={downloadStoredPdf}
-            >
-              <Download className="mr-2 size-5" aria-hidden="true" /> Download
-              PDF
-            </Button>
-          </div>
-        ) : null}
+        </div>
+        <PdfShareFeedback controller={shareController} />
         <Button
           variant="outline"
           className="min-h-14 w-full border-[#C6CDE8] text-[17px] text-primary"

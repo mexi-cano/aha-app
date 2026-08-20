@@ -16,7 +16,59 @@ export interface AhaPdfRecord {
   sourceRevision: number;
 }
 
+export type BackupEntityKind = "job" | "aha" | "pdf";
+
+export type BackupFailureKind = "retryable" | "rejected" | null;
+
+export interface BackupQueueItem {
+  key: string;
+  kind: BackupEntityKind;
+  entityId: string;
+  clientUpdatedAt: string;
+  attempts: number;
+  nextAttemptAt: string;
+  lastFailure: BackupFailureKind;
+  lastStatus: number | null;
+}
+
+export function backupQueueKey(
+  kind: BackupEntityKind,
+  entityId: string,
+): string {
+  return `${kind}:${entityId}`;
+}
+
+export function createBackupQueueItem(
+  kind: BackupEntityKind,
+  entityId: string,
+  clientUpdatedAt: string,
+  nextAttemptAt = new Date().toISOString(),
+): BackupQueueItem {
+  return {
+    key: backupQueueKey(kind, entityId),
+    kind,
+    entityId,
+    clientUpdatedAt,
+    attempts: 0,
+    nextAttemptAt,
+    lastFailure: null,
+    lastStatus: null,
+  };
+}
+
+export function ensureLaterTimestamp(
+  candidate: string,
+  previous: string | null | undefined,
+): string {
+  const previousTime = previous ? Date.parse(previous) : Number.NaN;
+  if (Number.isNaN(previousTime)) return candidate;
+  if (Date.parse(candidate) > previousTime) return candidate;
+  return new Date(previousTime + 1).toISOString();
+}
+
 export const ACTIVE_JOB_SETTING = "activeJobId";
+export const RESTORE_NEEDS_JOB_CHOICE_SETTING = "restoreNeedsJobChoice";
+export const RESTORE_PROGRESS_SETTING = "restoreProgress";
 
 class AhaDatabase extends Dexie {
   jobs!: EntityTable<Job, "id">;
@@ -24,6 +76,7 @@ class AhaDatabase extends Dexie {
   settings!: EntityTable<AppSetting, "key">;
   draftMetadata!: EntityTable<DraftMetadata, "ahaId">;
   ahaPdfs!: EntityTable<AhaPdfRecord, "ahaId">;
+  backupQueue!: EntityTable<BackupQueueItem, "key">;
 
   constructor() {
     super("its-aha");
@@ -42,6 +95,75 @@ class AhaDatabase extends Dexie {
       draftMetadata: "&ahaId, sourceAhaId",
       ahaPdfs: "&ahaId, sourceRevision, generatedAt",
     });
+
+    this.version(3)
+      .stores({
+        jobs: "&id",
+        ahas: "&id, &[jobId+date], jobId, date, status, sync.savedLocallyAt",
+        settings: "&key",
+        draftMetadata: "&ahaId, sourceAhaId",
+        ahaPdfs: "&ahaId, sourceRevision, generatedAt",
+        backupQueue:
+          "&key, kind, entityId, clientUpdatedAt, nextAttemptAt, lastFailure",
+      })
+      .upgrade(async (transaction) => {
+        const now = new Date().toISOString();
+        const [jobs, ahas] = await Promise.all([
+          transaction.table("jobs").toArray(),
+          transaction.table("ahas").toArray(),
+        ]);
+        const queue = transaction.table("backupQueue");
+
+        for (const value of jobs) {
+          const record = value as { id?: unknown };
+          if (
+            typeof record.id === "string" &&
+            !record.id.startsWith("dev-fixture:")
+          ) {
+            await queue.put(createBackupQueueItem("job", record.id, now));
+          }
+        }
+
+        for (const value of ahas) {
+          const record = value as {
+            id?: unknown;
+            sync?: { savedLocallyAt?: unknown };
+          };
+          if (
+            typeof record.id === "string" &&
+            !record.id.startsWith("dev-fixture:") &&
+            typeof record.sync?.savedLocallyAt === "string"
+          ) {
+            await queue.put(
+              createBackupQueueItem(
+                "aha",
+                record.id,
+                record.sync.savedLocallyAt,
+              ),
+            );
+          }
+        }
+
+        const pdfTable = transaction.table("ahaPdfs");
+        const pdfKeys = await pdfTable.toCollection().primaryKeys();
+        for (const key of pdfKeys) {
+          if (typeof key !== "string") continue;
+          const value = await pdfTable.get(key);
+          const record = value as {
+            ahaId?: unknown;
+            generatedAt?: unknown;
+          };
+          if (
+            typeof record.ahaId === "string" &&
+            !record.ahaId.startsWith("dev-fixture:") &&
+            typeof record.generatedAt === "string"
+          ) {
+            await queue.put(
+              createBackupQueueItem("pdf", record.ahaId, record.generatedAt),
+            );
+          }
+        }
+      });
   }
 }
 

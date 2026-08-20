@@ -10,7 +10,14 @@ import {
   type LocalDate,
 } from "@workspace/aha-domain";
 
-import { ACTIVE_JOB_SETTING, ahaDatabase, type AhaPdfRecord } from "./database";
+import {
+  ACTIVE_JOB_SETTING,
+  ahaDatabase,
+  createBackupQueueItem,
+  ensureLaterTimestamp,
+  RESTORE_NEEDS_JOB_CHOICE_SETTING,
+  type AhaPdfRecord,
+} from "./database";
 import {
   createBlankDraftMetadata,
   createCopiedDraftMetadata,
@@ -18,16 +25,44 @@ import {
   markPrefillBannerDismissed,
   type DraftMetadata,
 } from "./draft-metadata";
-import { ensureDevFixture, isDevFixtureId } from "./dev-fixture";
+import { isDevFixtureId } from "./dev-fixture";
 import { openLocalDataWithRecovery } from "./local-data-initialization";
-import { partitionReadableAhas } from "./stored-records";
+import { partitionReadableAhas, partitionReadableJobs } from "./stored-records";
 
 export interface HomeSnapshot {
   job: Job | null;
+  jobCount: number;
   todayAha: Aha | null;
   todayPdfStatus: AhaPdfStatus | null;
   recentAhas: Aha[];
+  recentAhaPdfStatuses: Record<string, AhaPdfStatus>;
+  completedAhaCount: number;
   unreadableCount: number;
+}
+
+export interface CompletedAhaHistoryItem {
+  aha: Aha;
+  pdf: AhaPdfState;
+}
+
+export interface CompletedAhaHistorySnapshot {
+  job: Job | null;
+  items: CompletedAhaHistoryItem[];
+  totalCount: number;
+  unreadableCount: number;
+}
+
+export function selectCompletedAhaHistory(
+  records: Aha[],
+  limit: number,
+): { visible: Aha[]; totalCount: number } {
+  const completed = records
+    .filter((aha) => aha.status === "completed")
+    .sort((left, right) => right.date.localeCompare(left.date));
+  return {
+    visible: completed.slice(0, Math.max(0, limit)),
+    totalCount: completed.length,
+  };
 }
 
 export interface EditorSnapshot {
@@ -85,31 +120,14 @@ function dependencies() {
 }
 
 export async function initializeLocalData(today: LocalDate): Promise<void> {
+  void today;
   await openLocalDataWithRecovery(ahaDatabase);
-  if (import.meta.env.DEV) {
-    try {
-      await ensureDevFixture(ahaDatabase, today);
-    } catch (error) {
-      const diagnostic =
-        typeof error === "object" && error !== null
-          ? {
-              name:
-                "name" in error && typeof error.name === "string"
-                  ? error.name
-                  : "UnknownError",
-              stack:
-                "stack" in error && typeof error.stack === "string"
-                  ? error.stack
-                  : undefined,
-            }
-          : { name: "UnknownError" };
-      console.error("Local data initialization failed", diagnostic);
-      throw error;
-    }
-  }
 }
 
 async function readActiveJob(): Promise<Job | null> {
+  if (await ahaDatabase.settings.get(RESTORE_NEEDS_JOB_CHOICE_SETTING)) {
+    return null;
+  }
   const activeSetting = await ahaDatabase.settings.get(ACTIVE_JOB_SETTING);
   if (activeSetting) {
     if (!import.meta.env.DEV && isDevFixtureId(activeSetting.value)) {
@@ -118,25 +136,36 @@ async function readActiveJob(): Promise<Job | null> {
 
     const activeJob = await ahaDatabase.jobs.get(activeSetting.value);
     if (activeJob) {
-      return parseStoredJob(activeJob);
+      try {
+        return parseStoredJob(activeJob);
+      } catch {
+        return null;
+      }
     }
   }
 
-  const jobs = await ahaDatabase.jobs.toArray();
-  const firstUsableJob = jobs.find(
-    ({ id }) => import.meta.env.DEV || !isDevFixtureId(id),
+  const { records: jobs } = partitionReadableJobs(
+    (await ahaDatabase.jobs.toArray()).filter(
+      ({ id }) => import.meta.env.DEV || !isDevFixtureId(id),
+    ),
   );
-  return firstUsableJob ? parseStoredJob(firstUsableJob) : null;
+  return jobs[0] ?? null;
 }
 
 export async function getHomeSnapshot(today: LocalDate): Promise<HomeSnapshot> {
+  const jobCount = (await ahaDatabase.jobs.toArray()).filter(
+    ({ id }) => import.meta.env.DEV || !isDevFixtureId(id),
+  ).length;
   const job = await readActiveJob();
   if (!job) {
     return {
       job: null,
+      jobCount,
       todayAha: null,
       todayPdfStatus: null,
       recentAhas: [],
+      recentAhaPdfStatuses: {},
+      completedAhaCount: 0,
       unreadableCount: 0,
     };
   }
@@ -149,11 +178,49 @@ export async function getHomeSnapshot(today: LocalDate): Promise<HomeSnapshot> {
   );
 
   const todayAha = sorted.find((aha) => aha.date === today) ?? null;
+  const recentAhas = sorted.filter((aha) => aha.date < today).slice(0, 3);
+  const recentAhaPdfStatuses = Object.fromEntries(
+    await Promise.all(
+      recentAhas
+        .filter((aha) => aha.status === "completed")
+        .map(
+          async (aha) => [aha.id, (await getAhaPdfState(aha)).status] as const,
+        ),
+    ),
+  );
   return {
     job,
+    jobCount,
     todayAha,
     todayPdfStatus: todayAha ? (await getAhaPdfState(todayAha)).status : null,
-    recentAhas: sorted.filter((aha) => aha.date < today).slice(0, 3),
+    recentAhas,
+    recentAhaPdfStatuses,
+    completedAhaCount: sorted.filter((aha) => aha.status === "completed")
+      .length,
+    unreadableCount,
+  };
+}
+
+export async function getCompletedAhaHistorySnapshot(
+  limit: number,
+): Promise<CompletedAhaHistorySnapshot> {
+  const job = await readActiveJob();
+  if (!job) {
+    return { job: null, items: [], totalCount: 0, unreadableCount: 0 };
+  }
+
+  const { records, unreadableCount } = partitionReadableAhas(
+    await ahaDatabase.ahas.where("jobId").equals(job.id).toArray(),
+  );
+  const { visible, totalCount } = selectCompletedAhaHistory(records, limit);
+  const items = await Promise.all(
+    visible.map(async (aha) => ({ aha, pdf: await getAhaPdfState(aha) })),
+  );
+
+  return {
+    job,
+    items,
+    totalCount,
     unreadableCount,
   };
 }
@@ -167,6 +234,7 @@ export async function startToday(
       "rw",
       ahaDatabase.ahas,
       ahaDatabase.draftMetadata,
+      ahaDatabase.backupQueue,
       async () => {
         const existing = await ahaDatabase.ahas
           .where("[jobId+date]")
@@ -204,6 +272,9 @@ export async function startToday(
             : createBlankDraftMetadata(aha.id);
 
         await ahaDatabase.ahas.add(aha);
+        await ahaDatabase.backupQueue.put(
+          createBackupQueueItem("aha", aha.id, aha.sync.savedLocallyAt),
+        );
         await ahaDatabase.draftMetadata.put(metadata);
         return { aha, created: true };
       },
@@ -300,32 +371,65 @@ export async function storeAhaPdf(
     throw new Error("A generated PDF filename and bytes are required");
   }
   const copiedBytes = bytes.slice();
-  const record: AhaPdfRecord = {
+  let record: AhaPdfRecord = {
     ahaId: aha.id,
     filename,
     bytes: copiedBytes.buffer as ArrayBuffer,
     generatedAt: generatedAt.toISOString(),
     sourceRevision: aha.documentRevision,
   };
-  await ahaDatabase.ahaPdfs.put(record);
+  await ahaDatabase.transaction(
+    "rw",
+    ahaDatabase.ahaPdfs,
+    ahaDatabase.backupQueue,
+    async () => {
+      const previous = await ahaDatabase.ahaPdfs.get(aha.id);
+      if (previous) {
+        record = {
+          ...record,
+          generatedAt: ensureLaterTimestamp(
+            record.generatedAt,
+            previous.generatedAt,
+          ),
+        };
+      }
+      await ahaDatabase.ahaPdfs.put(record);
+      await ahaDatabase.backupQueue.put(
+        createBackupQueueItem("pdf", aha.id, record.generatedAt),
+      );
+    },
+  );
   return record;
 }
 
 export async function persistEditedAha(aha: Aha): Promise<Aha> {
-  const saved = ahaSchema.parse({
-    ...aha,
-    sync: {
-      savedLocallyAt: new Date().toISOString(),
-      backedUpAt: null,
-    },
-  });
+  const candidateTimestamp = new Date().toISOString();
+  let saved: Aha | null = null;
 
   await ahaDatabase.transaction(
     "rw",
     ahaDatabase.ahas,
     ahaDatabase.draftMetadata,
+    ahaDatabase.backupQueue,
     async () => {
+      const stored = await ahaDatabase.ahas.get(aha.id);
+      const previousTimestamp = stored
+        ? parseStoredAha(stored).sync.savedLocallyAt
+        : aha.sync.savedLocallyAt;
+      saved = ahaSchema.parse({
+        ...aha,
+        sync: {
+          savedLocallyAt: ensureLaterTimestamp(
+            ensureLaterTimestamp(candidateTimestamp, aha.sync.savedLocallyAt),
+            previousTimestamp,
+          ),
+          backedUpAt: null,
+        },
+      });
       await ahaDatabase.ahas.put(saved);
+      await ahaDatabase.backupQueue.put(
+        createBackupQueueItem("aha", saved.id, saved.sync.savedLocallyAt),
+      );
       const metadata =
         (await ahaDatabase.draftMetadata.get(aha.id)) ??
         createBlankDraftMetadata(aha.id);
@@ -333,6 +437,7 @@ export async function persistEditedAha(aha: Aha): Promise<Aha> {
     },
   );
 
+  if (!saved) throw new Error("The AHA save did not complete.");
   return saved;
 }
 
@@ -348,16 +453,29 @@ export async function replaceWithBlankAha(
   job: Job,
   date: LocalDate,
 ): Promise<EditorSnapshot> {
-  const blank = createBlankAha(job, date, dependencies());
-  const replacement = ahaSchema.parse({ ...blank, id: ahaId });
   const metadata = createBlankDraftMetadata(ahaId);
+  let replacement: Aha | null = null;
 
   await ahaDatabase.transaction(
     "rw",
     ahaDatabase.ahas,
     ahaDatabase.draftMetadata,
     ahaDatabase.ahaPdfs,
+    ahaDatabase.backupQueue,
     async () => {
+      const blank = createBlankAha(job, date, dependencies());
+      const previous = await ahaDatabase.ahas.get(ahaId);
+      replacement = ahaSchema.parse({
+        ...blank,
+        id: ahaId,
+        sync: {
+          ...blank.sync,
+          savedLocallyAt: ensureLaterTimestamp(
+            blank.sync.savedLocallyAt,
+            previous ? parseStoredAha(previous).sync.savedLocallyAt : null,
+          ),
+        },
+      });
       await writeBlankAhaReplacement(
         {
           putAha: (value) => ahaDatabase.ahas.put(value),
@@ -367,8 +485,17 @@ export async function replaceWithBlankAha(
         replacement,
         metadata,
       );
+      await ahaDatabase.backupQueue.put(
+        createBackupQueueItem(
+          "aha",
+          replacement.id,
+          replacement.sync.savedLocallyAt,
+        ),
+      );
     },
   );
+
+  if (!replacement) throw new Error("The blank AHA replacement did not save.");
 
   return {
     aha: replacement,

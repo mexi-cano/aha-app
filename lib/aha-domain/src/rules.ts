@@ -113,10 +113,9 @@ export function createBlankAha(
       signaturePng: null,
       signedAt: null,
     })),
-    personInChargeWorkerId: findUniqueWorkerIdByName(
-      job.roster,
-      job.defaults.personInCharge,
-    ),
+    personInChargeWorkerId:
+      job.defaultPersonInChargeWorkerId ??
+      findUniqueWorkerIdByName(job.roster, job.defaults.personInCharge),
     documentRevision: 0,
     completedAt: null,
     updatedAfterCompletionAt: [],

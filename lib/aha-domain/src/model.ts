@@ -37,13 +37,36 @@ export const jobDefaultsSchema = z.object({
   jhaProcedureNumbers: z.string(),
 });
 
-export const jobSchema = z.object({
-  id: z.string().min(1),
-  name: z.string(),
-  cityLabel: z.string(),
-  defaults: jobDefaultsSchema,
-  roster: z.array(jobWorkerSchema).max(MAX_CREW_MEMBERS),
-});
+export const jobSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string(),
+    cityLabel: z.string(),
+    defaults: jobDefaultsSchema,
+    roster: z.array(jobWorkerSchema).max(MAX_CREW_MEMBERS),
+    defaultPersonInChargeWorkerId: z.string().min(1).nullable().default(null),
+  })
+  .superRefine(({ roster, defaultPersonInChargeWorkerId }, context) => {
+    const workerIds = roster.map(({ id }) => id);
+    if (new Set(workerIds).size !== workerIds.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Job worker IDs must be unique",
+        path: ["roster"],
+      });
+    }
+
+    if (
+      defaultPersonInChargeWorkerId !== null &&
+      !workerIds.includes(defaultPersonInChargeWorkerId)
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Default Person in charge must belong to the job roster",
+        path: ["defaultPersonInChargeWorkerId"],
+      });
+    }
+  });
 
 export type Job = z.infer<typeof jobSchema>;
 
@@ -291,5 +314,19 @@ export function parseStoredJob(value: unknown): Job {
       { cause: result.error },
     );
   }
-  return result.data;
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    Object.prototype.hasOwnProperty.call(value, "defaultPersonInChargeWorkerId")
+  ) {
+    return result.data;
+  }
+
+  return {
+    ...result.data,
+    defaultPersonInChargeWorkerId: findUniqueWorkerIdByName(
+      result.data.roster,
+      result.data.defaults.personInCharge,
+    ),
+  };
 }

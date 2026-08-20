@@ -41,3 +41,14 @@ test("restored PDF metadata rejects malformed checksums and filenames", () => {
     /invalid metadata/,
   );
 });
+
+test("restored PDF metadata rejects a well-formed mismatched checksum", () => {
+  assert.throws(
+    () =>
+      parseRestoredPdfMetadata(
+        headers({ "X-Content-SHA256": "cd".repeat(32) }),
+        checksum,
+      ),
+    /checksum check/,
+  );
+});

@@ -134,7 +134,7 @@ export const SAFETY_GATE_QUESTION =
   "Have all known hazards been identified and addressed using the Energy Wheel?";
 
 export const SAFETY_GATE_INSTRUCTION =
-  "Do not proceed until you can answer 'yes'";
+  'Do not proceed until you can answer "yes"';
 
 export const MAX_TASKS = 15;
 export const MAX_CREW_MEMBERS = 10;

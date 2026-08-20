@@ -410,8 +410,8 @@ test("person in charge selection is explicit and stays consistent with crew edit
   assert.equal(removed.header.personInCharge, "Jordan R.");
   assert.equal(resolvePersonInChargeWorkerId(removed), null);
 
-  const custom = enterCustomPersonInCharge(aha, "Off-site supervisor");
-  assert.equal(custom.header.personInCharge, "Off-site supervisor");
+  const custom = enterCustomPersonInCharge(aha, "  Off-site supervisor  ");
+  assert.equal(custom.header.personInCharge, "  Off-site supervisor  ");
   assert.equal(resolvePersonInChargeWorkerId(custom), null);
   assert.throws(
     () => selectPersonInChargeWorker(aha, "missing-worker"),

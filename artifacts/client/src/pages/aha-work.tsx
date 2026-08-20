@@ -24,11 +24,13 @@ import { PrefillBanner } from "@/components/aha/prefill-banner";
 import { Button } from "@/components/ui/button";
 import { createLocalId } from "@/data/aha-repository";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
+import { shouldShowPrefillBanner } from "@/features/aha-editor/completed-update-grouping";
 import { scrollToAndFocus } from "@/features/aha-editor/editor-navigation";
 import { taskNeedsDetails } from "@/features/aha-editor/review-presentation";
 
 export default function AhaWork() {
-  const { aha, updateAha, navigateSafely, editorBasePath } = useAhaEditor();
+  const { aha, updateAha, navigateSafely, editorBasePath, editorMode } =
+    useAhaEditor();
   const [searchParams] = useSearchParams();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -105,7 +107,7 @@ export default function AhaWork() {
   return (
     <EditorShell>
       <div className="flex flex-col gap-5">
-        <PrefillBanner />
+        {shouldShowPrefillBanner(editorMode) ? <PrefillBanner /> : null}
         <header>
           <h1 className="text-[28px] font-bold">Work</h1>
           <p className="mt-1 text-base font-medium text-muted-foreground">

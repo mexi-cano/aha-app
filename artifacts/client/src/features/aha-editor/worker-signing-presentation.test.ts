@@ -75,6 +75,7 @@ test("worker presentation contains the safety review and omits the crew roster",
 
   for (const expected of [
     "READ ONLY",
+    "FOREMAN",
     "I-40 Utility Relocation",
     "Closest emergency centre",
     "WakeMed Raleigh Campus",

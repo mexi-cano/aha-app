@@ -1,5 +1,6 @@
 export * from "./pdf-service";
 export * from "./pdf-view-capability";
+export * from "./completed-pdf-recovery";
 export * from "./saved-pdf-operation";
 export * from "./use-pdf-object-url";
 export { PDF_FAILURE_MESSAGE } from "./pdf-constants";

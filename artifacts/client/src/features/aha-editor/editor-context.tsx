@@ -6,9 +6,14 @@ import {
   useRef,
   useState,
 } from "react";
-import { Outlet, useLocation, useNavigate, useParams } from "react-router";
 import {
-  applyAhaMutationRules,
+  Outlet,
+  useLocation,
+  useNavigate,
+  useParams,
+  type NavigateOptions,
+} from "react-router";
+import {
   type Aha,
   type Job,
 } from "@workspace/aha-domain";
@@ -17,7 +22,6 @@ import {
   dismissPrefillBanner,
   getEditorSnapshot,
   getAhaPdfState,
-  hasRecordedCompletedUpdateSincePdf,
   persistEditedAha,
   replaceWithBlankAha,
   type AhaPdfState,
@@ -28,6 +32,10 @@ import { useOnlineStatus } from "@/hooks/use-online-status";
 import { Button } from "@/components/ui/button";
 
 import { getEditorLoadView, type EditorLoadError } from "./editor-load-state";
+import {
+  applyEditorMutationRules,
+  type AhaEditorMode,
+} from "./completed-update-grouping";
 import { createSerializedPersistence } from "./persistence-queue";
 
 export type SaveState = "saved" | "saving" | "error";
@@ -42,13 +50,13 @@ interface EditorContextValue {
   job: Job;
   metadata: DraftMetadata;
   pdf: AhaPdfState;
-  editorMode: "initial" | "completed_update";
+  editorMode: AhaEditorMode;
   editorBasePath: string;
   saveState: SaveState;
   isOnline: boolean;
   updateAha: (update: (current: Aha) => Aha) => void;
   commitAha: (update: (current: Aha) => Aha) => Promise<Aha | null>;
-  navigateSafely: (path: string) => Promise<boolean>;
+  navigateSafely: (path: string, options?: NavigateOptions) => Promise<boolean>;
   retrySave: () => Promise<boolean>;
   dismissBanner: () => Promise<void>;
   startBlank: () => Promise<boolean>;
@@ -106,7 +114,10 @@ export function AhaEditorLayout() {
   const pendingRef = useRef<Aha | null>(null);
   const savePromiseRef = useRef<Promise<boolean> | null>(null);
   const criticalSavePromiseRef = useRef<Promise<Aha | null> | null>(null);
-  const completedUpdateRecordedRef = useRef(false);
+  const sourcePdfStateRef = useRef<AhaPdfState>({
+    status: "missing",
+    record: null,
+  });
   const loadGenerationRef = useRef(0);
   const failedOperationsRef = useRef(
     new Map<FailedPersistenceOperation["kind"], FailedPersistenceOperation>(),
@@ -129,6 +140,7 @@ export function AhaEditorLayout() {
     const isCurrent = () => generation === loadGenerationRef.current;
     const clearLoadedSnapshot = () => {
       draftRef.current = null;
+      sourcePdfStateRef.current = { status: "missing", record: null };
       setSnapshot(null);
     };
 
@@ -160,9 +172,7 @@ export function AhaEditorLayout() {
       pendingRef.current = null;
       failedOperationsRef.current.clear();
       draftRef.current = loaded.aha;
-      completedUpdateRecordedRef.current =
-        loaded.aha.status !== "completed" ||
-        hasRecordedCompletedUpdateSincePdf(loaded.aha, loaded.pdf);
+      sourcePdfStateRef.current = loaded.pdf;
       setSnapshot(loaded);
       setSaveState("saved");
     } catch (error) {
@@ -187,35 +197,14 @@ export function AhaEditorLayout() {
     };
   }, [load]);
 
-  useEffect(() => {
-    if (editorMode !== "completed_update" || !draftRef.current) return;
-    let active = true;
-    void getAhaPdfState(draftRef.current).then((state) => {
-      if (active && draftRef.current) {
-        completedUpdateRecordedRef.current =
-          hasRecordedCompletedUpdateSincePdf(draftRef.current, state);
-      }
-    });
-    return () => {
-      active = false;
-    };
-  }, [editorMode]);
-
   const applyMutationRules = useCallback(
-    (current: Aha, next: Aha): Aha => {
-      const previousTimestampCount = current.updatedAfterCompletionAt.length;
-      const adjusted = applyAhaMutationRules(current, next, {
-        recordCompletedUpdateAt:
-          editorMode === "completed_update" &&
-          !completedUpdateRecordedRef.current
-            ? new Date()
-            : undefined,
-      });
-      if (adjusted.updatedAfterCompletionAt.length > previousTimestampCount) {
-        completedUpdateRecordedRef.current = true;
-      }
-      return adjusted;
-    },
+    (current: Aha, next: Aha): Aha =>
+      applyEditorMutationRules(
+        current,
+        next,
+        editorMode,
+        sourcePdfStateRef.current,
+      ),
     [editorMode],
   );
 
@@ -428,6 +417,7 @@ export function AhaEditorLayout() {
         pendingRef.current = null;
         failedOperationsRef.current.clear();
         draftRef.current = replacement.aha;
+        sourcePdfStateRef.current = replacement.pdf;
         setSnapshot(replacement);
       } catch {
         rememberFailure(operation);
@@ -440,10 +430,19 @@ export function AhaEditorLayout() {
   }, [flushAhaSaves, rememberFailure, runSaveQueue, settleSaveState]);
 
   const navigateSafely = useCallback(
-    async (path: string) => {
+    async (path: string, options?: NavigateOptions) => {
       const saved = await flushSaves();
       if (saved) {
-        navigate(path);
+        const current = draftRef.current;
+        if (current && path.includes(`/ahas/${current.id}/update/`)) {
+          try {
+            sourcePdfStateRef.current = await getAhaPdfState(current);
+          } catch {
+            // Retain the last successfully loaded state so a transient read
+            // failure cannot discard saved work or block the local editor.
+          }
+        }
+        navigate(path, options);
       }
       return saved;
     },
@@ -498,6 +497,7 @@ export function AhaEditorLayout() {
       pendingRef.current = null;
       failedOperationsRef.current.clear();
       draftRef.current = replacement.aha;
+      sourcePdfStateRef.current = replacement.pdf;
       setSnapshot(replacement);
       setSaveState("saved");
       return true;

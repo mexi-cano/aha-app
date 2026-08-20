@@ -5,6 +5,7 @@ import {
   ENERGY_CATEGORIES,
   MAX_CREW_MEMBERS,
   MAX_TASKS,
+  SAFETY_GATE_INSTRUCTION,
   SAFETY_GATE_QUESTION,
   WORKER_ACKNOWLEDGMENT,
   ahaSchema,
@@ -115,6 +116,10 @@ test("canonical form strings remain exact and ordered", () => {
   assert.equal(
     SAFETY_GATE_QUESTION,
     "Have all known hazards been identified and addressed using the Energy Wheel?",
+  );
+  assert.equal(
+    SAFETY_GATE_INSTRUCTION,
+    'Do not proceed until you can answer "yes"',
   );
 });
 
@@ -263,6 +268,13 @@ test("Monday copy carries work forward but resets daily and signature state", ()
 
 test("stored AHA person-in-charge associations migrate without guessing duplicates", () => {
   const current = previousAha();
+  assert.equal(
+    parseStoredAha({
+      ...current,
+      personInChargeWorkerId: "worker-2",
+    }).personInChargeWorkerId,
+    "worker-2",
+  );
   const { personInChargeWorkerId: _association, ...legacy } = current;
   assert.equal(parseStoredAha(legacy).personInChargeWorkerId, "worker-1");
 

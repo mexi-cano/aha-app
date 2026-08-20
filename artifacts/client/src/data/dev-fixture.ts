@@ -74,6 +74,15 @@ function errorName(error: unknown): string | null {
     : null;
 }
 
+function isConfirmedConstraintError(error: unknown): boolean {
+  if (errorName(error) === "ConstraintError") return true;
+  if (errorName(error) !== "AbortError") return false;
+  if (typeof error !== "object" || error === null || !("inner" in error)) {
+    return false;
+  }
+  return errorName(error.inner) === "ConstraintError";
+}
+
 export async function ignoreConfirmedConstraint(
   operation: () => Promise<void>,
   constraintNowExists: () => Promise<boolean>,
@@ -82,7 +91,7 @@ export async function ignoreConfirmedConstraint(
     await operation();
   } catch (error) {
     if (
-      errorName(error) !== "ConstraintError" ||
+      !isConfirmedConstraintError(error) ||
       !(await constraintNowExists())
     ) {
       throw error;

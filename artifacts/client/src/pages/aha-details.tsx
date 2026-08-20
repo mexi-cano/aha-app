@@ -14,6 +14,7 @@ import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import { formatLongDate } from "@/lib/date-format";
 import { cn } from "@/lib/utils";
 import { scrollToAndFocus } from "@/features/aha-editor/editor-navigation";
+import { shouldShowPrefillBanner } from "@/features/aha-editor/completed-update-grouping";
 
 export default function AhaDetails() {
   const { aha, updateAha, navigateSafely, editorBasePath, editorMode } =
@@ -51,7 +52,7 @@ export default function AhaDetails() {
   return (
     <EditorShell>
       <div className="flex flex-col gap-5">
-        {editorMode === "initial" ? <PrefillBanner /> : null}
+        {shouldShowPrefillBanner(editorMode) ? <PrefillBanner /> : null}
         <header>
           <h1 className="text-[28px] font-bold">Details</h1>
           <p className="mt-1 text-base font-medium text-muted-foreground">

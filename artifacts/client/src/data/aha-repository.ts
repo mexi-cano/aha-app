@@ -49,6 +49,22 @@ export interface StartTodayResult {
   created: boolean;
 }
 
+interface BlankAhaReplacementWriter {
+  putAha: (aha: Aha) => Promise<unknown>;
+  putMetadata: (metadata: DraftMetadata) => Promise<unknown>;
+  deletePdf: (ahaId: string) => Promise<unknown>;
+}
+
+export async function writeBlankAhaReplacement(
+  writer: BlankAhaReplacementWriter,
+  replacement: Aha,
+  metadata: DraftMetadata,
+): Promise<void> {
+  await writer.putAha(replacement);
+  await writer.putMetadata(metadata);
+  await writer.deletePdf(replacement.id);
+}
+
 export function createLocalId(): string {
   if (typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -340,9 +356,17 @@ export async function replaceWithBlankAha(
     "rw",
     ahaDatabase.ahas,
     ahaDatabase.draftMetadata,
+    ahaDatabase.ahaPdfs,
     async () => {
-      await ahaDatabase.ahas.put(replacement);
-      await ahaDatabase.draftMetadata.put(metadata);
+      await writeBlankAhaReplacement(
+        {
+          putAha: (value) => ahaDatabase.ahas.put(value),
+          putMetadata: (value) => ahaDatabase.draftMetadata.put(value),
+          deletePdf: (value) => ahaDatabase.ahaPdfs.delete(value),
+        },
+        replacement,
+        metadata,
+      );
     },
   );
 

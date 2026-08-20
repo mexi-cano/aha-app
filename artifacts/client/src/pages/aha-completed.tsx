@@ -1,16 +1,20 @@
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Check, Download, Home as HomeIcon, Printer } from "lucide-react";
+import { useLocation } from "react-router";
 import { getReviewReport } from "@workspace/aha-domain";
 
 import { Button } from "@/components/ui/button";
 import { getAhaPdfState } from "@/data/aha-repository";
+import type { AhaPdfRecord } from "@/data/database";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import { formatEditorDate, formatTime } from "@/lib/date-format";
 import {
   PDF_FAILURE_MESSAGE,
   downloadPdf,
   getCurrentPdfOpenMode,
+  parseCompletedPdfRecoveryState,
+  pdfFitIssueUpdatePath,
   saveAhaAndGeneratePdf,
   shareOrDownloadPdf,
   usePdfObjectUrl,
@@ -19,39 +23,58 @@ import {
 
 export default function AhaCompleted() {
   const { aha, job, commitAha, navigateSafely } = useAhaEditor();
+  const location = useLocation();
   const pdf = useLiveQuery(
     () => getAhaPdfState(aha),
     [aha.id, aha.documentRevision],
   );
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
-  const [fitIssues, setFitIssues] = useState<PdfFitIssue[]>([]);
+  const [freshlyStoredPdf, setFreshlyStoredPdf] =
+    useState<AhaPdfRecord | null>(null);
+  const [fitIssues, setFitIssues] = useState<PdfFitIssue[]>(
+    () => parseCompletedPdfRecoveryState(location.state)?.issues ?? [],
+  );
   const [shareFailed, setShareFailed] = useState(false);
   const [downloadStarted, setDownloadStarted] = useState(false);
   const [shareIsTakingLong, setShareIsTakingLong] = useState(false);
   const pdfOpenMode = getCurrentPdfOpenMode();
-  const nativePdfUrl = usePdfObjectUrl(
-    pdf?.status === "current" ? pdf.record : null,
-  );
+  const currentPdfRecord =
+    pdf?.status === "current"
+      ? pdf.record
+      : freshlyStoredPdf?.sourceRevision === aha.documentRevision
+        ? freshlyStoredPdf
+        : null;
+  const nativePdfUrl = usePdfObjectUrl(currentPdfRecord);
 
   const regenerate = async () => {
     if (isGenerating) return;
     setIsGenerating(true);
-    setFitIssues([]);
     try {
       const result = await saveAhaAndGeneratePdf({
         commitAha,
         update: (current) => current,
         job,
       });
-      if (result.status === "fit_failed") setFitIssues(result.issues);
+      if (result.status === "fit_failed") {
+        setFreshlyStoredPdf(null);
+        setFitIssues(result.issues);
+      } else if (result.status === "stored") {
+        setFreshlyStoredPdf(result.record);
+        setFitIssues([]);
+      } else if (result.status === "generation_failed") {
+        setFreshlyStoredPdf(null);
+        setFitIssues([]);
+      } else {
+        // A failed save leaves the current recovery presentation intact.
+      }
     } finally {
       setIsGenerating(false);
     }
   };
 
   const share = async () => {
-    if (!pdf?.record || isSharing) return;
+    if (!currentPdfRecord || isSharing) return;
     setIsSharing(true);
     setShareFailed(false);
     setDownloadStarted(false);
@@ -61,7 +84,7 @@ export default function AhaCompleted() {
       1_500,
     );
     try {
-      const result = await shareOrDownloadPdf(pdf.record);
+      const result = await shareOrDownloadPdf(currentPdfRecord);
       if (result.status === "failed") setShareFailed(true);
       if (result.status === "downloaded") setDownloadStarted(true);
     } finally {
@@ -72,8 +95,8 @@ export default function AhaCompleted() {
   };
 
   const downloadStoredPdf = () => {
-    if (!pdf?.record) return;
-    downloadPdf(pdf.record);
+    if (!currentPdfRecord) return;
+    downloadPdf(currentPdfRecord);
     setShareFailed(false);
     setDownloadStarted(true);
   };
@@ -94,7 +117,7 @@ export default function AhaCompleted() {
     );
   }
 
-  const pdfCurrent = pdf?.status === "current";
+  const pdfCurrent = currentPdfRecord !== null;
   const hasUpdatedChip = aha.updatedAfterCompletionAt.length > 0;
   const pendingUpdateNeedsReview = !getReviewReport(aha).canStartSigning;
 
@@ -140,16 +163,19 @@ export default function AhaCompleted() {
         </section>
 
         {pdf === undefined ||
-        (pdfCurrent && pdfOpenMode === "native" && !nativePdfUrl) ? (
+        (pdfCurrent && pdfOpenMode === "native" && !nativePdfUrl) ||
+        (isGenerating && fitIssues.length === 0) ? (
           <section
             className="rounded-2xl border border-card-border bg-card p-5 text-center"
             role="status"
           >
             <p className="text-base font-semibold text-muted-foreground">
-              Opening the saved PDF…
+              {isGenerating
+                ? "Creating the official PDF…"
+                : "Opening the saved PDF…"}
             </p>
           </section>
-        ) : pdfCurrent && pdf.record ? (
+        ) : pdfCurrent && currentPdfRecord ? (
           pdfOpenMode === "native" && nativePdfUrl ? (
             <Button
               asChild
@@ -167,7 +193,7 @@ export default function AhaCompleted() {
               VIEW PDF
             </Button>
           )
-        ) : (
+        ) : fitIssues.length === 0 ? (
           <section
             className="rounded-2xl border border-warning/30 bg-warning/10 p-5"
             role="alert"
@@ -200,21 +226,53 @@ export default function AhaCompleted() {
                   : "TRY AGAIN"}
             </Button>
           </section>
-        )}
+        ) : null}
 
         {fitIssues.length > 0 ? (
           <div
             className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-warning-foreground"
             role="alert"
           >
-            <p className="font-bold">The PDF needs shorter content:</p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm font-semibold">
-              {fitIssues.map((issue) => (
-                <li key={`${issue.fieldPath}-${issue.code}`}>
-                  {issue.message}
-                </li>
-              ))}
+            <p className="font-bold">The PDF needs shorter content.</p>
+            <p className="mt-1 text-sm font-semibold">
+              The completed AHA and every signature remain saved.
+            </p>
+            <ul className="mt-3 space-y-3 text-sm font-semibold">
+              {fitIssues.map((issue) => {
+                const updatePath = pdfFitIssueUpdatePath(aha.id, issue);
+                return (
+                  <li
+                    className="rounded-lg border border-warning/30 bg-card/70 p-3"
+                    key={`${issue.fieldPath}-${issue.code}`}
+                  >
+                    <p>{issue.message}</p>
+                    {updatePath ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="mt-3 min-h-12 w-full border-warning/40 bg-card text-warning-foreground"
+                        onClick={() => void navigateSafely(updatePath)}
+                      >
+                        Edit {issue.label}
+                      </Button>
+                    ) : (
+                      <p className="mt-2 text-xs font-medium">
+                        This field cannot be changed safely from the completed
+                        workflow.
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
+            <Button
+              type="button"
+              className="mt-4 min-h-12 w-full"
+              disabled={isGenerating}
+              onClick={() => void regenerate()}
+            >
+              {isGenerating ? "CHECKING PDF…" : "CHECK PDF AGAIN"}
+            </Button>
           </div>
         ) : null}
 
@@ -235,7 +293,7 @@ export default function AhaCompleted() {
             Sharing is not available here, so the PDF download was started.
           </p>
         ) : null}
-        {isSharing && shareIsTakingLong && pdf?.record ? (
+        {isSharing && shareIsTakingLong && currentPdfRecord ? (
           <div
             className="rounded-xl border border-card-border bg-card p-4"
             role="status"
@@ -253,7 +311,7 @@ export default function AhaCompleted() {
             </Button>
           </div>
         ) : null}
-        {shareFailed && pdf?.record ? (
+        {shareFailed && currentPdfRecord ? (
           <div
             className="rounded-xl border border-warning/30 bg-warning/10 p-4"
             role="alert"

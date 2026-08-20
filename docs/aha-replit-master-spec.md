@@ -1,6 +1,6 @@
-# ITS AHA App — Replit Master Build Specification (v1.4)
+# ITS AHA App — Replit Master Build Specification (v1.5)
 
-_v1.4 changelog: replaces the optional worker-review detour with one continuous, read-only AHA followed by the official acknowledgment and signature; the crew list remains the handoff controller. v1.3 clarified that FOREMAN is the official Person in charge, not necessarily the device operator; the app may associate that printed name with a crew worker ID for unambiguous presentation. v1.2 moved the database to external Neon (Drizzle + @neondatabase/serverless), pinned the PDF/frontend stack, added the §3 no-deduplication rule, detailed gate-code auth, and expanded §10 exclusions. Supersedes v1.0/v1.1/v1.2/v1.3._
+_v1.5 changelog: reconciles the safety-gate instruction with the authoritative ITS PDF renderer/reference, using double quotes around "yes". v1.4 replaced the optional worker-review detour with one continuous, read-only AHA followed by the official acknowledgment and signature; the crew list remains the handoff controller. v1.3 clarified that FOREMAN is the official Person in charge, not necessarily the device operator; the app may associate that printed name with a crew worker ID for unambiguous presentation. v1.2 moved the database to external Neon (Drizzle + @neondatabase/serverless), pinned the PDF/frontend stack, added the §3 no-deduplication rule, detailed gate-code auth, and expanded §10 exclusions. Supersedes v1.0/v1.1/v1.2/v1.3/v1.4._
 
 You are building a mobile-first PWA that lets a construction crew lead complete the company's daily Activity Hazard Analysis (AHA) on an iPad, collect 5–10 finger signatures, and produce a PDF that exactly matches the official ITS form (IS_F_222_EN.2203). The app UI is modern and touch-first; the PDF output is the fixed official company sheet.
 
@@ -67,7 +67,7 @@ These strings are data from the official form. Example chips, Review listings, t
 
 **Worker acknowledgment (shown verbatim on the signature screen):** "I have reviewed all applicable documentation, site hazards, and my responsibilities to follow safe work plans to protect myself and others while on site."
 
-**Safety gate question (verbatim):** "Have all known hazards been identified and addressed using the Energy Wheel?" — with the form's instruction "Do not proceed until you can answer 'yes'" honored as a hard block (§5).
+**Safety gate question (verbatim):** "Have all known hazards been identified and addressed using the Energy Wheel?" — with the form's instruction `Do not proceed until you can answer "yes"` honored as a hard block (§5).
 
 ## 4. Core behaviors
 

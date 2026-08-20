@@ -229,14 +229,7 @@ function printedCrewChanged(current: Aha, next: Aha): boolean {
 
 export function hasPdfSourceChanged(current: Aha, next: Aha): boolean {
   return (
-    current.date !== next.date ||
-    headerChanged(current, next) ||
-    current.description !== next.description ||
-    current.meetingNotes !== next.meetingNotes ||
-    notApplicableChanged(current, next) ||
-    tasksChanged(current, next) ||
-    energyChanged(current, next) ||
-    current.safetyCheck !== next.safetyCheck ||
+    hasNonCrewPdfSourceChanged(current, next) ||
     printedCrewChanged(current, next)
   );
 }

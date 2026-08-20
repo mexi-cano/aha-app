@@ -18,6 +18,7 @@ import {
   createAhaPdfFilename,
   createAhaPdfInput,
   renderAhaPdf,
+  TASK_GRID_ROWS,
 } from "./aha-pdf";
 
 const job: Job = jobSchema.parse({
@@ -117,16 +118,18 @@ test("adaptive allocation keeps six short tasks roomy and fits fifteen short tas
     [2, 2, 2, 2, 2, 2],
   );
 
-  const fifteen = await analyzeAhaPdfFit(
+  const maximum = await analyzeAhaPdfFit(
     createAha({
-      tasks: Array.from({ length: 15 }, (_, index) => shortTask(index)),
+      tasks: Array.from({ length: TASK_GRID_ROWS }, (_, index) =>
+        shortTask(index),
+      ),
     }),
     job,
   );
-  assert.equal(fifteen.issues.length, 0);
+  assert.equal(maximum.issues.length, 0);
   assert.deepEqual(
-    fifteen.tasks.map(({ rowSpan }) => rowSpan),
-    Array(15).fill(1),
+    maximum.tasks.map(({ rowSpan }) => rowSpan),
+    Array(TASK_GRID_ROWS).fill(1),
   );
 });
 
@@ -147,11 +150,18 @@ test("fit analysis targets unbroken text and total task-row overflow", async () 
   });
   const overflow = await analyzeAhaPdfFit(
     createAha({
-      tasks: Array.from({ length: 15 }, (_, index) => longTask(index)),
+      tasks: Array.from({ length: TASK_GRID_ROWS }, (_, index) =>
+        longTask(index),
+      ),
     }),
     job,
   );
   assert.ok(overflow.issues.some(({ code }) => code === "task_row_overflow"));
+  assert.ok(
+    overflow.issues.some(({ message }) =>
+      message.includes(`${TASK_GRID_ROWS} rows`),
+    ),
+  );
 });
 
 test("fit failure returns no PDF bytes and does not touch invalid assets", async () => {

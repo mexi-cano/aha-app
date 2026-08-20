@@ -23,6 +23,43 @@ interface PersonInChargeFieldProps {
   updateAha: (update: (current: Aha) => Aha) => void;
 }
 
+interface PersonInChargeCrewChoicesProps {
+  crew: Aha["crew"];
+  selectedWorkerId: string | null;
+  onSelect: (workerId: string) => void;
+}
+
+export function PersonInChargeCrewChoices({
+  crew,
+  selectedWorkerId,
+  onSelect,
+}: PersonInChargeCrewChoicesProps) {
+  return crew.map((member) => {
+    const selected = member.workerId === selectedWorkerId;
+    return (
+      <button
+        key={member.workerId}
+        type="button"
+        aria-pressed={selected}
+        className="flex min-h-12 items-center gap-3 rounded-[10px] border-[1.5px] border-border bg-card px-4 text-left text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        onClick={() => onSelect(member.workerId)}
+      >
+        <span
+          className={`flex size-6 shrink-0 items-center justify-center rounded-full border-2 ${
+            selected
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-[#8A93AC] text-transparent"
+          }`}
+          aria-hidden="true"
+        >
+          <Check className="size-4" strokeWidth={3} />
+        </span>
+        <span>{member.name}</span>
+      </button>
+    );
+  });
+}
+
 export function PersonInChargeField({
   aha,
   updateAha,
@@ -99,34 +136,12 @@ export function PersonInChargeField({
           </DialogHeader>
           <div
             className="flex max-h-[min(60vh,480px)] flex-col gap-2 overflow-y-auto pr-1"
-            role="radiogroup"
-            aria-label="Today's crew"
           >
-            {aha.crew.map((member) => {
-              const selected = member.workerId === selectedWorkerId;
-              return (
-                <button
-                  key={member.workerId}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  className="flex min-h-12 items-center gap-3 rounded-[10px] border-[1.5px] border-border bg-card px-4 text-left text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  onClick={() => selectWorker(member.workerId)}
-                >
-                  <span
-                    className={`flex size-6 shrink-0 items-center justify-center rounded-full border-2 ${
-                      selected
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-[#8A93AC] text-transparent"
-                    }`}
-                    aria-hidden="true"
-                  >
-                    <Check className="size-4" strokeWidth={3} />
-                  </span>
-                  <span>{member.name}</span>
-                </button>
-              );
-            })}
+            <PersonInChargeCrewChoices
+              crew={aha.crew}
+              selectedWorkerId={selectedWorkerId}
+              onSelect={selectWorker}
+            />
           </div>
           <DialogFooter>
             <Button

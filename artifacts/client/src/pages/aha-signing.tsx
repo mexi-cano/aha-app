@@ -36,6 +36,7 @@ import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import { formatEditorDate, formatTime } from "@/lib/date-format";
 import {
   analyzeAhaPdfFit,
+  navigateAfterPersistedPdfOperation,
   saveAhaAndGeneratePdf,
   type PdfFitIssue,
 } from "@/pdf";
@@ -257,10 +258,7 @@ export default function AhaSigning() {
         );
         return;
       }
-      if (result.status === "fit_failed") {
-        setFitIssues(result.issues);
-      }
-      await navigateSafely(`/ahas/${result.savedAha.id}/completed`);
+      await navigateAfterPersistedPdfOperation(result, navigateSafely);
     } finally {
       finishInFlightRef.current = false;
       setIsCommitting(false);

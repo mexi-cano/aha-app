@@ -24,6 +24,7 @@ const LEFT = 45;
 const RIGHT = 567;
 const MIDDLE = 306;
 const MIN_FONT_SIZE = 5.4;
+export const TASK_GRID_ROWS = 15;
 
 const COLORS = {
   bar: rgb(0.28, 0.33, 0.3),
@@ -359,18 +360,18 @@ export function planAhaPdfLayout(
     taskMinimumSpan(task, font, issues),
   );
   const minimumRows = minimumSpans.reduce((sum, span) => sum + span, 0);
-  if (minimumRows > 15) {
+  if (minimumRows > TASK_GRID_ROWS) {
     issues.push({
       code: "task_row_overflow",
       fieldPath: "tasks",
       label: "Tasks",
       message:
-        "The task details need more than the 15 rows available on the ITS sheet. Shorten them or split the work.",
+        `The task details need more than the ${TASK_GRID_ROWS} rows available on the ITS sheet. Shorten them or split the work.`,
     });
   }
 
   const spans = [...minimumSpans];
-  let remaining = Math.max(0, 15 - minimumRows);
+  let remaining = Math.max(0, TASK_GRID_ROWS - minimumRows);
   for (let index = 0; index < spans.length && remaining > 0; index += 1) {
     if (spans[index] === 1) {
       spans[index] = 2;
@@ -661,7 +662,7 @@ function drawFrontPage(
   const tableTop = 318;
   const headerHeight = 18;
   const rowHeight = 24;
-  const tableBottom = tableTop + headerHeight + rowHeight * 15;
+  const tableBottom = tableTop + headerHeight + rowHeight * TASK_GRID_ROWS;
   page.drawRectangle({
     x: LEFT,
     y: topY(tableTop + headerHeight),
@@ -673,7 +674,7 @@ function drawFrontPage(
   drawText(page, "Hazards", 224, tableTop + 13, bold, 9, COLORS.white);
   drawText(page, "Controls", 398, tableTop + 13, bold, 9, COLORS.white);
   drawBox(page, LEFT, tableTop + headerHeight, RIGHT, tableBottom);
-  for (let row = 1; row < 15; row += 1)
+  for (let row = 1; row < TASK_GRID_ROWS; row += 1)
     drawHorizontal(
       page,
       LEFT,
@@ -1077,7 +1078,7 @@ async function drawBackPage(
     drawX(page, input.safetyCheck === "yes" ? yesBox : noBox);
   drawText(
     page,
-    `(${SAFETY_GATE_INSTRUCTION.replace("'yes'", '"yes"')})`,
+    `(${SAFETY_GATE_INSTRUCTION})`,
     LEFT,
     gateBaseline + 15,
     bold,

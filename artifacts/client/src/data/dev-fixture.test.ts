@@ -28,7 +28,7 @@ test("a real AHA occupying the fixture job/date is never replaced", () => {
   assert.equal(shouldCreateDevSourceAha(true, true), false);
 });
 
-test("a concurrent constraint is ignored only after the target is confirmed", async () => {
+test("a direct concurrent constraint is ignored only after the target is confirmed", async () => {
   await ignoreConfirmedConstraint(
     async () => {
       throw { name: "ConstraintError" };
@@ -50,12 +50,45 @@ test("a concurrent constraint is ignored only after the target is confirmed", as
       error.name === "ConstraintError",
   );
 
+});
+
+test("a wrapped concurrent constraint is ignored only after confirmation", async () => {
+  const wrapped = {
+    name: "AbortError",
+    inner: { name: "ConstraintError" },
+  };
+  await ignoreConfirmedConstraint(
+    async () => {
+      throw wrapped;
+    },
+    async () => true,
+  );
+
   await assert.rejects(
     ignoreConfirmedConstraint(
       async () => {
-        throw { name: "DataError" };
+        throw wrapped;
       },
-      async () => true,
+      async () => false,
     ),
+    (error) => error === wrapped,
   );
+});
+
+test("unrelated and unwrapped abort errors are never suppressed", async () => {
+  for (const error of [
+    { name: "DataError" },
+    { name: "AbortError" },
+    { name: "AbortError", inner: { name: "DataError" } },
+  ]) {
+    await assert.rejects(
+      ignoreConfirmedConstraint(
+        async () => {
+          throw error;
+        },
+        async () => true,
+      ),
+      (received) => received === error,
+    );
+  }
 });

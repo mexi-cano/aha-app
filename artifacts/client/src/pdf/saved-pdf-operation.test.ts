@@ -138,6 +138,9 @@ test("save-first PDF orchestration distinguishes every recovery result", async (
     commitAha: async () => {
       throw new Error("unexpected persistence rejection");
     },
+    generate: async () => {
+      assert.fail("generation must not run after rejected persistence");
+    },
   });
   assert.equal(rejectedSave.status, "save_failed");
 });

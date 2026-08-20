@@ -2,6 +2,7 @@ import energyWheelUrl from "../../../../assets/aha-energy-wheel-recolored.png?ur
 import logoUrl from "../../../../assets/its-logo.png?url";
 
 import type { AhaPdfAssets } from "./aha-pdf";
+import { createRetryableMemoizedLoader } from "./retryable-memo";
 
 async function loadAsset(url: string, label: string): Promise<Uint8Array> {
   const response = await fetch(url);
@@ -10,12 +11,14 @@ async function loadAsset(url: string, label: string): Promise<Uint8Array> {
   return new Uint8Array(await response.arrayBuffer());
 }
 
-let assetsPromise: Promise<AhaPdfAssets> | null = null;
-
-export function loadAhaPdfAssets(): Promise<AhaPdfAssets> {
-  assetsPromise ??= Promise.all([
+const loadAssets = createRetryableMemoizedLoader(async () => {
+  const [logoPng, energyWheelPng] = await Promise.all([
     loadAsset(logoUrl, "ITS logo"),
     loadAsset(energyWheelUrl, "energy wheel"),
-  ]).then(([logoPng, energyWheelPng]) => ({ logoPng, energyWheelPng }));
-  return assetsPromise;
+  ]);
+  return { logoPng, energyWheelPng };
+});
+
+export function loadAhaPdfAssets(): Promise<AhaPdfAssets> {
+  return loadAssets();
 }

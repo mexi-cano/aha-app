@@ -20,6 +20,7 @@ import { createLocalId } from "@/data/aha-repository";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import {
   analyzeAhaPdfFit,
+  navigateAfterPersistedPdfOperation,
   saveAhaAndGeneratePdf,
   type PdfFitIssue,
 } from "@/pdf";
@@ -97,10 +98,7 @@ export default function AhaLateWorker() {
         );
         return;
       }
-      if (result.status === "fit_failed") {
-        setFitIssues(result.issues);
-      }
-      await navigateSafely(`/ahas/${result.savedAha.id}/completed`);
+      await navigateAfterPersistedPdfOperation(result, navigateSafely);
     } finally {
       saveInFlightRef.current = false;
       setIsSaving(false);

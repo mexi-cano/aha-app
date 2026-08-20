@@ -124,6 +124,8 @@ export function HomeStateCard({
       <p className="mt-3 text-base font-medium text-muted-foreground">
         {todayPdfStatus === "current"
           ? "The completed AHA and current PDF are saved on this iPad."
+          : todayPdfStatus === "unreadable"
+            ? "The AHA is saved, but its stored PDF cannot be opened. The existing file was not deleted."
           : "The AHA is saved. Its current PDF still needs to be created."}
       </p>
       <div className="mt-7 flex flex-col gap-3">
@@ -133,6 +135,8 @@ export function HomeStateCard({
         >
           {todayPdfStatus === "current"
             ? "VIEW AHA"
+            : todayPdfStatus === "unreadable"
+              ? "REPAIR PDF"
             : getReviewReport(todayAha).canStartSigning
               ? "FINISH PDF"
               : "FINISH UPDATE"}

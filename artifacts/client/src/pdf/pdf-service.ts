@@ -65,31 +65,59 @@ export type SharePdfResult =
   | { status: "shared" | "downloaded" | "cancelled" }
   | { status: "failed"; error: unknown };
 
+export interface PdfShareDependencies {
+  navigator: {
+    share?: (data?: ShareData) => Promise<void>;
+    canShare?: (data?: ShareData) => boolean;
+  };
+  download: (record: AhaPdfRecord) => void;
+  createFile: (record: AhaPdfRecord) => File;
+}
+
+function defaultShareDependencies(): PdfShareDependencies {
+  return {
+    navigator,
+    download: downloadPdf,
+    createFile: (record) =>
+      new File([record.bytes.slice(0)], record.filename, {
+        type: "application/pdf",
+      }),
+  };
+}
+
 export async function shareOrDownloadPdf(
   record: AhaPdfRecord,
+  dependencies = defaultShareDependencies(),
 ): Promise<SharePdfResult> {
   try {
-    const file = new File([record.bytes.slice(0)], record.filename, {
-      type: "application/pdf",
-    });
+    const file = dependencies.createFile(record);
     const shareData = { files: [file], title: record.filename };
-    const hasShare = typeof navigator.share === "function";
+    const hasShare = typeof dependencies.navigator.share === "function";
     let canShareFiles: boolean | null = null;
-    if (typeof navigator.canShare === "function") {
+    if (typeof dependencies.navigator.canShare === "function") {
       try {
-        canShareFiles = navigator.canShare(shareData);
+        canShareFiles = dependencies.navigator.canShare(shareData);
       } catch {
         canShareFiles = false;
       }
     }
     if (!supportsNativeFileShare(hasShare, canShareFiles)) {
-      downloadPdf(record);
+      dependencies.download(record);
       return { status: "downloaded" };
     }
-    await navigator.share(shareData);
+    await dependencies.navigator.share!(shareData);
     return { status: "shared" };
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
+    if (
+      error instanceof DOMException
+        ? error.name === "AbortError"
+        : Boolean(
+            error &&
+            typeof error === "object" &&
+            "name" in error &&
+            error.name === "AbortError",
+          )
+    ) {
       return { status: "cancelled" };
     }
     return { status: "failed", error };

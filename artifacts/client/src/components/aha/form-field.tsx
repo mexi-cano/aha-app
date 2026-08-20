@@ -1,3 +1,4 @@
+import * as React from "react";
 import type {
   InputHTMLAttributes,
   ReactNode,
@@ -10,6 +11,8 @@ interface FieldFrameProps {
   id: string;
   label: string;
   hint?: string;
+  description?: ReactNode;
+  descriptionId?: string;
   requirement?: FieldRequirement;
   children: ReactNode;
 }
@@ -34,6 +37,8 @@ function FieldFrame({
   id,
   label,
   hint,
+  description,
+  descriptionId,
   requirement,
   children,
 }: FieldFrameProps) {
@@ -54,6 +59,14 @@ function FieldFrame({
         ) : null}
       </label>
       {children}
+      {description ? (
+        <div
+          id={descriptionId}
+          className="text-sm font-medium leading-relaxed text-muted-foreground"
+        >
+          {description}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -62,6 +75,7 @@ export function TextField({
   id,
   label,
   hint,
+  description,
   requirement,
   className,
   ...props
@@ -69,10 +83,23 @@ export function TextField({
   id: string;
   label: string;
   hint?: string;
+  description?: ReactNode;
   requirement?: FieldRequirement;
 }) {
+  const descriptionId = description ? `${id}-description` : undefined;
+  const ariaDescribedBy =
+    [props["aria-describedby"], descriptionId].filter(Boolean).join(" ") ||
+    undefined;
+
   return (
-    <FieldFrame id={id} label={label} hint={hint} requirement={requirement}>
+    <FieldFrame
+      id={id}
+      label={label}
+      hint={hint}
+      description={description}
+      descriptionId={descriptionId}
+      requirement={requirement}
+    >
       <input
         id={id}
         aria-required={
@@ -84,6 +111,7 @@ export function TextField({
           className,
         )}
         {...props}
+        aria-describedby={ariaDescribedBy}
       />
     </FieldFrame>
   );
@@ -93,6 +121,7 @@ export function TextAreaField({
   id,
   label,
   hint,
+  description,
   requirement,
   className,
   ...props
@@ -100,10 +129,23 @@ export function TextAreaField({
   id: string;
   label: string;
   hint?: string;
+  description?: ReactNode;
   requirement?: FieldRequirement;
 }) {
+  const descriptionId = description ? `${id}-description` : undefined;
+  const ariaDescribedBy =
+    [props["aria-describedby"], descriptionId].filter(Boolean).join(" ") ||
+    undefined;
+
   return (
-    <FieldFrame id={id} label={label} hint={hint} requirement={requirement}>
+    <FieldFrame
+      id={id}
+      label={label}
+      hint={hint}
+      description={description}
+      descriptionId={descriptionId}
+      requirement={requirement}
+    >
       <textarea
         id={id}
         aria-required={
@@ -115,6 +157,7 @@ export function TextAreaField({
           className,
         )}
         {...props}
+        aria-describedby={ariaDescribedBy}
       />
     </FieldFrame>
   );

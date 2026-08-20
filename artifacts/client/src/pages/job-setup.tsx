@@ -15,6 +15,7 @@ import { createLocalId } from "@/data/aha-repository";
 import {
   buildJobConfiguration,
   createEmptyJobSetupDraft,
+  getVisibleJobSetupIssues,
   jobToSetupDraft,
   validateJobSetup,
   type JobSetupDraft,
@@ -42,7 +43,11 @@ export default function JobSetup() {
   );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [issues, setIssues] = useState(() => validateJobSetup(draft));
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+  const issues = useMemo(
+    () => getVisibleJobSetupIssues(draft, hasAttemptedSubmit),
+    [draft, hasAttemptedSubmit],
+  );
 
   useEffect(() => {
     if (!jobId) return;
@@ -101,7 +106,7 @@ export default function JobSetup() {
   const submit = async () => {
     if (state === "saving") return;
     const nextIssues = validateJobSetup(draft);
-    setIssues(nextIssues);
+    setHasAttemptedSubmit(true);
     setSaveError(null);
     if (nextIssues.length) {
       document.getElementById(FIELD_IDS[nextIssues[0]!.field])?.focus();
@@ -181,7 +186,19 @@ export default function JobSetup() {
           </p>
         </div>
 
-        {issues.length ? (
+        {!hasAttemptedSubmit ? (
+          <section className="rounded-xl border border-card-border bg-card px-4 py-4">
+            <h2 className="text-lg font-bold">Before you begin</h2>
+            <p className="mt-1 text-base font-medium leading-relaxed text-muted-foreground">
+              Have the project identity, work location, emergency details, usual
+              crew, and default Person in charge ready.
+            </p>
+            <p className="mt-2 text-base font-medium leading-relaxed text-muted-foreground">
+              Site defaults and the roster can be updated later. The job name
+              and city or area become permanent after creation.
+            </p>
+          </section>
+        ) : issues.length ? (
           <section
             className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3"
             role="alert"
@@ -207,6 +224,7 @@ export default function JobSetup() {
           <TextField
             id={FIELD_IDS.name}
             label="Job name"
+            description="The project name your crew uses to identify this job."
             requirement="required"
             value={draft.name}
             disabled={isEditing}
@@ -216,6 +234,7 @@ export default function JobSetup() {
           <TextField
             id={FIELD_IDS.cityLabel}
             label="City or area"
+            description="The general work area used to distinguish this job."
             requirement="required"
             value={draft.cityLabel}
             disabled={isEditing}
@@ -229,6 +248,7 @@ export default function JobSetup() {
           <TextField
             id={FIELD_IDS.location}
             label="Location"
+            description="The specific work location printed on each AHA."
             requirement="required"
             value={draft.location}
             aria-invalid={issueByField.has("location")}
@@ -237,6 +257,7 @@ export default function JobSetup() {
           <TextField
             id={FIELD_IDS.closestEmergencyCentre}
             label="Closest emergency centre"
+            description="The facility identified in the site emergency plan."
             requirement="required"
             value={draft.closestEmergencyCentre}
             aria-invalid={issueByField.has("closestEmergencyCentre")}
@@ -247,6 +268,7 @@ export default function JobSetup() {
           <TextField
             id={FIELD_IDS.emergencyNumber}
             label="Emergency number"
+            description="The number the crew should call for a site emergency."
             requirement="required"
             value={draft.emergencyNumber}
             aria-invalid={issueByField.has("emergencyNumber")}
@@ -255,6 +277,7 @@ export default function JobSetup() {
           <TextField
             id={FIELD_IDS.musterPoint}
             label="Muster point"
+            description="Where the crew meets during an evacuation."
             requirement="required"
             value={draft.musterPoint}
             aria-invalid={issueByField.has("musterPoint")}
@@ -263,6 +286,7 @@ export default function JobSetup() {
           <TextField
             id="job-work-order"
             label="Work order / permit number"
+            description="An optional default used only when starting an AHA from a blank form."
             requirement="optional"
             value={draft.workOrderPermit}
             onChange={(event) => update("workOrderPermit", event.target.value)}
@@ -270,6 +294,7 @@ export default function JobSetup() {
           <TextField
             id="job-jha"
             label="JHA / procedure numbers"
+            description="An optional default used only when starting an AHA from a blank form."
             requirement="optional"
             value={draft.jhaProcedureNumbers}
             onChange={(event) =>
@@ -287,8 +312,9 @@ export default function JobSetup() {
             <div>
               <h2 className="text-xl font-bold">Job roster</h2>
               <p className="mt-1 text-base font-medium text-muted-foreground">
-                Worker names are isolated to this job. An empty roster is
-                allowed, but Review will require a crew before signing.
+                Add the workers usually assigned to this job. Today's crew can
+                still be adjusted during Review. An empty roster is allowed, but
+                Review requires a crew before signing.
               </p>
             </div>
             <span className="shrink-0 text-base font-semibold text-muted-foreground">
@@ -345,8 +371,9 @@ export default function JobSetup() {
           <div>
             <h2 className="text-xl font-bold">Default Person in charge</h2>
             <p className="mt-1 text-base font-medium text-muted-foreground">
-              Choose after entering the roster so duplicate names remain
-              unambiguous.
+              Choose the foreman or person responsible for the work. They do not
+              have to be in the signing crew. Choose after entering the roster
+              so duplicate names remain unambiguous.
             </p>
           </div>
           {draft.roster.map((worker, index) => {

@@ -23,6 +23,7 @@ import AhaReview from "@/pages/aha-review";
 import AhaSigning from "@/pages/aha-signing";
 import AhaWork from "@/pages/aha-work";
 import Home from "@/pages/home";
+import History from "@/pages/history";
 import JobSetup from "@/pages/job-setup";
 import Jobs from "@/pages/jobs";
 import NotFound from "@/pages/not-found";
@@ -59,6 +60,7 @@ function AppRoutes() {
       <UpdateManager />
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/history" element={<History />} />
         <Route path="/setup" element={<JobSetup />} />
         <Route path="/jobs" element={<Jobs />} />
         <Route path="/jobs/:jobId/setup" element={<JobSetup />} />

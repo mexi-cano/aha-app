@@ -35,7 +35,34 @@ export interface HomeSnapshot {
   todayAha: Aha | null;
   todayPdfStatus: AhaPdfStatus | null;
   recentAhas: Aha[];
+  recentAhaPdfStatuses: Record<string, AhaPdfStatus>;
+  completedAhaCount: number;
   unreadableCount: number;
+}
+
+export interface CompletedAhaHistoryItem {
+  aha: Aha;
+  pdf: AhaPdfState;
+}
+
+export interface CompletedAhaHistorySnapshot {
+  job: Job | null;
+  items: CompletedAhaHistoryItem[];
+  totalCount: number;
+  unreadableCount: number;
+}
+
+export function selectCompletedAhaHistory(
+  records: Aha[],
+  limit: number,
+): { visible: Aha[]; totalCount: number } {
+  const completed = records
+    .filter((aha) => aha.status === "completed")
+    .sort((left, right) => right.date.localeCompare(left.date));
+  return {
+    visible: completed.slice(0, Math.max(0, limit)),
+    totalCount: completed.length,
+  };
 }
 
 export interface EditorSnapshot {
@@ -132,6 +159,8 @@ export async function getHomeSnapshot(today: LocalDate): Promise<HomeSnapshot> {
       todayAha: null,
       todayPdfStatus: null,
       recentAhas: [],
+      recentAhaPdfStatuses: {},
+      completedAhaCount: 0,
       unreadableCount: 0,
     };
   }
@@ -144,12 +173,47 @@ export async function getHomeSnapshot(today: LocalDate): Promise<HomeSnapshot> {
   );
 
   const todayAha = sorted.find((aha) => aha.date === today) ?? null;
+  const recentAhas = sorted.filter((aha) => aha.date < today).slice(0, 3);
+  const recentAhaPdfStatuses = Object.fromEntries(
+    await Promise.all(
+      recentAhas
+        .filter((aha) => aha.status === "completed")
+        .map(async (aha) => [aha.id, (await getAhaPdfState(aha)).status]),
+    ),
+  );
   return {
     job,
     jobCount,
     todayAha,
     todayPdfStatus: todayAha ? (await getAhaPdfState(todayAha)).status : null,
-    recentAhas: sorted.filter((aha) => aha.date < today).slice(0, 3),
+    recentAhas,
+    recentAhaPdfStatuses,
+    completedAhaCount: sorted.filter((aha) => aha.status === "completed")
+      .length,
+    unreadableCount,
+  };
+}
+
+export async function getCompletedAhaHistorySnapshot(
+  limit: number,
+): Promise<CompletedAhaHistorySnapshot> {
+  const job = await readActiveJob();
+  if (!job) {
+    return { job: null, items: [], totalCount: 0, unreadableCount: 0 };
+  }
+
+  const { records, unreadableCount } = partitionReadableAhas(
+    await ahaDatabase.ahas.where("jobId").equals(job.id).toArray(),
+  );
+  const { visible, totalCount } = selectCompletedAhaHistory(records, limit);
+  const items = await Promise.all(
+    visible.map(async (aha) => ({ aha, pdf: await getAhaPdfState(aha) })),
+  );
+
+  return {
+    job,
+    items,
+    totalCount,
     unreadableCount,
   };
 }

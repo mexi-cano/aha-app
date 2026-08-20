@@ -1,9 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createBlankAha, jobSchema } from "@workspace/aha-domain";
+import {
+  ahaSchema,
+  createBlankAha,
+  jobSchema,
+  type Aha,
+} from "@workspace/aha-domain";
 
 import { createBlankDraftMetadata } from "./draft-metadata";
-import { writeBlankAhaReplacement } from "./aha-repository";
+import {
+  selectCompletedAhaHistory,
+  writeBlankAhaReplacement,
+} from "./aha-repository";
 
 const job = jobSchema.parse({
   id: "job-1",
@@ -50,4 +58,39 @@ test("blank replacement updates matching rows and deletes only its PDF artifact"
     ["metadata", "aha-target"],
     ["pdf", "aha-target"],
   ]);
+});
+
+function completedAha(id: string, date: string): Aha {
+  return ahaSchema.parse({
+    ...createBlankAha(job, date as Aha["date"], {
+      createId: () => id,
+      now: () => new Date(`${date}T12:00:00.000Z`),
+    }),
+    status: "completed",
+    completedAt: `${date}T13:00:00.000Z`,
+  });
+}
+
+test("completed history filters, sorts newest first, and pages without mutating input", () => {
+  const draft = createBlankAha(job, "2026-08-18", {
+    createId: () => "draft",
+    now: () => new Date("2026-08-18T12:00:00.000Z"),
+  });
+  const records = [
+    completedAha("older", "2026-08-17"),
+    draft,
+    completedAha("newer", "2026-08-19"),
+  ];
+  const originalOrder = records.map(({ id }) => id);
+
+  const result = selectCompletedAhaHistory(records, 1);
+  assert.equal(result.totalCount, 2);
+  assert.deepEqual(
+    result.visible.map(({ id }) => id),
+    ["newer"],
+  );
+  assert.deepEqual(
+    records.map(({ id }) => id),
+    originalOrder,
+  );
 });

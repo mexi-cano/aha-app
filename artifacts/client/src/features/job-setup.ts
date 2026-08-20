@@ -124,6 +124,13 @@ export function validateJobSetup(draft: JobSetupDraft): JobSetupIssue[] {
   return issues;
 }
 
+export function getVisibleJobSetupIssues(
+  draft: JobSetupDraft,
+  hasAttemptedSubmit: boolean,
+): JobSetupIssue[] {
+  return hasAttemptedSubmit ? validateJobSetup(draft) : [];
+}
+
 export function buildJobConfiguration(draft: JobSetupDraft): Omit<Job, "id"> {
   const issues = validateJobSetup(draft);
   if (issues.length) {

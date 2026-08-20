@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Check } from "lucide-react";
+import { Check, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router";
 import {
   canStartSigning,
@@ -13,6 +13,7 @@ import { BackupStatus } from "@/components/aha/backup-status";
 import { HomeStateCard } from "@/components/aha/home-state-card";
 import { Button } from "@/components/ui/button";
 import { getHomeSnapshot, startToday } from "@/data/aha-repository";
+import { createPdfNavigationState } from "@/features/aha-editor/pdf-navigation";
 import { useToday } from "@/hooks/use-today";
 import { formatLongDate, formatShortDate } from "@/lib/date-format";
 
@@ -142,33 +143,78 @@ export default function Home() {
                 {snapshot.recentAhas.map((aha) => {
                   const statusLabel = RECENT_AHA_STATUS_LABELS[aha.status];
                   return (
-                    <li
-                      key={aha.id}
-                      className="flex min-h-12 items-center justify-between gap-4 py-2 text-base font-semibold"
-                      aria-label={`${formatShortDate(aha.date)}, ${statusLabel}`}
-                    >
-                      <time dateTime={aha.date}>
-                        {formatShortDate(aha.date)}
-                      </time>
+                    <li key={aha.id}>
                       {aha.status === "completed" ? (
-                        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-success">
-                          <Check
-                            className="size-5"
-                            strokeWidth={3}
-                            aria-hidden="true"
-                          />
-                          {statusLabel}
-                        </span>
+                        <button
+                          type="button"
+                          className="flex min-h-12 w-full items-center justify-between gap-4 rounded-lg py-2 text-left text-base font-semibold outline-none focus-visible:ring-4 focus-visible:ring-secondary"
+                          aria-label={`${formatShortDate(aha.date)}, ${statusLabel}, view PDF`}
+                          onClick={() => {
+                            if (
+                              snapshot.recentAhaPdfStatuses[aha.id] ===
+                              "current"
+                            ) {
+                              navigate(`/ahas/${aha.id}/pdf`, {
+                                state: createPdfNavigationState("home"),
+                              });
+                            } else {
+                              navigate("/history");
+                            }
+                          }}
+                        >
+                          <time dateTime={aha.date}>
+                            {formatShortDate(aha.date)}
+                          </time>
+                          <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-success">
+                            <Check
+                              className="size-5"
+                              strokeWidth={3}
+                              aria-hidden="true"
+                            />
+                            {statusLabel}
+                            <ChevronRight
+                              className="size-5 text-primary"
+                              aria-hidden="true"
+                            />
+                          </span>
+                        </button>
                       ) : (
-                        <span className="text-sm text-muted-foreground">
-                          {statusLabel}
-                        </span>
+                        <div
+                          className="flex min-h-12 items-center justify-between gap-4 py-2 text-base font-semibold"
+                          aria-label={`${formatShortDate(aha.date)}, ${statusLabel}`}
+                        >
+                          <time dateTime={aha.date}>
+                            {formatShortDate(aha.date)}
+                          </time>
+                          <span className="text-sm text-muted-foreground">
+                            {statusLabel}
+                          </span>
+                        </div>
                       )}
                     </li>
                   );
                 })}
               </ul>
+              {snapshot.completedAhaCount ? (
+                <Button
+                  variant="ghost"
+                  className="mt-2 min-h-12 w-full justify-between px-0 text-base text-primary"
+                  onClick={() => navigate("/history")}
+                >
+                  View all completed AHAs
+                  <ChevronRight className="size-5" aria-hidden="true" />
+                </Button>
+              ) : null}
             </div>
+          ) : snapshot.completedAhaCount ? (
+            <Button
+              variant="ghost"
+              className="mt-4 min-h-12 w-full justify-between px-0 text-base text-primary"
+              onClick={() => navigate("/history")}
+            >
+              View all completed AHAs
+              <ChevronRight className="size-5" aria-hidden="true" />
+            </Button>
           ) : null}
         </section>
 
@@ -211,13 +257,17 @@ export default function Home() {
           }}
           onViewCompleted={() => {
             if (!snapshot.todayAha) return;
-            navigate(
-              snapshot.todayPdfStatus === "current"
-                ? `/ahas/${snapshot.todayAha.id}/pdf`
-                : !getReviewReport(snapshot.todayAha).canStartSigning
+            if (snapshot.todayPdfStatus === "current") {
+              navigate(`/ahas/${snapshot.todayAha.id}/pdf`, {
+                state: createPdfNavigationState("home"),
+              });
+            } else {
+              navigate(
+                !getReviewReport(snapshot.todayAha).canStartSigning
                   ? `/ahas/${snapshot.todayAha.id}/update/review`
                   : `/ahas/${snapshot.todayAha.id}/completed`,
-            );
+              );
+            }
           }}
           onUpdateCompleted={() => {
             if (!snapshot.todayAha) return;

@@ -4,8 +4,18 @@ import test from "node:test";
 import {
   buildJobConfiguration,
   createEmptyJobSetupDraft,
+  getVisibleJobSetupIssues,
   validateJobSetup,
 } from "../features/job-setup";
+
+test("setup errors stay hidden until Save and then clear as fields are fixed", () => {
+  const empty = createEmptyJobSetupDraft();
+  assert.deepEqual(getVisibleJobSetupIssues(empty, false), []);
+  assert.equal(getVisibleJobSetupIssues(empty, true)[0]?.field, "name");
+
+  const corrected = requiredDraft();
+  assert.deepEqual(getVisibleJobSetupIssues(corrected, true), []);
+});
 
 function requiredDraft() {
   return {

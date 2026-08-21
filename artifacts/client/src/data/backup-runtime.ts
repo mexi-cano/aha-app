@@ -1,5 +1,7 @@
 import {
   ahaSchema,
+  canonicalizePdfTimestamp,
+  isSamePdfVersionIdentity,
   parseStoredAha,
   parseStoredJob,
 } from "@workspace/aha-domain";
@@ -228,8 +230,10 @@ async function upload(item: BackupQueueItem): Promise<{
   );
   const value =
     current &&
-    current.sourceRevision === item.sourceRevision &&
-    current.generatedAt === item.generatedAt
+    isSamePdfVersionIdentity(current, {
+      sourceRevision: item.sourceRevision!,
+      generatedAt: item.generatedAt,
+    })
       ? current
       : revision?.bytes
         ? { ...revision, bytes: revision.bytes }
@@ -238,7 +242,7 @@ async function upload(item: BackupQueueItem): Promise<{
   const query = new URLSearchParams({
     filename: value.filename,
     sourceRevision: String(value.sourceRevision),
-    generatedAt: value.generatedAt,
+    generatedAt: canonicalizePdfTimestamp(value.generatedAt),
   });
   const result = await customFetch<{
     accepted: boolean;

@@ -200,6 +200,7 @@ paths:
         - name: generatedAt
           in: query
           required: true
+          description: PDF generation instant; legacy parseable PostgreSQL timestamps are accepted and normalized to UTC.
           schema: { type: string, format: date-time }
       requestBody:
         required: true
@@ -249,6 +250,7 @@ paths:
         - name: generatedAt
           in: query
           required: true
+          description: Exact generation instant; responses always use canonical UTC ISO 8601.
           schema: { type: string, format: date-time }
       responses:
         "200":
@@ -639,7 +641,10 @@ components:
         ahaId: { type: string }
         filename: { type: string }
         sourceRevision: { type: integer, minimum: 0 }
-        generatedAt: { type: string, format: date-time }
+        generatedAt:
+          type: string
+          format: date-time
+          description: Canonical UTC ISO 8601 timestamp used in PDF version identity.
         byteLength: { type: integer, minimum: 1 }
         sha256: { type: string }
         backedUpAt: { type: string, format: date-time }

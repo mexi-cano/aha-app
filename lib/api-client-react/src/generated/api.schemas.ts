@@ -287,6 +287,7 @@ export interface PdfBackupMetadata {
   filename: string;
   /** @minimum 0 */
   sourceRevision: number;
+  /** Canonical UTC ISO 8601 timestamp used in PDF version identity. */
   generatedAt: string;
   /** @minimum 1 */
   byteLength: number;
@@ -330,10 +331,16 @@ filename: string;
  * @minimum 0
  */
 sourceRevision: number;
+/**
+ * PDF generation instant; legacy parseable PostgreSQL timestamps are accepted and normalized to UTC.
+ */
 generatedAt: string;
 };
 
 export type GetAhaPdfVersionParams = {
+/**
+ * Exact generation instant; responses always use canonical UTC ISO 8601.
+ */
 generatedAt: string;
 };
 

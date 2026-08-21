@@ -5,6 +5,7 @@ import {
   type Job,
 } from "@workspace/aha-domain";
 import {
+  ApiError,
   customFetch,
   listJobs,
   type JobBackupRecord,
@@ -39,25 +40,40 @@ export interface RestoreProgress {
   pdfIndex: number;
 }
 
-function parseProgress(value: string): RestoreProgress {
-  const parsed = JSON.parse(value) as Partial<RestoreProgress>;
-  if (
-    parsed.version !== 1 ||
-    !["jobs", "ahas", "pdfs"].includes(parsed.stage ?? "") ||
-    !Array.isArray(parsed.jobs) ||
-    !Array.isArray(parsed.ahaIds) ||
-    typeof parsed.pdfIndex !== "number"
-  ) {
-    throw new Error("Saved restore progress is invalid.");
+export class InvalidRestoreProgressError extends Error {
+  readonly name = "InvalidRestoreProgressError";
+
+  constructor(cause?: unknown) {
+    super("Saved recovery progress could not be read.", { cause });
   }
-  return {
-    version: 1,
-    stage: parsed.stage!,
-    jobs: parsed.jobs.map((job) => jobSchema.parse(job)),
-    cursor: typeof parsed.cursor === "string" ? parsed.cursor : null,
-    ahaIds: parsed.ahaIds.filter((id): id is string => typeof id === "string"),
-    pdfIndex: parsed.pdfIndex,
-  };
+}
+
+export function parseRestoreProgress(value: string): RestoreProgress {
+  try {
+    const parsed = JSON.parse(value) as Partial<RestoreProgress>;
+    if (
+      parsed.version !== 1 ||
+      !["jobs", "ahas", "pdfs"].includes(parsed.stage ?? "") ||
+      !Array.isArray(parsed.jobs) ||
+      !Array.isArray(parsed.ahaIds) ||
+      typeof parsed.pdfIndex !== "number"
+    ) {
+      throw new InvalidRestoreProgressError();
+    }
+    return {
+      version: 1,
+      stage: parsed.stage!,
+      jobs: parsed.jobs.map((job) => jobSchema.parse(job)),
+      cursor: typeof parsed.cursor === "string" ? parsed.cursor : null,
+      ahaIds: parsed.ahaIds.filter(
+        (id): id is string => typeof id === "string",
+      ),
+      pdfIndex: parsed.pdfIndex,
+    };
+  } catch (cause) {
+    if (cause instanceof InvalidRestoreProgressError) throw cause;
+    throw new InvalidRestoreProgressError(cause);
+  }
 }
 
 async function saveProgress(progress: RestoreProgress): Promise<void> {
@@ -69,7 +85,11 @@ async function saveProgress(progress: RestoreProgress): Promise<void> {
 
 export async function getRestoreProgress(): Promise<RestoreProgress | null> {
   const setting = await ahaDatabase.settings.get(RESTORE_PROGRESS_SETTING);
-  return setting ? parseProgress(setting.value) : null;
+  return setting ? parseRestoreProgress(setting.value) : null;
+}
+
+export async function clearRestoreProgressForRestart(): Promise<void> {
+  await ahaDatabase.settings.delete(RESTORE_PROGRESS_SETTING);
 }
 
 export async function listRemoteJobs(): Promise<JobBackupRecord[]> {
@@ -117,7 +137,12 @@ async function authenticatedPdfFetch(ahaId: string): Promise<Response> {
 async function restorePdf(ahaId: string): Promise<void> {
   const response = await authenticatedPdfFetch(ahaId);
   if (response.status === 404) return;
-  if (!response.ok) throw new Error("A saved PDF could not be restored.");
+  if (!response.ok) {
+    throw new ApiError(response, null, {
+      method: "GET",
+      url: `/api/ahas/${encodeURIComponent(ahaId)}/pdf`,
+    });
+  }
   const bytes = await response.arrayBuffer();
   const metadata = parseRestoredPdfMetadata(
     response.headers,

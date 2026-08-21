@@ -10,11 +10,7 @@ type CanonicalEnergyExample =
   (typeof ENERGY_CATEGORIES)[number]["examples"][number];
 
 export type WorkerReviewErrorKey =
-  | "capacity"
-  | "fit"
-  | "pdf_check"
-  | "save_signature"
-  | "worker_add";
+  "capacity" | "fit" | "pdf_check" | "save_signature" | "worker_add";
 
 export interface WorkerReviewCopy {
   locale: "en-US" | "es-US";
@@ -44,6 +40,10 @@ export interface WorkerReviewCopy {
   controls: string;
   noTasks: string;
   energyLabel: (selected: number, total: number) => string;
+  energyWheelHeading: string;
+  energyWheelSelection: (selected: number, total: number) => string;
+  energyWheelHelper: string;
+  energyWheelAccessibility: (selected: number, total: number) => string;
   noExamples: string;
   noEnergy: string;
   safetyCheck: string;
@@ -141,8 +141,7 @@ const SPANISH_ENERGY_EXAMPLES: Record<CanonicalEnergyExample, string> = {
   Birds: "Aves",
   Bacteria: "Bacterias",
   "Flammable/combustible": "Inflamable o combustible",
-  "Toxic vapors/dusts/fibers/fumes":
-    "Vapores, polvos, fibras o humos tóxicos",
+  "Toxic vapors/dusts/fibers/fumes": "Vapores, polvos, fibras o humos tóxicos",
   Corrosive: "Corrosivo",
   "Skin/eye irritants": "Irritantes de la piel o los ojos",
   "Designated substances, pipeline contaminants, spills, suspect soils":
@@ -197,6 +196,12 @@ export const WORKER_REVIEW_COPY: Record<
     controls: "Controls",
     noTasks: "No task rows entered.",
     energyLabel: (selected, total) => `ENERGY — ${selected} OF ${total}`,
+    energyWheelHeading: "ENERGY WHEEL",
+    energyWheelSelection: (selected, total) =>
+      `${selected} of ${total} selected`,
+    energyWheelHelper: "Mirrors today’s selections",
+    energyWheelAccessibility: (selected, total) =>
+      `Energy Wheel showing ${selected} of ${total} selected categories`,
     noExamples: "No examples marked",
     noEnergy: "No energy categories marked.",
     safetyCheck: "Safety check",
@@ -210,8 +215,7 @@ export const WORKER_REVIEW_COPY: Record<
     acknowledgmentHelper: "Review the statement, then sign below.",
     acknowledgment: WORKER_ACKNOWLEDGMENT,
     signAs: (name) => `Sign as ${name}`,
-    signatureAreaLabel:
-      "Signature drawing area. Sign here with your finger.",
+    signatureAreaLabel: "Signature drawing area. Sign here with your finger.",
     signaturePlaceholder: "Sign here with your finger",
     thisWorker: "this worker",
     clear: "Clear",
@@ -267,12 +271,19 @@ export const WORKER_REVIEW_COPY: Record<
     workOrderPermit: "Número de orden de trabajo / permiso",
     jhaProcedureNumbers: "Números de JHA / procedimientos",
     descriptionOfWork: "DESCRIPCIÓN DEL TRABAJO",
-    workLabel: (count) => `TRABAJO — ${count} ${count === 1 ? "TAREA" : "TAREAS"}`,
+    workLabel: (count) =>
+      `TRABAJO — ${count} ${count === 1 ? "TAREA" : "TAREAS"}`,
     untitledTask: "Tarea sin título",
     hazards: "Peligros",
     controls: "Controles",
     noTasks: "No se ingresaron tareas.",
     energyLabel: (selected, total) => `ENERGÍA — ${selected} DE ${total}`,
+    energyWheelHeading: "RUEDA DE ENERGÍA",
+    energyWheelSelection: (selected, total) =>
+      `${selected} de ${total} seleccionadas`,
+    energyWheelHelper: "Refleja las selecciones de hoy",
+    energyWheelAccessibility: (selected, total) =>
+      `Rueda de energía que muestra ${selected} de ${total} categorías seleccionadas`,
     noExamples: "No se marcaron ejemplos",
     noEnergy: "No se marcaron categorías de energía.",
     safetyCheck: "Verificación de seguridad",
@@ -287,8 +298,7 @@ export const WORKER_REVIEW_COPY: Record<
     acknowledgment:
       "He revisado toda la documentación aplicable, los peligros del sitio y mis responsabilidades de seguir los planes de trabajo seguro para protegerme a mí mismo y a los demás mientras esté en el sitio.",
     signAs: (name) => `Firmar como ${name}`,
-    signatureAreaLabel:
-      "Área para dibujar la firma. Firme aquí con el dedo.",
+    signatureAreaLabel: "Área para dibujar la firma. Firme aquí con el dedo.",
     signaturePlaceholder: "Firme aquí con el dedo",
     thisWorker: "este trabajador",
     clear: "Borrar",
@@ -344,7 +354,7 @@ export function workerReviewEnergyExample(
   language: WorkerReviewLanguage,
 ): string {
   return language === "es"
-    ? SPANISH_ENERGY_EXAMPLES[example as CanonicalEnergyExample] ?? example
+    ? (SPANISH_ENERGY_EXAMPLES[example as CanonicalEnergyExample] ?? example)
     : example;
 }
 

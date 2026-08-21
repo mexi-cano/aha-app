@@ -5,7 +5,7 @@ import { Check, Download, ExternalLink, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ahaDatabase, type AhaPdfRevisionRecord } from "@/data/database";
 import {
-  PdfVersionUnavailableOfflineError,
+  PdfVersionOpenError,
   openPdfRevision,
   refreshPdfVersionMetadata,
 } from "@/data/pdf-version-repository";
@@ -25,12 +25,13 @@ const reasonLabels: Record<string, string> = {
   administrative_correction: "Administrative information corrected",
 };
 
-function formatVersionTime(value: string): string {
+function formatVersionTime(value: string, includeSeconds = false): string {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    ...(includeSeconds ? { second: "2-digit" } : {}),
   }).format(new Date(value));
 }
 
@@ -56,30 +57,75 @@ export default function AhaDocumentHistory() {
   >(null);
   const [isOpening, setIsOpening] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [failedRevision, setFailedRevision] =
+    useState<AhaPdfRevisionRecord | null>(null);
   const selectedUrl = usePdfObjectUrl(selected);
   const pdfOpenMode = getCurrentPdfOpenMode();
 
   useEffect(() => {
     if (!navigator.onLine) return;
-    void refreshPdfVersionMetadata(aha.id).catch(() => {
+    void refreshPdfVersionMetadata(aha.id).catch((error: unknown) => {
       setMessage(
-        "Document history could not be refreshed. Saved local versions are still available.",
+        error instanceof PdfVersionOpenError
+          ? error.message
+          : "Document history could not be refreshed. Saved offline versions are still available.",
       );
     });
   }, [aha.id]);
 
-  const eventsByRevision = useMemo(
-    () =>
-      new Map(
-        aha.documentEvents.map((event) => [event.toDocumentRevision, event]),
-      ),
-    [aha.documentEvents],
-  );
+  const revisionCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+    const sourceRevisions = [
+      ...(current?.record ? [current.record.sourceRevision] : []),
+      ...(revisions ?? []).map((revision) => revision.sourceRevision),
+    ];
+    for (const sourceRevision of sourceRevisions) {
+      counts.set(sourceRevision, (counts.get(sourceRevision) ?? 0) + 1);
+    }
+    return counts;
+  }, [current?.record, revisions]);
+
+  const eventsByVersionKey = useMemo(() => {
+    const matches = new Map<string, (typeof aha.documentEvents)[number]>();
+    const candidates = [
+      ...(current?.record
+        ? [
+            {
+              key: `current:${current.record.generatedAt}`,
+              sourceRevision: current.record.sourceRevision,
+              generatedAt: current.record.generatedAt,
+              isCurrent: true,
+            },
+          ]
+        : []),
+      ...(revisions ?? []).map((revision) => ({
+        key: revision.key,
+        sourceRevision: revision.sourceRevision,
+        generatedAt: revision.generatedAt,
+        isCurrent: false,
+      })),
+    ];
+    for (const event of aha.documentEvents) {
+      const match = candidates
+        .filter(
+          (candidate) =>
+            candidate.sourceRevision === event.toDocumentRevision &&
+            Date.parse(candidate.generatedAt) >= Date.parse(event.occurredAt),
+        )
+        .sort(
+          (left, right) =>
+            Date.parse(left.generatedAt) - Date.parse(right.generatedAt),
+        )[0];
+      if (match && !match.isCurrent) matches.set(match.key, event);
+    }
+    return matches;
+  }, [aha.documentEvents, current?.record, revisions]);
 
   const openRevision = async (revision: AhaPdfRevisionRecord) => {
     if (isOpening) return;
     setIsOpening(revision.key);
     setMessage(null);
+    setFailedRevision(null);
     try {
       const result = await openPdfRevision(revision);
       setSelected(result.record);
@@ -89,8 +135,9 @@ export default function AhaDocumentHistory() {
         );
       }
     } catch (error) {
+      setFailedRevision(revision);
       setMessage(
-        error instanceof PdfVersionUnavailableOfflineError
+        error instanceof PdfVersionOpenError
           ? error.message
           : "We couldn't open that older PDF. Its saved metadata was not removed.",
       );
@@ -131,12 +178,22 @@ export default function AhaDocumentHistory() {
         </section>
 
         {message ? (
-          <p
-            className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-base font-semibold text-warning-foreground"
-            role="status"
-          >
-            {message}
-          </p>
+          <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-warning-foreground">
+            <p className="text-base font-semibold" role="status">
+              {message}
+            </p>
+            {failedRevision ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-3 min-h-12 border-warning/40 bg-card px-5"
+                disabled={Boolean(isOpening)}
+                onClick={() => void openRevision(failedRevision)}
+              >
+                TRY AGAIN
+              </Button>
+            ) : null}
+          </div>
         ) : null}
 
         {current?.record ? (
@@ -158,7 +215,9 @@ export default function AhaDocumentHistory() {
         ) : null}
 
         {(revisions ?? []).map((revision) => {
-          const event = eventsByRevision.get(revision.sourceRevision);
+          const event = eventsByVersionKey.get(revision.key);
+          const hasSameRevisionVersions =
+            (revisionCounts.get(revision.sourceRevision) ?? 0) > 1;
           return (
             <button
               type="button"
@@ -176,12 +235,15 @@ export default function AhaDocumentHistory() {
               <span className="mt-1 block text-sm font-medium text-muted-foreground">
                 {event
                   ? (reasonLabels[event.reason] ?? "Completed AHA update")
-                  : "Earlier finalized PDF"}
+                  : hasSameRevisionVersions
+                    ? "Regenerated PDF"
+                    : "Earlier finalized PDF"}
                 {" · "}
-                {formatVersionTime(revision.generatedAt)}
-                {revision.bytes
-                  ? " · Saved on this iPad"
-                  : " · Download when opened"}
+                {formatVersionTime(
+                  revision.generatedAt,
+                  hasSameRevisionVersions,
+                )}
+                {revision.bytes ? " · Saved offline" : " · Available online"}
               </span>
             </button>
           );

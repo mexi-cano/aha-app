@@ -1,6 +1,8 @@
 import { and, asc, eq, gt, lte, or } from "drizzle-orm";
 import {
   ahaSchema,
+  canonicalizePdfTimestamp,
+  comparePdfVersionIdentity,
   jobSchema,
   parseStoredAha,
   parseStoredJob,
@@ -153,10 +155,10 @@ function asPdfRecord(row: {
     ahaId: row.ahaId,
     filename: row.filename,
     sourceRevision: row.sourceRevision,
-    generatedAt: row.generatedAt,
+    generatedAt: canonicalizePdfTimestamp(row.generatedAt),
     bytes: row.bytes,
     sha256: row.sha256,
-    backedUpAt: row.backedUpAt,
+    backedUpAt: canonicalizePdfTimestamp(row.backedUpAt),
   };
 }
 
@@ -177,11 +179,13 @@ function asPdfVersionMetadata(
     ahaId: row.ahaId,
     filename: row.filename,
     sourceRevision: row.sourceRevision,
-    generatedAt: row.generatedAt,
+    generatedAt: canonicalizePdfTimestamp(row.generatedAt),
     byteLength: row.byteLength,
     sha256: row.sha256,
-    backedUpAt: row.backedUpAt,
-    supersededAt: row.supersededAt ?? null,
+    backedUpAt: canonicalizePdfTimestamp(row.backedUpAt),
+    supersededAt: row.supersededAt
+      ? canonicalizePdfTimestamp(row.supersededAt)
+      : null,
     isCurrent,
   };
 }
@@ -353,16 +357,13 @@ export function createNeonBackupStore(): BackupStore {
       return [
         ...currentRows.map((row) => asPdfVersionMetadata(row, true)),
         ...revisionRows.map((row) => asPdfVersionMetadata(row, false)),
-      ].sort(
-        (left, right) =>
-          right.sourceRevision - left.sourceRevision ||
-          Date.parse(right.generatedAt) - Date.parse(left.generatedAt),
-      );
+      ].sort((left, right) => comparePdfVersionIdentity(right, left));
     },
 
     async getPdfVersion(ahaId, sourceRevision, generatedAt) {
       const { db, ahaPdfRevisionsTable, ahaPdfsTable } =
         await import("@workspace/db");
+      const canonicalGeneratedAt = canonicalizePdfTimestamp(generatedAt);
       const current = (
         await db
           .select()
@@ -371,7 +372,7 @@ export function createNeonBackupStore(): BackupStore {
             and(
               eq(ahaPdfsTable.ahaId, ahaId),
               eq(ahaPdfsTable.sourceRevision, sourceRevision),
-              eq(ahaPdfsTable.generatedAt, generatedAt),
+              eq(ahaPdfsTable.generatedAt, canonicalGeneratedAt),
             ),
           )
           .limit(1)
@@ -385,7 +386,7 @@ export function createNeonBackupStore(): BackupStore {
             and(
               eq(ahaPdfRevisionsTable.ahaId, ahaId),
               eq(ahaPdfRevisionsTable.sourceRevision, sourceRevision),
-              eq(ahaPdfRevisionsTable.generatedAt, generatedAt),
+              eq(ahaPdfRevisionsTable.generatedAt, canonicalGeneratedAt),
             ),
           )
           .limit(1)
@@ -396,11 +397,12 @@ export function createNeonBackupStore(): BackupStore {
     async putPdf(input) {
       const { sql: neonSql } = await import("@workspace/db");
       const acceptedAt = new Date().toISOString();
+      const generatedAt = canonicalizePdfTimestamp(input.generatedAt);
       try {
         const outcomeRows = await neonSql`
           select store_aha_pdf_version(
             ${input.ahaId}, ${input.filename}, ${input.sourceRevision},
-            ${input.generatedAt}, ${input.bytes}, ${input.bytes.byteLength},
+            ${generatedAt}, ${input.bytes}, ${input.bytes.byteLength},
             ${input.sha256}, ${acceptedAt}
           ) as "isCurrent"
         `;
@@ -413,6 +415,7 @@ export function createNeonBackupStore(): BackupStore {
           isCurrent: outcome.isCurrent,
           record: {
             ...input,
+            generatedAt,
             backedUpAt: acceptedAt,
           },
         };

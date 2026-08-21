@@ -10,6 +10,7 @@ import { HomeStateCard } from "@/components/aha/home-state-card";
 import { Button } from "@/components/ui/button";
 import { getHomeSnapshot, startToday } from "@/data/aha-repository";
 import { createPdfNavigationState } from "@/features/aha-editor/pdf-navigation";
+import { useRecoveryState } from "@/features/restore/restore-gate";
 import { useToday } from "@/hooks/use-today";
 import { formatLongDate, formatShortDate } from "@/lib/date-format";
 import { cn } from "@/lib/utils";
@@ -22,12 +23,16 @@ const RECENT_AHA_STATUS_LABELS = {
 
 function EmptyJobState({
   hasJobs,
+  isReadOnly,
   onSetup,
   onChoose,
+  onResumeRecovery,
 }: {
   hasJobs: boolean;
+  isReadOnly: boolean;
   onSetup: () => void;
   onChoose: () => void;
+  onResumeRecovery: () => void;
 }) {
   return (
     <main className="min-h-screen bg-background px-5 py-12">
@@ -45,9 +50,13 @@ function EmptyJobState({
         </p>
         <Button
           className="mt-7 min-h-14 w-full text-base font-bold"
-          onClick={hasJobs ? onChoose : onSetup}
+          onClick={isReadOnly ? onResumeRecovery : hasJobs ? onChoose : onSetup}
         >
-          {hasJobs ? "CHOOSE A JOB" : "SET UP A JOB"}
+          {isReadOnly
+            ? "RESUME RECOVERY"
+            : hasJobs
+              ? "CHOOSE A JOB"
+              : "SET UP A JOB"}
         </Button>
       </section>
     </main>
@@ -56,6 +65,7 @@ function EmptyJobState({
 
 export default function Home() {
   const navigate = useNavigate();
+  const { isPaused, resumeRecovery } = useRecoveryState();
   const today = useToday();
   const snapshot = useLiveQuery(() => getHomeSnapshot(today), [today]);
   const [isStarting, setIsStarting] = useState(false);
@@ -75,8 +85,10 @@ export default function Home() {
     return (
       <EmptyJobState
         hasJobs={snapshot.jobCount > 0}
+        isReadOnly={isPaused}
         onSetup={() => navigate("/setup")}
         onChoose={() => navigate("/jobs")}
+        onResumeRecovery={resumeRecovery}
       />
     );
   }
@@ -123,6 +135,7 @@ export default function Home() {
           <Button
             variant="ghost"
             className="mt-3 min-h-12 px-0 text-base text-primary"
+            disabled={isPaused}
             onClick={() => navigate("/jobs")}
           >
             Change job or update defaults
@@ -226,11 +239,30 @@ export default function Home() {
           </div>
         ) : null}
 
+        {isPaused ? (
+          <section className="rounded-xl border border-[#C6CDE8] bg-secondary px-4 py-4 text-secondary-foreground">
+            <p className="text-base font-bold">Safety records are read-only.</p>
+            <p className="mt-1 text-sm font-medium leading-relaxed">
+              Completed documents remain available. Resume recovery before
+              starting or changing an AHA.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-3 min-h-12 w-full border-[#C6CDE8] bg-card text-primary"
+              onClick={resumeRecovery}
+            >
+              RESUME RECOVERY
+            </Button>
+          </section>
+        ) : null}
+
         <HomeStateCard
           todayAha={snapshot.todayAha}
           todayPdfStatus={snapshot.todayPdfStatus}
           hasRecentAha={snapshot.recentAhas.length > 0}
           isStarting={isStarting}
+          isReadOnly={isPaused}
           onStart={() => void handleStart()}
           onOpenEditor={() =>
             snapshot.todayAha && openEditor(snapshot.todayAha.id)

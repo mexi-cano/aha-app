@@ -1,6 +1,7 @@
-import { lazy, Suspense, useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef, type ReactNode } from "react";
 import {
   BrowserRouter,
+  Navigate,
   Route,
   Routes,
   useLocation,
@@ -11,7 +12,7 @@ import { LocalDataGate } from "@/components/aha/local-data-gate";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { AuthProvider } from "@/features/auth/auth-context";
 import { BackupManager } from "@/features/backup/backup-manager";
-import { RestoreGate } from "@/features/restore/restore-gate";
+import { RestoreGate, useRecoveryState } from "@/features/restore/restore-gate";
 import { UpdateManager } from "@/features/pwa/update-manager";
 import { AhaEditorLayout } from "@/features/aha-editor/editor-context";
 import AhaDetails from "@/pages/aha-details";
@@ -54,6 +55,11 @@ function InitialEditorRecoveryRedirect() {
   return null;
 }
 
+function RecoveryWriteRoute({ children }: { children: ReactNode }) {
+  const { hasPendingRecovery } = useRecoveryState();
+  return hasPendingRecovery ? <Navigate to="/" replace /> : children;
+}
+
 function AppRoutes() {
   const location = useLocation();
 
@@ -64,9 +70,30 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/history" element={<History />} />
-        <Route path="/setup" element={<JobSetup />} />
-        <Route path="/jobs" element={<Jobs />} />
-        <Route path="/jobs/:jobId/setup" element={<JobSetup />} />
+        <Route
+          path="/setup"
+          element={
+            <RecoveryWriteRoute>
+              <JobSetup />
+            </RecoveryWriteRoute>
+          }
+        />
+        <Route
+          path="/jobs"
+          element={
+            <RecoveryWriteRoute>
+              <Jobs />
+            </RecoveryWriteRoute>
+          }
+        />
+        <Route
+          path="/jobs/:jobId/setup"
+          element={
+            <RecoveryWriteRoute>
+              <JobSetup />
+            </RecoveryWriteRoute>
+          }
+        />
         {PdfTest ? (
           <Route
             path="/pdf-test"
@@ -80,24 +107,105 @@ function AppRoutes() {
           />
         ) : null}
         <Route path="/ahas/:ahaId" element={<AhaEditorLayout />}>
-          <Route path="details" element={<AhaDetails />} />
-          <Route path="work" element={<AhaWork />} />
-          <Route path="energy" element={<AhaEnergy />} />
-          <Route path="review" element={<AhaReview />} />
-          <Route path="sign" element={<AhaSigning />} />
+          <Route
+            path="details"
+            element={
+              <RecoveryWriteRoute>
+                <AhaDetails />
+              </RecoveryWriteRoute>
+            }
+          />
+          <Route
+            path="work"
+            element={
+              <RecoveryWriteRoute>
+                <AhaWork />
+              </RecoveryWriteRoute>
+            }
+          />
+          <Route
+            path="energy"
+            element={
+              <RecoveryWriteRoute>
+                <AhaEnergy />
+              </RecoveryWriteRoute>
+            }
+          />
+          <Route
+            path="review"
+            element={
+              <RecoveryWriteRoute>
+                <AhaReview />
+              </RecoveryWriteRoute>
+            }
+          />
+          <Route
+            path="sign"
+            element={
+              <RecoveryWriteRoute>
+                <AhaSigning />
+              </RecoveryWriteRoute>
+            }
+          />
           <Route path="completed" element={<AhaCompleted />} />
           <Route path="pdf" element={<AhaPdfView />} />
-          <Route path="add-worker" element={<AhaLateWorker />} />
+          <Route
+            path="add-worker"
+            element={
+              <RecoveryWriteRoute>
+                <AhaLateWorker />
+              </RecoveryWriteRoute>
+            }
+          />
           <Route path="document-history" element={<AhaDocumentHistory />} />
-          <Route path="crew" element={<AhaCrewManagement />} />
+          <Route
+            path="crew"
+            element={
+              <RecoveryWriteRoute>
+                <AhaCrewManagement />
+              </RecoveryWriteRoute>
+            }
+          />
           <Route
             path="crew/:workerId/replace-signature"
-            element={<AhaSignatureCorrection />}
+            element={
+              <RecoveryWriteRoute>
+                <AhaSignatureCorrection />
+              </RecoveryWriteRoute>
+            }
           />
-          <Route path="update/details" element={<AhaDetails />} />
-          <Route path="update/work" element={<AhaWork />} />
-          <Route path="update/energy" element={<AhaEnergy />} />
-          <Route path="update/review" element={<AhaReview />} />
+          <Route
+            path="update/details"
+            element={
+              <RecoveryWriteRoute>
+                <AhaDetails />
+              </RecoveryWriteRoute>
+            }
+          />
+          <Route
+            path="update/work"
+            element={
+              <RecoveryWriteRoute>
+                <AhaWork />
+              </RecoveryWriteRoute>
+            }
+          />
+          <Route
+            path="update/energy"
+            element={
+              <RecoveryWriteRoute>
+                <AhaEnergy />
+              </RecoveryWriteRoute>
+            }
+          />
+          <Route
+            path="update/review"
+            element={
+              <RecoveryWriteRoute>
+                <AhaReview />
+              </RecoveryWriteRoute>
+            }
+          />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

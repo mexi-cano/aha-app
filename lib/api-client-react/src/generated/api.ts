@@ -960,4 +960,3 @@ export function useGetAhaPdfVersion<TData = Awaited<ReturnType<typeof getAhaPdfV
 
   return withQueryKey(query, queryOptions.queryKey);
 }
-

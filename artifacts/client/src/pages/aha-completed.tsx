@@ -14,6 +14,7 @@ import {
 } from "@/components/aha/pdf-share";
 import type { AhaPdfRecord } from "@/data/database";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
+import { useRecoveryState } from "@/features/restore/restore-gate";
 import { useAhaPdfState } from "@/hooks/use-aha-pdf-state";
 import { formatEditorDate, formatTime } from "@/lib/date-format";
 import {
@@ -27,6 +28,7 @@ import {
 } from "@/pdf";
 
 export default function AhaCompleted() {
+  const { isPaused } = useRecoveryState();
   const { aha, job, commitAha, navigateSafely, isCompletedLocked } =
     useAhaEditor();
   const location = useLocation();
@@ -100,7 +102,10 @@ export default function AhaCompleted() {
     !aha.pendingCompletedUpdate.crewReviewConfirmation;
   const hasPendingCompletedUpdate = Boolean(aha.pendingCompletedUpdate);
   const correctionActionsDisabled =
-    isCompletedLocked || !pdfCurrent || Boolean(aha.pendingCompletedUpdate);
+    isPaused ||
+    isCompletedLocked ||
+    !pdfCurrent ||
+    Boolean(aha.pendingCompletedUpdate);
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -123,6 +128,15 @@ export default function AhaCompleted() {
       </header>
 
       <div className="mx-auto flex max-w-[700px] flex-col gap-4 px-5 py-7 sm:px-7 sm:py-9">
+        {isPaused ? (
+          <section className="rounded-xl border border-[#C6CDE8] bg-secondary px-4 py-4 text-center text-secondary-foreground">
+            <p className="font-bold">Recovery is paused.</p>
+            <p className="mt-1 text-sm font-medium">
+              Current and historical documents remain available. Resume recovery
+              before changing or recreating this AHA.
+            </p>
+          </section>
+        ) : null}
         <section className="rounded-2xl border border-card-border bg-card px-6 py-7 text-center shadow-sm sm:px-10">
           <span className="mx-auto flex size-[72px] items-center justify-center rounded-full bg-success text-white">
             <Check className="size-10" strokeWidth={3.2} aria-hidden="true" />
@@ -194,7 +208,7 @@ export default function AhaCompleted() {
             ) : null}
             <Button
               className="mt-4 min-h-14 w-full text-lg font-bold"
-              disabled={isGenerating}
+              disabled={isGenerating || isPaused}
               onClick={() =>
                 pendingUpdateNeedsReview || pendingSafetyConfirmation
                   ? void navigateSafely(`/ahas/${aha.id}/update/review`)
@@ -248,6 +262,7 @@ export default function AhaCompleted() {
                         type="button"
                         variant="outline"
                         className="mt-3 min-h-12 w-full border-warning/40 bg-card text-warning-foreground"
+                        disabled={isPaused}
                         onClick={() => void navigateSafely(updatePath)}
                       >
                         Edit {issue.label}
@@ -265,7 +280,7 @@ export default function AhaCompleted() {
             <Button
               type="button"
               className="mt-4 min-h-12 w-full"
-              disabled={isGenerating}
+              disabled={isGenerating || isPaused}
               onClick={() => void regenerate()}
             >
               {isGenerating ? "CHECKING PDF…" : "CHECK PDF AGAIN"}

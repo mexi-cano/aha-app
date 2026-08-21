@@ -118,6 +118,7 @@ test("backup constraints return a generic 409 problem", async () => {
 
 test("PDF version routes list metadata and return one exact no-store artifact", async () => {
   const generatedAt = "2026-08-20T12:00:00.000Z";
+  const databaseGeneratedAt = "2026-08-20 12:00:00+00";
   const bytes = Buffer.from("%PDF-history");
   const sha256 = "ab".repeat(32);
   const store: BackupStore = {
@@ -142,11 +143,11 @@ test("PDF version routes list metadata and return one exact no-store artifact", 
           ahaId,
           filename: "completed history.pdf",
           sourceRevision: 2,
-          generatedAt,
+          generatedAt: databaseGeneratedAt,
           byteLength: bytes.byteLength,
           sha256,
-          backedUpAt: "2026-08-20T12:01:00.000Z",
-          supersededAt: "2026-08-20T13:00:00.000Z",
+          backedUpAt: "2026-08-20 12:01:00+00",
+          supersededAt: "2026-08-20 13:00:00+00",
           isCurrent: false,
         },
       ];
@@ -188,12 +189,21 @@ test("PDF version routes list metadata and return one exact no-store artifact", 
       { headers },
     );
     assert.equal(listResponse.status, 200);
-    assert.deepEqual(
-      await listResponse.json(),
-      await store.listPdfVersions("aha-1"),
-    );
+    assert.deepEqual(await listResponse.json(), [
+      {
+        ahaId: "aha-1",
+        filename: "completed history.pdf",
+        sourceRevision: 2,
+        generatedAt,
+        byteLength: bytes.byteLength,
+        sha256,
+        backedUpAt: "2026-08-20T12:01:00.000Z",
+        supersededAt: "2026-08-20T13:00:00.000Z",
+        isCurrent: false,
+      },
+    ]);
 
-    const query = new URLSearchParams({ generatedAt });
+    const query = new URLSearchParams({ generatedAt: databaseGeneratedAt });
     const versionResponse = await fetch(
       `http://127.0.0.1:${port}/ahas/aha-1/pdf/versions/2?${query}`,
       { headers },
@@ -201,6 +211,10 @@ test("PDF version routes list metadata and return one exact no-store artifact", 
     assert.equal(versionResponse.status, 200);
     assert.equal(versionResponse.headers.get("cache-control"), "no-store");
     assert.equal(versionResponse.headers.get("x-content-sha256"), sha256);
+    assert.equal(
+      versionResponse.headers.get("x-aha-generated-at"),
+      generatedAt,
+    );
     assert.equal(
       decodeURIComponent(versionResponse.headers.get("x-aha-filename") ?? ""),
       "completed history.pdf",

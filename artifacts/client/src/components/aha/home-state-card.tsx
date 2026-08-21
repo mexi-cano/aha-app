@@ -14,6 +14,7 @@ interface HomeStateCardProps {
   todayPdfStatus: AhaPdfStatus | null;
   hasRecentAha: boolean;
   isStarting: boolean;
+  isReadOnly?: boolean;
   onStart: () => void;
   onOpenEditor: () => void;
   onResumeInProgress: () => void;
@@ -25,6 +26,7 @@ export function HomeStateCard({
   todayPdfStatus,
   hasRecentAha,
   isStarting,
+  isReadOnly = false,
   onStart,
   onOpenEditor,
   onResumeInProgress,
@@ -39,12 +41,16 @@ export function HomeStateCard({
         <Button
           className="mt-7 min-h-[72px] w-full rounded-[14px] text-xl font-bold tracking-wide"
           onClick={onStart}
-          disabled={isStarting}
+          disabled={isStarting || isReadOnly}
         >
           {isStarting ? "STARTING…" : "START TODAY'S AHA"}
         </Button>
         <p className="mt-3 text-base font-medium text-muted-foreground">
-          {hasRecentAha ? "Starts with your most recent AHA" : "Starts blank"}
+          {isReadOnly
+            ? "Resume recovery before starting today’s AHA."
+            : hasRecentAha
+              ? "Starts with your most recent AHA"
+              : "Starts blank"}
         </p>
       </section>
     );
@@ -57,9 +63,15 @@ export function HomeStateCard({
         <Button
           className="mt-7 min-h-[72px] w-full rounded-[14px] text-xl font-bold tracking-wide"
           onClick={onOpenEditor}
+          disabled={isReadOnly}
         >
           CONTINUE TODAY'S AHA
         </Button>
+        {isReadOnly ? (
+          <p className="mt-3 text-base font-semibold text-muted-foreground">
+            Resume recovery before continuing this AHA.
+          </p>
+        ) : null}
       </section>
     );
   }
@@ -80,6 +92,7 @@ export function HomeStateCard({
           <Button
             className="min-h-[72px] w-full rounded-[14px] text-xl font-bold tracking-wide"
             onClick={onResumeInProgress}
+            disabled={isReadOnly}
           >
             {readyToFinish
               ? "REVIEW & FINISH"
@@ -91,11 +104,16 @@ export function HomeStateCard({
             variant="outline"
             className="min-h-[52px] w-full border-[#C6CDE8] text-[17px] text-primary"
             onClick={onOpenEditor}
+            disabled={isReadOnly}
           >
             Open editor
           </Button>
         </div>
-        {readyToFinish ? (
+        {isReadOnly ? (
+          <p className="mt-3 text-base font-semibold text-muted-foreground">
+            Resume recovery before continuing this AHA.
+          </p>
+        ) : readyToFinish ? (
           <p className="mt-3 text-base font-semibold text-muted-foreground">
             Review the saved signatures, then create the official PDF.
           </p>

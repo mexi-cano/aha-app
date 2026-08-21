@@ -10,6 +10,7 @@ import {
   type AhaPdfStatus,
 } from "@/data/aha-repository";
 import { createPdfNavigationState } from "@/features/aha-editor/pdf-navigation";
+import { useRecoveryState } from "@/features/restore/restore-gate";
 import { formatEditorDate, formatTime } from "@/lib/date-format";
 import { generateAndStoreAhaPdf } from "@/pdf";
 
@@ -26,6 +27,7 @@ type RecreationFailure = "fit_failed" | "failed";
 
 export default function History() {
   const navigate = useNavigate();
+  const { isPaused } = useRecoveryState();
   const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
   const [recreatingId, setRecreatingId] = useState<string | null>(null);
   const [failures, setFailures] = useState<
@@ -58,7 +60,7 @@ export default function History() {
   const recreate = async (
     item: (typeof snapshot.items)[number],
   ): Promise<void> => {
-    if (!snapshot.job || recreatingId) return;
+    if (!snapshot.job || recreatingId || isPaused) return;
     const jobId = snapshot.job.id;
     setRecreatingId(item.aha.id);
     setFailures((current) => ({ ...current, [item.aha.id]: undefined }));
@@ -116,6 +118,13 @@ export default function History() {
             {snapshot.unreadableCount === 1
               ? "1 saved AHA could not be read. It remains on this iPad; readable completed AHAs are shown below."
               : `${snapshot.unreadableCount} saved AHAs could not be read. They remain on this iPad; readable completed AHAs are shown below.`}
+          </div>
+        ) : null}
+
+        {isPaused ? (
+          <div className="rounded-xl border border-[#C6CDE8] bg-secondary px-4 py-3 text-base font-semibold text-secondary-foreground">
+            Recovery is paused. Saved PDFs can be viewed, but missing PDFs
+            cannot be recreated until recovery finishes.
           </div>
         ) : null}
 
@@ -187,7 +196,9 @@ export default function History() {
                         className={`min-h-12 w-full shrink-0 text-base sm:w-auto ${
                           isCurrent ? "text-primary" : ""
                         }`}
-                        disabled={Boolean(recreatingId)}
+                        disabled={
+                          Boolean(recreatingId) || (!isCurrent && isPaused)
+                        }
                         onClick={() => {
                           if (isCurrent) {
                             navigate(`/ahas/${item.aha.id}/pdf`, {

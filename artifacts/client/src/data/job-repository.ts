@@ -11,6 +11,7 @@ import {
 } from "./database";
 import { isDevFixtureId } from "./dev-fixture";
 import { partitionReadableJobs } from "./stored-records";
+import { assertRecoveryMutationAllowed } from "./recovery-mutation-guard";
 
 export interface JobListSnapshot {
   jobs: Job[];
@@ -65,6 +66,7 @@ export async function createJob(
   input: Omit<Job, "id">,
   now = new Date(),
 ): Promise<Job> {
+  await assertRecoveryMutationAllowed();
   const job = jobSchema.parse({ ...input, id: createLocalId() });
   const changedAt = now.toISOString();
   await ahaDatabase.transaction(
@@ -95,6 +97,7 @@ export async function updateJobConfiguration(
   >,
   now = new Date(),
 ): Promise<Job> {
+  await assertRecoveryMutationAllowed();
   const existingValue = await ahaDatabase.jobs.get(jobId);
   if (!existingValue || isDevFixtureId(jobId)) {
     throw new Error("That job is not available on this iPad.");

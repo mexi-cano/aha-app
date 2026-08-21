@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  InvalidRestoreProgressError,
+  parseRestoreProgress,
   parseRemotePdfVersionMetadata,
   parseRestoredPdfMetadata,
 } from "./restore";
@@ -73,4 +75,24 @@ test("remote PDF history metadata requires checksums and valid version identity"
     () => parseRemotePdfVersionMetadata({ ...value, sha256: "bad" }),
     /history is invalid/,
   );
+});
+
+test("corrupt recovery progress maps invalid JSON, shapes, and jobs to a restartable error", () => {
+  for (const value of [
+    "not-json",
+    JSON.stringify({ version: 1, stage: "jobs" }),
+    JSON.stringify({
+      version: 1,
+      stage: "jobs",
+      jobs: [{ id: "invalid-job" }],
+      cursor: null,
+      ahaIds: [],
+      pdfIndex: 0,
+    }),
+  ]) {
+    assert.throws(
+      () => parseRestoreProgress(value),
+      InvalidRestoreProgressError,
+    );
+  }
 });

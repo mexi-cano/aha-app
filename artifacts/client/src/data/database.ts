@@ -1,5 +1,11 @@
 import Dexie, { type EntityTable } from "dexie";
-import type { Aha, Job } from "@workspace/aha-domain";
+import {
+  canonicalizePdfTimestamp,
+  pdfVersionIdentityKey,
+  type Aha,
+  type Job,
+  type PdfVersionIdentity,
+} from "@workspace/aha-domain";
 
 import type { DraftMetadata } from "./draft-metadata";
 
@@ -46,17 +52,12 @@ export interface BackupQueueItem {
   generatedAt?: string;
 }
 
-export interface PdfVersionIdentity {
-  sourceRevision: number;
-  generatedAt: string;
-}
-
 export function ahaPdfRevisionKey(
   ahaId: string,
   sourceRevision: number,
   generatedAt: string,
 ): string {
-  return `${encodeURIComponent(ahaId)}:${sourceRevision}:${encodeURIComponent(generatedAt)}`;
+  return pdfVersionIdentityKey(ahaId, sourceRevision, generatedAt);
 }
 
 export function backupQueueKey(
@@ -80,19 +81,28 @@ export function createBackupQueueItem(
   nextAttemptAt = new Date().toISOString(),
   pdfVersion?: PdfVersionIdentity,
 ): BackupQueueItem {
+  const canonicalPdfVersion = pdfVersion
+    ? {
+        ...pdfVersion,
+        generatedAt: canonicalizePdfTimestamp(pdfVersion.generatedAt),
+      }
+    : undefined;
   return {
-    key: backupQueueKey(kind, entityId, pdfVersion),
+    key: backupQueueKey(kind, entityId, canonicalPdfVersion),
     kind,
     entityId,
-    clientUpdatedAt,
+    clientUpdatedAt:
+      kind === "pdf" && canonicalPdfVersion
+        ? canonicalPdfVersion.generatedAt
+        : clientUpdatedAt,
     attempts: 0,
     nextAttemptAt,
     lastFailure: null,
     lastStatus: null,
-    ...(pdfVersion
+    ...(canonicalPdfVersion
       ? {
-          sourceRevision: pdfVersion.sourceRevision,
-          generatedAt: pdfVersion.generatedAt,
+          sourceRevision: canonicalPdfVersion.sourceRevision,
+          generatedAt: canonicalPdfVersion.generatedAt,
         }
       : {}),
   };

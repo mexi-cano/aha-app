@@ -46,7 +46,7 @@ export function parseRestoredPdfMetadata(
     !Number.isInteger(sourceRevision) ||
     sourceRevision < 0 ||
     !generatedAt ||
-    Number.isNaN(Date.parse(generatedAt))
+    !isValidPdfTimestamp(generatedAt)
   ) {
     throw new Error("A restored PDF has invalid metadata.");
   }
@@ -59,7 +59,11 @@ export function parseRestoredPdfMetadata(
   }
   if (!filename) throw new Error("A restored PDF has invalid metadata.");
 
-  return { filename, sourceRevision, generatedAt };
+  return {
+    filename,
+    sourceRevision,
+    generatedAt: canonicalizePdfTimestamp(generatedAt),
+  };
 }
 
 export function parseRemotePdfVersionMetadata(
@@ -77,21 +81,33 @@ export function parseRemotePdfVersionMetadata(
     !Number.isInteger(record.sourceRevision) ||
     record.sourceRevision! < 0 ||
     typeof record.generatedAt !== "string" ||
-    Number.isNaN(Date.parse(record.generatedAt)) ||
+    !isValidPdfTimestamp(record.generatedAt) ||
     !Number.isInteger(record.byteLength) ||
     record.byteLength! < 1 ||
     typeof record.sha256 !== "string" ||
     !/^[a-f0-9]{64}$/i.test(record.sha256) ||
     typeof record.backedUpAt !== "string" ||
-    Number.isNaN(Date.parse(record.backedUpAt)) ||
+    !isValidPdfTimestamp(record.backedUpAt) ||
     !(
       record.supersededAt === null ||
       (typeof record.supersededAt === "string" &&
-        !Number.isNaN(Date.parse(record.supersededAt)))
+        isValidPdfTimestamp(record.supersededAt))
     ) ||
     typeof record.isCurrent !== "boolean"
   ) {
     throw new Error("Saved PDF history is invalid.");
   }
-  return record as RemotePdfVersionMetadata;
+  return {
+    ...(record as RemotePdfVersionMetadata),
+    generatedAt: canonicalizePdfTimestamp(record.generatedAt),
+    backedUpAt: canonicalizePdfTimestamp(record.backedUpAt),
+    supersededAt:
+      record.supersededAt === null
+        ? null
+        : canonicalizePdfTimestamp(record.supersededAt!),
+  };
 }
+import {
+  canonicalizePdfTimestamp,
+  isValidPdfTimestamp,
+} from "@workspace/aha-domain";

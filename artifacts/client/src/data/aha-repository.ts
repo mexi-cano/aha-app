@@ -31,6 +31,7 @@ import {
 import { isDevFixtureId } from "./dev-fixture";
 import { openLocalDataWithRecovery } from "./local-data-initialization";
 import { partitionReadableAhas, partitionReadableJobs } from "./stored-records";
+import { assertRecoveryMutationAllowed } from "./recovery-mutation-guard";
 
 export interface HomeSnapshot {
   job: Job | null;
@@ -233,6 +234,7 @@ export async function startToday(
   job: Job,
   today: LocalDate,
 ): Promise<StartTodayResult> {
+  await assertRecoveryMutationAllowed();
   try {
     return await ahaDatabase.transaction(
       "rw",
@@ -376,6 +378,7 @@ export async function storeAhaPdf(
   bytes: Uint8Array,
   generatedAt = new Date(),
 ): Promise<AhaPdfRecord> {
+  await assertRecoveryMutationAllowed();
   if (!filename.trim() || !bytes.byteLength) {
     throw new Error("A generated PDF filename and bytes are required");
   }
@@ -445,6 +448,7 @@ export async function storeAhaPdf(
 }
 
 export async function persistEditedAha(aha: Aha): Promise<Aha> {
+  await assertRecoveryMutationAllowed();
   const candidateTimestamp = new Date().toISOString();
   let saved: Aha | null = null;
 
@@ -495,6 +499,7 @@ export async function replaceWithBlankAha(
   job: Job,
   date: LocalDate,
 ): Promise<EditorSnapshot> {
+  await assertRecoveryMutationAllowed();
   const metadata = createBlankDraftMetadata(ahaId);
   let replacement: Aha | null = null;
 

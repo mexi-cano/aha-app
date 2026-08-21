@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
-import { ahaSchema, jobSchema } from "@workspace/aha-domain";
+import {
+  ahaSchema,
+  canonicalizePdfTimestamp,
+  isValidPdfTimestamp,
+  jobSchema,
+} from "@workspace/aha-domain";
 import { z } from "zod";
 
 import {
@@ -25,11 +30,17 @@ const listQuerySchema = z
     limit: z.coerce.number().int().min(1).max(50).default(25),
   })
   .strict();
+const pdfTimestampSchema = z
+  .string()
+  .min(1)
+  .max(80)
+  .refine(isValidPdfTimestamp)
+  .transform(canonicalizePdfTimestamp);
 const pdfQuerySchema = z
   .object({
     filename: z.string().min(1).max(240),
     sourceRevision: z.coerce.number().int().nonnegative(),
-    generatedAt: z.string().datetime(),
+    generatedAt: pdfTimestampSchema,
   })
   .strict();
 const pdfVersionParamsSchema = z.object({
@@ -37,7 +48,7 @@ const pdfVersionParamsSchema = z.object({
   sourceRevision: z.coerce.number().int().nonnegative(),
 });
 const pdfVersionQuerySchema = z
-  .object({ generatedAt: z.string().datetime() })
+  .object({ generatedAt: pdfTimestampSchema })
   .strict();
 
 function pdfMetadata(record: {
@@ -45,7 +56,8 @@ function pdfMetadata(record: {
   filename: string;
   sourceRevision: number;
   generatedAt: string;
-  bytes: Buffer;
+  bytes?: Buffer;
+  byteLength?: number;
   sha256: string;
   backedUpAt: string;
 }) {
@@ -53,10 +65,25 @@ function pdfMetadata(record: {
     ahaId: record.ahaId,
     filename: record.filename,
     sourceRevision: record.sourceRevision,
-    generatedAt: record.generatedAt,
-    byteLength: record.bytes.byteLength,
+    generatedAt: canonicalizePdfTimestamp(record.generatedAt),
+    byteLength: record.byteLength ?? record.bytes!.byteLength,
     sha256: record.sha256,
-    backedUpAt: record.backedUpAt,
+    backedUpAt: canonicalizePdfTimestamp(record.backedUpAt),
+  };
+}
+
+function pdfVersionMetadata(
+  record: Parameters<typeof pdfMetadata>[0] & {
+    supersededAt: string | null;
+    isCurrent: boolean;
+  },
+) {
+  return {
+    ...pdfMetadata(record),
+    supersededAt: record.supersededAt
+      ? canonicalizePdfTimestamp(record.supersededAt)
+      : null,
+    isCurrent: record.isCurrent,
   };
 }
 
@@ -64,11 +91,12 @@ function sendPdf(
   response: Response,
   record: Parameters<typeof pdfMetadata>[0],
 ) {
+  const generatedAt = canonicalizePdfTimestamp(record.generatedAt);
   response
     .set({
       "X-AHA-Filename": encodeURIComponent(record.filename),
       "X-AHA-Source-Revision": String(record.sourceRevision),
-      "X-AHA-Generated-At": record.generatedAt,
+      "X-AHA-Generated-At": generatedAt,
       "X-Content-SHA256": record.sha256,
       "Cache-Control": "no-store",
     })
@@ -264,7 +292,11 @@ export function createDataRouter(
 
   router.get("/ahas/:ahaId/pdf/versions", async (request, response) => {
     try {
-      response.json(await store.listPdfVersions(request.params.ahaId!));
+      response.json(
+        (await store.listPdfVersions(request.params.ahaId!)).map(
+          pdfVersionMetadata,
+        ),
+      );
     } catch (error) {
       request.log.error(
         { err: error instanceof Error ? { name: error.name } : undefined },

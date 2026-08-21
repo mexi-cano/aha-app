@@ -1,8 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
-import {
-  type Aha,
-  type Job,
-} from "@workspace/aha-domain";
+import { type Aha, type Job } from "@workspace/aha-domain";
 
 import { AhaSummary } from "@/components/aha/aha-summary";
 import { ForemanBadge } from "@/components/aha/foreman-badge";
@@ -149,6 +146,7 @@ export function WorkerReviewAndSign({
         job={job}
         mode="signing"
         showCrew={false}
+        showSigningEnergyWheel
         workerReviewLanguage={language}
       />
 

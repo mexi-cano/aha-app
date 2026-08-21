@@ -725,7 +725,7 @@ export const backupAhaPdfQuerySourceRevisionMin = 0;
 export const BackupAhaPdfQueryParams = zod.object({
   "filename": zod.coerce.string().min(1).max(backupAhaPdfQueryFilenameMax),
   "sourceRevision": zod.coerce.number().int().min(backupAhaPdfQuerySourceRevisionMin),
-  "generatedAt": zod.coerce.string().datetime({"offset":true})
+  "generatedAt": zod.coerce.string().datetime({"offset":true}).describe('PDF generation instant; legacy parseable PostgreSQL timestamps are accepted and normalized to UTC.')
 })
 
 export const backupAhaPdfResponseRecordSourceRevisionMin = 0;
@@ -740,7 +740,7 @@ export const BackupAhaPdfResponse = zod.object({
   "ahaId": zod.string(),
   "filename": zod.string(),
   "sourceRevision": zod.number().int().min(backupAhaPdfResponseRecordSourceRevisionMin),
-  "generatedAt": zod.string().datetime({"offset":true}),
+  "generatedAt": zod.string().datetime({"offset":true}).describe('Canonical UTC ISO 8601 timestamp used in PDF version identity.'),
   "byteLength": zod.number().int().min(1),
   "sha256": zod.string(),
   "backedUpAt": zod.string().datetime({"offset":true})
@@ -767,7 +767,7 @@ export const ListAhaPdfVersionsResponseItem = zod.object({
   "ahaId": zod.string(),
   "filename": zod.string(),
   "sourceRevision": zod.number().int().min(listAhaPdfVersionsResponseOneSourceRevisionMin),
-  "generatedAt": zod.string().datetime({"offset":true}),
+  "generatedAt": zod.string().datetime({"offset":true}).describe('Canonical UTC ISO 8601 timestamp used in PDF version identity.'),
   "byteLength": zod.number().int().min(1),
   "sha256": zod.string(),
   "backedUpAt": zod.string().datetime({"offset":true})
@@ -792,7 +792,7 @@ export const GetAhaPdfVersionParams = zod.object({
 })
 
 export const GetAhaPdfVersionQueryParams = zod.object({
-  "generatedAt": zod.coerce.string().datetime({"offset":true})
+  "generatedAt": zod.coerce.string().datetime({"offset":true}).describe('Exact generation instant; responses always use canonical UTC ISO 8601.')
 })
 
 export const GetAhaPdfVersionResponse = zod.unknown()

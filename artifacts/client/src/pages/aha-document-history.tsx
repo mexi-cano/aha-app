@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   AlertTriangle,
@@ -81,30 +81,29 @@ export default function AhaDocumentHistory() {
   const [message, setMessage] = useState<string | null>(null);
   const [failedRevision, setFailedRevision] =
     useState<AhaPdfRevisionRecord | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const isOnline = useOnlineStatus();
   const selectedUrl = usePdfObjectUrl(selected);
   const pdfOpenMode = getCurrentPdfOpenMode();
 
-  const refreshHistory = async () => {
-    if (!isOnline || isRefreshing) return;
+  const refreshHistory = useCallback(async () => {
+    if (!isOnline) return;
     setIsRefreshing(true);
-    setMessage(null);
+    setRefreshError(null);
     try {
       await refreshPdfVersionMetadata(aha.id);
     } catch (error) {
-      setMessage(historyRefreshErrorMessage(error, navigator.onLine));
+      setRefreshError(historyRefreshErrorMessage(error, navigator.onLine));
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [aha.id, isOnline]);
 
   useEffect(() => {
     if (!isOnline) return;
-    void refreshPdfVersionMetadata(aha.id).catch((error: unknown) => {
-      setMessage(historyRefreshErrorMessage(error, navigator.onLine));
-    });
-  }, [aha.id, isOnline]);
+    void refreshHistory();
+  }, [isOnline, refreshHistory]);
 
   const revisionCounts = useMemo(() => {
     const counts = new Map<number, number>();
@@ -224,6 +223,25 @@ export default function AhaDocumentHistory() {
                 onClick={() => void openRevision(failedRevision)}
               >
                 TRY AGAIN
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {refreshError ? (
+          <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-warning-foreground">
+            <p className="text-base font-semibold" role="status">
+              {refreshError}
+            </p>
+            {!integrityState?.conflicts.length ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-3 min-h-12 w-full border-warning/40 bg-card text-warning-foreground"
+                disabled={!isOnline || isRefreshing}
+                onClick={() => void refreshHistory()}
+              >
+                {isRefreshing ? "TRYING AGAIN…" : "TRY AGAIN"}
               </Button>
             ) : null}
           </div>

@@ -31,6 +31,21 @@ increments must update the master specification before implementation.
 - Define retention and storage-capacity policy with ITS legal, insurance, and
   safety stakeholders before any evidence expiration or compression work.
 
+## Approved site profiles and location assistance
+
+- Evaluate an organization-scoped directory of ITS-approved sites, emergency
+  centres, contact instructions, and muster points only after multi-crew scope
+  is server-enforced. Shared recent-value suggestions must never cross a crew or
+  organization boundary merely because a device has cached them.
+- Treat address autocomplete and device geolocation as optional, user-initiated
+  helpers. Manual entry and offline completion must remain available, and every
+  proposed result must be confirmed before it changes an AHA or job default.
+- Select a provider only after reviewing billing, attribution, privacy, and
+  permanent-storage rights for values retained in IndexedDB, Neon, and safety
+  evidence. Keep provider credentials behind a rate-limited server proxy.
+- Never infer the operationally appropriate emergency centre from geographic
+  proximity. ITS's site emergency plan remains authoritative.
+
 ## Company and supervisor experience
 
 - Treat company-wide safety review, exports, approvals, and notifications as a

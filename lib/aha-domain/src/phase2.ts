@@ -4,6 +4,7 @@ import {
   MAX_CREW_MEMBERS,
   type EnergyCategoryName,
 } from "./canonical";
+import { classifyEmergencyContact } from "./input-quality";
 import type {
   Aha,
   AhaCrewMember,
@@ -35,6 +36,7 @@ export type RequiredReviewTarget =
 export type WarningReviewTarget =
   | { section: "details"; field: "workOrderPermit" }
   | { section: "details"; field: "jhaProcedureNumbers" }
+  | { section: "details"; field: "emergencyNumber" }
   | { section: "work"; field: "meetingNotes" };
 
 export type ReviewIssue =
@@ -58,7 +60,11 @@ export type ReviewIssue =
     }
   | {
       tier: "warning";
-      code: "work_order_permit" | "jha_procedures" | "meeting_notes";
+      code:
+        | "work_order_permit"
+        | "jha_procedures"
+        | "meeting_notes"
+        | "emergency_contact_format";
       message: string;
       target: WarningReviewTarget;
     };
@@ -74,6 +80,12 @@ export interface ReviewReport {
   warnings: Extract<ReviewIssue, { tier: "warning" }>[];
   information: ReviewInformation[];
   canStartSigning: boolean;
+}
+
+export function canMarkReviewWarningNotApplicable(
+  issue: Extract<ReviewIssue, { tier: "warning" }>,
+): boolean {
+  return issue.code !== "emergency_contact_format";
 }
 
 export interface EditorSectionReadiness {
@@ -475,6 +487,15 @@ export function getReviewReport(aha: Aha): ReviewReport {
         target: { section: "details", field },
       });
     }
+  }
+
+  if (classifyEmergencyContact(aha.header.emergencyNumber) === "unrecognized") {
+    warnings.push({
+      tier: "warning",
+      code: "emergency_contact_format",
+      message: "Check that this includes the number the crew should call.",
+      target: { section: "details", field: "emergencyNumber" },
+    });
   }
 
   if (isBlank(aha.description)) {

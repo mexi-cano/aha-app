@@ -31,3 +31,26 @@ test("field descriptions remain visible and are associated with their controls",
   assert.match(textarea, /aria-describedby="work-description-description"/);
   assert.match(textarea, /Persistent help/);
 });
+
+test("field feedback and assistive actions are accessible and touch sized", () => {
+  const input = renderToStaticMarkup(
+    createElement(TextField, {
+      id: "emergency-number",
+      label: "Emergency number",
+      feedback: {
+        tone: "warning",
+        message: "Check that this includes the number the crew should call.",
+      },
+      assistiveAction: {
+        label: "Use job default",
+        onClick: () => undefined,
+      },
+    }),
+  );
+  assert.match(input, /aria-describedby="emergency-number-feedback"/);
+  assert.match(input, /id="emergency-number-feedback"/);
+  assert.match(input, /Check that this includes the number/);
+  assert.match(input, /min-h-12/);
+  assert.match(input, />Use job default</);
+  assert.doesNotMatch(input, /label="Use job default"/);
+});

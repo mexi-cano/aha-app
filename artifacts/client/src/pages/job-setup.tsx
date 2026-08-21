@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router";
 import { MAX_CREW_MEMBERS } from "@workspace/aha-domain";
 
 import { AppLogo } from "@/components/aha/app-logo";
+import { EmergencyContactField } from "@/components/aha/emergency-contact-field";
 import { TextField } from "@/components/aha/form-field";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +22,7 @@ import {
   type JobSetupDraft,
   type JobSetupField,
 } from "@/features/job-setup";
+import { cityOrAreaLocationSuggestion } from "@/features/location-assistance";
 
 const FIELD_IDS = {
   name: "job-name",
@@ -79,6 +81,10 @@ export default function JobSetup() {
   const issueByField = useMemo(
     () => new Map(issues.map((issue) => [issue.field, issue.message])),
     [issues],
+  );
+  const cityForLocation = cityOrAreaLocationSuggestion(
+    draft.cityLabel,
+    draft.location,
   );
   const update = <K extends keyof JobSetupDraft>(
     key: K,
@@ -250,11 +256,19 @@ export default function JobSetup() {
           <TextField
             id={FIELD_IDS.location}
             label="Location"
-            description="The specific work location printed on each AHA."
+            description="The street address, intersection, station, subdivision, easement, or work area printed on each AHA."
             requirement="required"
             value={draft.location}
             aria-invalid={issueByField.has("location")}
             onChange={(event) => update("location", event.target.value)}
+            assistiveAction={
+              cityForLocation
+                ? {
+                    label: "Use city or area",
+                    onClick: () => update("location", cityForLocation),
+                  }
+                : undefined
+            }
           />
           <TextField
             id={FIELD_IDS.closestEmergencyCentre}
@@ -267,14 +281,12 @@ export default function JobSetup() {
               update("closestEmergencyCentre", event.target.value)
             }
           />
-          <TextField
+          <EmergencyContactField
             id={FIELD_IDS.emergencyNumber}
-            label="Emergency number"
             description="The number the crew should call for a site emergency."
-            requirement="required"
             value={draft.emergencyNumber}
-            aria-invalid={issueByField.has("emergencyNumber")}
-            onChange={(event) => update("emergencyNumber", event.target.value)}
+            invalid={issueByField.has("emergencyNumber")}
+            onValueChange={(value) => update("emergencyNumber", value)}
           />
           <TextField
             id={FIELD_IDS.musterPoint}

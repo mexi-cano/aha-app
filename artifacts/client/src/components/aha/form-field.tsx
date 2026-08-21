@@ -1,11 +1,45 @@
 import * as React from "react";
 import type {
+  ButtonHTMLAttributes,
   InputHTMLAttributes,
   ReactNode,
   TextareaHTMLAttributes,
 } from "react";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+export interface FieldFeedback {
+  message: string;
+  tone: "warning";
+}
+
+export interface FieldAssistiveAction extends Omit<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  "children" | "type"
+> {
+  label: string;
+}
+
+function AssistiveActionButton({
+  label,
+  className,
+  ...props
+}: FieldAssistiveAction) {
+  return (
+    <Button
+      {...props}
+      type="button"
+      variant="outline"
+      className={cn(
+        "min-h-12 w-full border-[#C6CDE8] bg-card px-4 text-sm font-bold uppercase tracking-[0.04em] text-primary sm:w-auto sm:self-start",
+        className,
+      )}
+    >
+      {label}
+    </Button>
+  );
+}
 
 interface FieldFrameProps {
   id: string;
@@ -13,6 +47,9 @@ interface FieldFrameProps {
   hint?: string;
   description?: ReactNode;
   descriptionId?: string;
+  feedback?: FieldFeedback;
+  feedbackId?: string;
+  assistiveAction?: FieldAssistiveAction;
   requirement?: FieldRequirement;
   children: ReactNode;
 }
@@ -39,6 +76,9 @@ function FieldFrame({
   hint,
   description,
   descriptionId,
+  feedback,
+  feedbackId,
+  assistiveAction,
   requirement,
   children,
 }: FieldFrameProps) {
@@ -59,6 +99,7 @@ function FieldFrame({
         ) : null}
       </label>
       {children}
+      {assistiveAction ? <AssistiveActionButton {...assistiveAction} /> : null}
       {description ? (
         <div
           id={descriptionId}
@@ -66,6 +107,15 @@ function FieldFrame({
         >
           {description}
         </div>
+      ) : null}
+      {feedback ? (
+        <p
+          id={feedbackId}
+          className="flex items-start gap-2 text-sm font-semibold leading-relaxed text-warning-foreground"
+        >
+          <span aria-hidden="true">⚠</span>
+          <span>{feedback.message}</span>
+        </p>
       ) : null}
     </div>
   );
@@ -76,6 +126,8 @@ export function TextField({
   label,
   hint,
   description,
+  feedback,
+  assistiveAction,
   requirement,
   className,
   ...props
@@ -84,12 +136,16 @@ export function TextField({
   label: string;
   hint?: string;
   description?: ReactNode;
+  feedback?: FieldFeedback;
+  assistiveAction?: FieldAssistiveAction;
   requirement?: FieldRequirement;
 }) {
   const descriptionId = description ? `${id}-description` : undefined;
+  const feedbackId = feedback ? `${id}-feedback` : undefined;
   const ariaDescribedBy =
-    [props["aria-describedby"], descriptionId].filter(Boolean).join(" ") ||
-    undefined;
+    [props["aria-describedby"], descriptionId, feedbackId]
+      .filter(Boolean)
+      .join(" ") || undefined;
 
   return (
     <FieldFrame
@@ -98,6 +154,9 @@ export function TextField({
       hint={hint}
       description={description}
       descriptionId={descriptionId}
+      feedback={feedback}
+      feedbackId={feedbackId}
+      assistiveAction={assistiveAction}
       requirement={requirement}
     >
       <input
@@ -122,6 +181,8 @@ export function TextAreaField({
   label,
   hint,
   description,
+  feedback,
+  assistiveAction,
   requirement,
   className,
   ...props
@@ -130,12 +191,16 @@ export function TextAreaField({
   label: string;
   hint?: string;
   description?: ReactNode;
+  feedback?: FieldFeedback;
+  assistiveAction?: FieldAssistiveAction;
   requirement?: FieldRequirement;
 }) {
   const descriptionId = description ? `${id}-description` : undefined;
+  const feedbackId = feedback ? `${id}-feedback` : undefined;
   const ariaDescribedBy =
-    [props["aria-describedby"], descriptionId].filter(Boolean).join(" ") ||
-    undefined;
+    [props["aria-describedby"], descriptionId, feedbackId]
+      .filter(Boolean)
+      .join(" ") || undefined;
 
   return (
     <FieldFrame
@@ -144,6 +209,9 @@ export function TextAreaField({
       hint={hint}
       description={description}
       descriptionId={descriptionId}
+      feedback={feedback}
+      feedbackId={feedbackId}
+      assistiveAction={assistiveAction}
       requirement={requirement}
     >
       <textarea

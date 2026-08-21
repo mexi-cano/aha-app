@@ -57,7 +57,15 @@ export default function AhaReview() {
   const markNotApplicable = (
     issue: Extract<ReviewIssue, { tier: "warning" }>,
   ) => {
-    const field = issue.target.field;
+    const field =
+      issue.code === "work_order_permit"
+        ? "workOrderPermit"
+        : issue.code === "jha_procedures"
+          ? "jhaProcedureNumbers"
+          : issue.code === "meeting_notes"
+            ? "meetingNotes"
+            : null;
+    if (!field) return;
     updateAha((current) => ({
       ...current,
       notApplicable: { ...current.notApplicable, [field]: true },

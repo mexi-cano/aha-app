@@ -10,6 +10,7 @@ import {
   applyAhaMutationRules,
   beginSigning,
   canFinishAha,
+  canMarkReviewWarningNotApplicable,
   canStartSigning,
   completeAha,
   confirmCompletedCrewReview,
@@ -209,6 +210,42 @@ test("entered optional values clear warnings without changing signing readiness"
   const filledReport = getReviewReport(filledOptionals);
   assert.deepEqual(filledReport.warnings, []);
   assert.equal(filledReport.canStartSigning, true);
+});
+
+test("an ambiguous emergency contact warns without blocking or allowing N/A", () => {
+  const ambiguous: Aha = {
+    ...reviewReadyAha(),
+    header: {
+      ...reviewReadyAha().header,
+      emergencyNumber: "Call the site radio",
+    },
+  };
+  const report = getReviewReport(ambiguous);
+  const warning = report.warnings.find(
+    ({ code }) => code === "emergency_contact_format",
+  );
+  assert.ok(warning);
+  assert.equal(
+    warning.message,
+    "Check that this includes the number the crew should call.",
+  );
+  assert.equal(canMarkReviewWarningNotApplicable(warning), false);
+  assert.equal(report.canStartSigning, true);
+  assert.equal(canStartSigning(ambiguous), true);
+
+  const recognized: Aha = {
+    ...ambiguous,
+    header: {
+      ...ambiguous.header,
+      emergencyNumber: "911 / Site safety: (919) 555-0182",
+    },
+  };
+  assert.equal(
+    getReviewReport(recognized).warnings.some(
+      ({ code }) => code === "emergency_contact_format",
+    ),
+    false,
+  );
 });
 
 test("zero tasks and zero energy categories are not invented blockers", () => {

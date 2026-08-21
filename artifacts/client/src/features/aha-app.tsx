@@ -56,8 +56,8 @@ function InitialEditorRecoveryRedirect() {
 }
 
 function RecoveryWriteRoute({ children }: { children: ReactNode }) {
-  const { hasPendingRecovery } = useRecoveryState();
-  return hasPendingRecovery ? <Navigate to="/" replace /> : children;
+  const { isWriteBlocked } = useRecoveryState();
+  return isWriteBlocked ? <Navigate to="/" replace /> : children;
 }
 
 function AppRoutes() {
@@ -78,14 +78,7 @@ function AppRoutes() {
             </RecoveryWriteRoute>
           }
         />
-        <Route
-          path="/jobs"
-          element={
-            <RecoveryWriteRoute>
-              <Jobs />
-            </RecoveryWriteRoute>
-          }
-        />
+        <Route path="/jobs" element={<Jobs />} />
         <Route
           path="/jobs/:jobId/setup"
           element={

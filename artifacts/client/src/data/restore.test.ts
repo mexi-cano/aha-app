@@ -6,6 +6,7 @@ import {
   parseRestoreProgress,
   parseRemotePdfVersionMetadata,
   parseRestoredPdfMetadata,
+  planRestoredJobChoice,
 } from "./restore";
 
 const checksum = "ab".repeat(32);
@@ -95,4 +96,19 @@ test("corrupt recovery progress maps invalid JSON, shapes, and jobs to a restart
       InvalidRestoreProgressError,
     );
   }
+});
+
+test("restored jobs activate one explicit choice and never guess among many", () => {
+  assert.deepEqual(planRestoredJobChoice([]), {
+    activeJobId: null,
+    needsChoice: false,
+  });
+  assert.deepEqual(planRestoredJobChoice([{ id: "job-1" }]), {
+    activeJobId: "job-1",
+    needsChoice: false,
+  });
+  assert.deepEqual(
+    planRestoredJobChoice([{ id: "job-1" }, { id: "job-2" }]),
+    { activeJobId: null, needsChoice: true },
+  );
 });

@@ -41,19 +41,35 @@ function EmptyJobState({
           <AppLogo />
         </div>
         <h1 className="mt-8 text-2xl font-bold">
-          {hasJobs ? "Choose the restored job" : "No job is set up yet"}
+          {isReadOnly && hasJobs
+            ? "Recovery paused"
+            : hasJobs
+              ? "Choose the restored job"
+              : "No job is set up yet"}
         </h1>
         <p className="mt-3 text-base font-medium leading-relaxed text-muted-foreground">
-          {hasJobs
+          {isReadOnly && hasJobs
+            ? "Choose a verified saved job to view its completed documents, or resume recovery from the banner above."
+            : hasJobs
             ? "Recovery is complete. Choose the job to open; the app will not guess for you."
             : "No job has been set up on this iPad. Your existing local data has not been changed."}
         </p>
         <Button
           className="mt-7 min-h-14 w-full text-base font-bold"
-          onClick={isReadOnly ? onResumeRecovery : hasJobs ? onChoose : onSetup}
+          onClick={
+            isReadOnly
+              ? hasJobs
+                ? onChoose
+                : onResumeRecovery
+              : hasJobs
+                ? onChoose
+                : onSetup
+          }
         >
-          {isReadOnly
-            ? "RESUME RECOVERY"
+          {isReadOnly && hasJobs
+            ? "CHOOSE SAVED JOB"
+            : isReadOnly
+              ? "RESUME RECOVERY"
             : hasJobs
               ? "CHOOSE A JOB"
               : "SET UP A JOB"}
@@ -135,10 +151,9 @@ export default function Home() {
           <Button
             variant="ghost"
             className="mt-3 min-h-12 px-0 text-base text-primary"
-            disabled={isPaused}
             onClick={() => navigate("/jobs")}
           >
-            Change job or update defaults
+            {isPaused ? "Choose saved job" : "Change job or update defaults"}
           </Button>
 
           {snapshot.recentAhas.length ? (

@@ -10,6 +10,7 @@ import {
   RESTORE_NEEDS_JOB_CHOICE_SETTING,
 } from "./database";
 import { isDevFixtureId } from "./dev-fixture";
+import { sortJobsForSelection } from "./job-selection";
 import { partitionReadableJobs } from "./stored-records";
 import { assertRecoveryMutationAllowed } from "./recovery-mutation-guard";
 
@@ -27,11 +28,11 @@ export async function getJobListSnapshot(): Promise<JobListSnapshot> {
   const { records: jobs, unreadableCount } = partitionReadableJobs(
     records.filter(({ id }) => !isDevFixtureId(id)),
   );
-  jobs.sort((left, right) => left.name.localeCompare(right.name));
-  const activeJobId = jobs.some(({ id }) => id === activeSetting?.value)
+  const orderedJobs = sortJobsForSelection(jobs);
+  const activeJobId = orderedJobs.some(({ id }) => id === activeSetting?.value)
     ? activeSetting!.value
     : null;
-  return { jobs, activeJobId, unreadableCount };
+  return { jobs: orderedJobs, activeJobId, unreadableCount };
 }
 
 export async function getJob(jobId: string): Promise<Job | null> {

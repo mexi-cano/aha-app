@@ -19,6 +19,7 @@ import {
 } from "./pdf-backup-metadata";
 import { refreshPdfVersionMetadata } from "./pdf-version-repository";
 import {
+  ACTIVE_JOB_SETTING,
   ahaDatabase,
   RESTORE_NEEDS_JOB_CHOICE_SETTING,
   RESTORE_PROGRESS_SETTING,
@@ -45,6 +46,39 @@ export class InvalidRestoreProgressError extends Error {
 
   constructor(cause?: unknown) {
     super("Saved recovery progress could not be read.", { cause });
+  }
+}
+
+export function planRestoredJobChoice(
+  jobs: readonly Pick<Job, "id">[],
+): { activeJobId: string | null; needsChoice: boolean } {
+  if (jobs.length === 0) {
+    return { activeJobId: null, needsChoice: false };
+  }
+  if (jobs.length === 1) {
+    return { activeJobId: jobs[0]!.id, needsChoice: false };
+  }
+  return { activeJobId: null, needsChoice: true };
+}
+
+async function applyRestoredJobChoice(jobs: readonly Job[]): Promise<void> {
+  const current = await ahaDatabase.settings.get(ACTIVE_JOB_SETTING);
+  const plan = planRestoredJobChoice(jobs);
+  if (plan.activeJobId) {
+    await ahaDatabase.settings.put({
+      key: ACTIVE_JOB_SETTING,
+      value: plan.activeJobId,
+    });
+  } else if (current) {
+    await ahaDatabase.settings.delete(ACTIVE_JOB_SETTING);
+  }
+  if (plan.needsChoice) {
+    await ahaDatabase.settings.put({
+      key: RESTORE_NEEDS_JOB_CHOICE_SETTING,
+      value: "true",
+    });
+  } else {
+    await ahaDatabase.settings.delete(RESTORE_NEEDS_JOB_CHOICE_SETTING);
   }
 }
 
@@ -164,9 +198,15 @@ export async function resumeRestore(
 
   if (progress.stage === "jobs") {
     onProgress?.("Restoring job setup…");
-    await ahaDatabase.transaction("rw", ahaDatabase.jobs, async () => {
-      for (const job of progress!.jobs) await ahaDatabase.jobs.put(job);
-    });
+    await ahaDatabase.transaction(
+      "rw",
+      ahaDatabase.jobs,
+      ahaDatabase.settings,
+      async () => {
+        for (const job of progress!.jobs) await ahaDatabase.jobs.put(job);
+        await applyRestoredJobChoice(progress!.jobs);
+      },
+    );
     progress = { ...progress, stage: "ahas", cursor: null };
     await saveProgress(progress);
   }
@@ -217,9 +257,6 @@ export async function resumeRestore(
 
   await ahaDatabase.transaction("rw", ahaDatabase.settings, async () => {
     await ahaDatabase.settings.delete(RESTORE_PROGRESS_SETTING);
-    await ahaDatabase.settings.put({
-      key: RESTORE_NEEDS_JOB_CHOICE_SETTING,
-      value: "true",
-    });
+    await applyRestoredJobChoice(progress.jobs);
   });
 }

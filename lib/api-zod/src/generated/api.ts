@@ -171,6 +171,17 @@ export const listAhasResponseItemsItemCrewMax = 10;
 export const listAhasResponseItemsItemDocumentRevisionMin = 0;
 
 
+export const listAhasResponseItemsItemDocumentEventsItemNoteMax = 250;
+
+export const listAhasResponseItemsItemDocumentEventsItemFromDocumentRevisionMin = 0;
+
+export const listAhasResponseItemsItemDocumentEventsItemToDocumentRevisionMin = 0;
+
+
+export const listAhasResponseItemsItemDocumentEventsDefault = [];
+export const listAhasResponseItemsItemPendingCompletedUpdateOneBaselineDocumentRevisionMin = 0;
+
+export const listAhasResponseItemsItemPendingCompletedUpdateDefault = null;
 
 export const ListAhasResponse = zod.object({
   "items": zod.array(zod.object({
@@ -217,6 +228,33 @@ export const ListAhasResponse = zod.object({
   "documentRevision": zod.number().int().min(listAhasResponseItemsItemDocumentRevisionMin),
   "completedAt": zod.string().datetime({"offset":true}).nullable(),
   "updatedAfterCompletionAt": zod.array(zod.string().datetime({"offset":true})),
+  "documentEvents": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "kind": zod.enum(['initial_completion', 'late_worker_added', 'signature_replaced', 'worker_removed', 'safety_update', 'administrative_update']),
+  "reason": zod.enum(['initial_completion', 'late_arrival', 'wrong_person_signed', 'signature_unclear', 'worker_not_on_site', 'duplicate_entry', 'added_by_mistake', 'work_conditions_changed', 'administrative_correction']),
+  "note": zod.string().max(listAhasResponseItemsItemDocumentEventsItemNoteMax).nullable(),
+  "occurredAt": zod.string().datetime({"offset":true}),
+  "fromDocumentRevision": zod.number().int().min(listAhasResponseItemsItemDocumentEventsItemFromDocumentRevisionMin).nullable(),
+  "toDocumentRevision": zod.number().int().min(listAhasResponseItemsItemDocumentEventsItemToDocumentRevisionMin),
+  "affectedWorkers": zod.array(zod.object({
+  "workerId": zod.string().min(1),
+  "name": zod.string()
+})),
+  "crewReviewConfirmation": zod.union([zod.object({
+  "confirmedAt": zod.string().datetime({"offset":true}),
+  "personInChargeName": zod.string()
+}),zod.null()])
+})).default(listAhasResponseItemsItemDocumentEventsDefault),
+  "pendingCompletedUpdate": zod.union([zod.object({
+  "id": zod.string().min(1),
+  "startedAt": zod.string().datetime({"offset":true}),
+  "baselineDocumentRevision": zod.number().int().min(listAhasResponseItemsItemPendingCompletedUpdateOneBaselineDocumentRevisionMin),
+  "kind": zod.enum(['safety', 'administrative']),
+  "crewReviewConfirmation": zod.union([zod.object({
+  "confirmedAt": zod.string().datetime({"offset":true}),
+  "personInChargeName": zod.string()
+}),zod.null()])
+}),zod.null()]).default(listAhasResponseItemsItemPendingCompletedUpdateDefault),
   "sync": zod.object({
   "savedLocallyAt": zod.string().datetime({"offset":true}),
   "backedUpAt": zod.string().datetime({"offset":true}).nullable()
@@ -242,6 +280,17 @@ export const backupAhaBodyCrewMax = 10;
 export const backupAhaBodyDocumentRevisionMin = 0;
 
 
+export const backupAhaBodyDocumentEventsItemNoteMax = 250;
+
+export const backupAhaBodyDocumentEventsItemFromDocumentRevisionMin = 0;
+
+export const backupAhaBodyDocumentEventsItemToDocumentRevisionMin = 0;
+
+
+export const backupAhaBodyDocumentEventsDefault = [];
+export const backupAhaBodyPendingCompletedUpdateOneBaselineDocumentRevisionMin = 0;
+
+export const backupAhaBodyPendingCompletedUpdateDefault = null;
 
 export const BackupAhaBody = zod.object({
   "id": zod.string().min(1),
@@ -287,6 +336,33 @@ export const BackupAhaBody = zod.object({
   "documentRevision": zod.number().int().min(backupAhaBodyDocumentRevisionMin),
   "completedAt": zod.string().datetime({"offset":true}).nullable(),
   "updatedAfterCompletionAt": zod.array(zod.string().datetime({"offset":true})),
+  "documentEvents": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "kind": zod.enum(['initial_completion', 'late_worker_added', 'signature_replaced', 'worker_removed', 'safety_update', 'administrative_update']),
+  "reason": zod.enum(['initial_completion', 'late_arrival', 'wrong_person_signed', 'signature_unclear', 'worker_not_on_site', 'duplicate_entry', 'added_by_mistake', 'work_conditions_changed', 'administrative_correction']),
+  "note": zod.string().max(backupAhaBodyDocumentEventsItemNoteMax).nullable(),
+  "occurredAt": zod.string().datetime({"offset":true}),
+  "fromDocumentRevision": zod.number().int().min(backupAhaBodyDocumentEventsItemFromDocumentRevisionMin).nullable(),
+  "toDocumentRevision": zod.number().int().min(backupAhaBodyDocumentEventsItemToDocumentRevisionMin),
+  "affectedWorkers": zod.array(zod.object({
+  "workerId": zod.string().min(1),
+  "name": zod.string()
+})),
+  "crewReviewConfirmation": zod.union([zod.object({
+  "confirmedAt": zod.string().datetime({"offset":true}),
+  "personInChargeName": zod.string()
+}),zod.null()])
+})).default(backupAhaBodyDocumentEventsDefault),
+  "pendingCompletedUpdate": zod.union([zod.object({
+  "id": zod.string().min(1),
+  "startedAt": zod.string().datetime({"offset":true}),
+  "baselineDocumentRevision": zod.number().int().min(backupAhaBodyPendingCompletedUpdateOneBaselineDocumentRevisionMin),
+  "kind": zod.enum(['safety', 'administrative']),
+  "crewReviewConfirmation": zod.union([zod.object({
+  "confirmedAt": zod.string().datetime({"offset":true}),
+  "personInChargeName": zod.string()
+}),zod.null()])
+}),zod.null()]).default(backupAhaBodyPendingCompletedUpdateDefault),
   "sync": zod.object({
   "savedLocallyAt": zod.string().datetime({"offset":true}),
   "backedUpAt": zod.string().datetime({"offset":true}).nullable()
@@ -306,6 +382,17 @@ export const backupAhaResponseRecordCrewMax = 10;
 export const backupAhaResponseRecordDocumentRevisionMin = 0;
 
 
+export const backupAhaResponseRecordDocumentEventsItemNoteMax = 250;
+
+export const backupAhaResponseRecordDocumentEventsItemFromDocumentRevisionMin = 0;
+
+export const backupAhaResponseRecordDocumentEventsItemToDocumentRevisionMin = 0;
+
+
+export const backupAhaResponseRecordDocumentEventsDefault = [];
+export const backupAhaResponseRecordPendingCompletedUpdateOneBaselineDocumentRevisionMin = 0;
+
+export const backupAhaResponseRecordPendingCompletedUpdateDefault = null;
 
 export const BackupAhaResponse = zod.object({
   "accepted": zod.boolean(),
@@ -353,6 +440,33 @@ export const BackupAhaResponse = zod.object({
   "documentRevision": zod.number().int().min(backupAhaResponseRecordDocumentRevisionMin),
   "completedAt": zod.string().datetime({"offset":true}).nullable(),
   "updatedAfterCompletionAt": zod.array(zod.string().datetime({"offset":true})),
+  "documentEvents": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "kind": zod.enum(['initial_completion', 'late_worker_added', 'signature_replaced', 'worker_removed', 'safety_update', 'administrative_update']),
+  "reason": zod.enum(['initial_completion', 'late_arrival', 'wrong_person_signed', 'signature_unclear', 'worker_not_on_site', 'duplicate_entry', 'added_by_mistake', 'work_conditions_changed', 'administrative_correction']),
+  "note": zod.string().max(backupAhaResponseRecordDocumentEventsItemNoteMax).nullable(),
+  "occurredAt": zod.string().datetime({"offset":true}),
+  "fromDocumentRevision": zod.number().int().min(backupAhaResponseRecordDocumentEventsItemFromDocumentRevisionMin).nullable(),
+  "toDocumentRevision": zod.number().int().min(backupAhaResponseRecordDocumentEventsItemToDocumentRevisionMin),
+  "affectedWorkers": zod.array(zod.object({
+  "workerId": zod.string().min(1),
+  "name": zod.string()
+})),
+  "crewReviewConfirmation": zod.union([zod.object({
+  "confirmedAt": zod.string().datetime({"offset":true}),
+  "personInChargeName": zod.string()
+}),zod.null()])
+})).default(backupAhaResponseRecordDocumentEventsDefault),
+  "pendingCompletedUpdate": zod.union([zod.object({
+  "id": zod.string().min(1),
+  "startedAt": zod.string().datetime({"offset":true}),
+  "baselineDocumentRevision": zod.number().int().min(backupAhaResponseRecordPendingCompletedUpdateOneBaselineDocumentRevisionMin),
+  "kind": zod.enum(['safety', 'administrative']),
+  "crewReviewConfirmation": zod.union([zod.object({
+  "confirmedAt": zod.string().datetime({"offset":true}),
+  "personInChargeName": zod.string()
+}),zod.null()])
+}),zod.null()]).default(backupAhaResponseRecordPendingCompletedUpdateDefault),
   "sync": zod.object({
   "savedLocallyAt": zod.string().datetime({"offset":true}),
   "backedUpAt": zod.string().datetime({"offset":true}).nullable()
@@ -384,6 +498,17 @@ export const updateAhaBackupBodyCrewMax = 10;
 export const updateAhaBackupBodyDocumentRevisionMin = 0;
 
 
+export const updateAhaBackupBodyDocumentEventsItemNoteMax = 250;
+
+export const updateAhaBackupBodyDocumentEventsItemFromDocumentRevisionMin = 0;
+
+export const updateAhaBackupBodyDocumentEventsItemToDocumentRevisionMin = 0;
+
+
+export const updateAhaBackupBodyDocumentEventsDefault = [];
+export const updateAhaBackupBodyPendingCompletedUpdateOneBaselineDocumentRevisionMin = 0;
+
+export const updateAhaBackupBodyPendingCompletedUpdateDefault = null;
 
 export const UpdateAhaBackupBody = zod.object({
   "id": zod.string().min(1),
@@ -429,6 +554,33 @@ export const UpdateAhaBackupBody = zod.object({
   "documentRevision": zod.number().int().min(updateAhaBackupBodyDocumentRevisionMin),
   "completedAt": zod.string().datetime({"offset":true}).nullable(),
   "updatedAfterCompletionAt": zod.array(zod.string().datetime({"offset":true})),
+  "documentEvents": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "kind": zod.enum(['initial_completion', 'late_worker_added', 'signature_replaced', 'worker_removed', 'safety_update', 'administrative_update']),
+  "reason": zod.enum(['initial_completion', 'late_arrival', 'wrong_person_signed', 'signature_unclear', 'worker_not_on_site', 'duplicate_entry', 'added_by_mistake', 'work_conditions_changed', 'administrative_correction']),
+  "note": zod.string().max(updateAhaBackupBodyDocumentEventsItemNoteMax).nullable(),
+  "occurredAt": zod.string().datetime({"offset":true}),
+  "fromDocumentRevision": zod.number().int().min(updateAhaBackupBodyDocumentEventsItemFromDocumentRevisionMin).nullable(),
+  "toDocumentRevision": zod.number().int().min(updateAhaBackupBodyDocumentEventsItemToDocumentRevisionMin),
+  "affectedWorkers": zod.array(zod.object({
+  "workerId": zod.string().min(1),
+  "name": zod.string()
+})),
+  "crewReviewConfirmation": zod.union([zod.object({
+  "confirmedAt": zod.string().datetime({"offset":true}),
+  "personInChargeName": zod.string()
+}),zod.null()])
+})).default(updateAhaBackupBodyDocumentEventsDefault),
+  "pendingCompletedUpdate": zod.union([zod.object({
+  "id": zod.string().min(1),
+  "startedAt": zod.string().datetime({"offset":true}),
+  "baselineDocumentRevision": zod.number().int().min(updateAhaBackupBodyPendingCompletedUpdateOneBaselineDocumentRevisionMin),
+  "kind": zod.enum(['safety', 'administrative']),
+  "crewReviewConfirmation": zod.union([zod.object({
+  "confirmedAt": zod.string().datetime({"offset":true}),
+  "personInChargeName": zod.string()
+}),zod.null()])
+}),zod.null()]).default(updateAhaBackupBodyPendingCompletedUpdateDefault),
   "sync": zod.object({
   "savedLocallyAt": zod.string().datetime({"offset":true}),
   "backedUpAt": zod.string().datetime({"offset":true}).nullable()
@@ -448,6 +600,17 @@ export const updateAhaBackupResponseRecordCrewMax = 10;
 export const updateAhaBackupResponseRecordDocumentRevisionMin = 0;
 
 
+export const updateAhaBackupResponseRecordDocumentEventsItemNoteMax = 250;
+
+export const updateAhaBackupResponseRecordDocumentEventsItemFromDocumentRevisionMin = 0;
+
+export const updateAhaBackupResponseRecordDocumentEventsItemToDocumentRevisionMin = 0;
+
+
+export const updateAhaBackupResponseRecordDocumentEventsDefault = [];
+export const updateAhaBackupResponseRecordPendingCompletedUpdateOneBaselineDocumentRevisionMin = 0;
+
+export const updateAhaBackupResponseRecordPendingCompletedUpdateDefault = null;
 
 export const UpdateAhaBackupResponse = zod.object({
   "accepted": zod.boolean(),
@@ -495,6 +658,33 @@ export const UpdateAhaBackupResponse = zod.object({
   "documentRevision": zod.number().int().min(updateAhaBackupResponseRecordDocumentRevisionMin),
   "completedAt": zod.string().datetime({"offset":true}).nullable(),
   "updatedAfterCompletionAt": zod.array(zod.string().datetime({"offset":true})),
+  "documentEvents": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "kind": zod.enum(['initial_completion', 'late_worker_added', 'signature_replaced', 'worker_removed', 'safety_update', 'administrative_update']),
+  "reason": zod.enum(['initial_completion', 'late_arrival', 'wrong_person_signed', 'signature_unclear', 'worker_not_on_site', 'duplicate_entry', 'added_by_mistake', 'work_conditions_changed', 'administrative_correction']),
+  "note": zod.string().max(updateAhaBackupResponseRecordDocumentEventsItemNoteMax).nullable(),
+  "occurredAt": zod.string().datetime({"offset":true}),
+  "fromDocumentRevision": zod.number().int().min(updateAhaBackupResponseRecordDocumentEventsItemFromDocumentRevisionMin).nullable(),
+  "toDocumentRevision": zod.number().int().min(updateAhaBackupResponseRecordDocumentEventsItemToDocumentRevisionMin),
+  "affectedWorkers": zod.array(zod.object({
+  "workerId": zod.string().min(1),
+  "name": zod.string()
+})),
+  "crewReviewConfirmation": zod.union([zod.object({
+  "confirmedAt": zod.string().datetime({"offset":true}),
+  "personInChargeName": zod.string()
+}),zod.null()])
+})).default(updateAhaBackupResponseRecordDocumentEventsDefault),
+  "pendingCompletedUpdate": zod.union([zod.object({
+  "id": zod.string().min(1),
+  "startedAt": zod.string().datetime({"offset":true}),
+  "baselineDocumentRevision": zod.number().int().min(updateAhaBackupResponseRecordPendingCompletedUpdateOneBaselineDocumentRevisionMin),
+  "kind": zod.enum(['safety', 'administrative']),
+  "crewReviewConfirmation": zod.union([zod.object({
+  "confirmedAt": zod.string().datetime({"offset":true}),
+  "personInChargeName": zod.string()
+}),zod.null()])
+}),zod.null()]).default(updateAhaBackupResponseRecordPendingCompletedUpdateDefault),
   "sync": zod.object({
   "savedLocallyAt": zod.string().datetime({"offset":true}),
   "backedUpAt": zod.string().datetime({"offset":true}).nullable()
@@ -545,6 +735,7 @@ export const backupAhaPdfResponseRecordSourceRevisionMin = 0;
 
 export const BackupAhaPdfResponse = zod.object({
   "accepted": zod.boolean(),
+  "isCurrent": zod.boolean(),
   "record": zod.object({
   "ahaId": zod.string(),
   "filename": zod.string(),
@@ -555,5 +746,55 @@ export const BackupAhaPdfResponse = zod.object({
   "backedUpAt": zod.string().datetime({"offset":true})
 })
 })
+
+
+/**
+ * @summary List current and superseded PDF metadata
+ */
+
+
+
+export const ListAhaPdfVersionsParams = zod.object({
+  "ahaId": zod.coerce.string().min(1)
+})
+
+export const listAhaPdfVersionsResponseOneSourceRevisionMin = 0;
+
+
+
+
+export const ListAhaPdfVersionsResponseItem = zod.object({
+  "ahaId": zod.string(),
+  "filename": zod.string(),
+  "sourceRevision": zod.number().int().min(listAhaPdfVersionsResponseOneSourceRevisionMin),
+  "generatedAt": zod.string().datetime({"offset":true}),
+  "byteLength": zod.number().int().min(1),
+  "sha256": zod.string(),
+  "backedUpAt": zod.string().datetime({"offset":true})
+}).and(zod.object({
+  "supersededAt": zod.string().datetime({"offset":true}).nullable(),
+  "isCurrent": zod.boolean()
+}))
+export const ListAhaPdfVersionsResponse = zod.array(ListAhaPdfVersionsResponseItem)
+
+
+/**
+ * @summary Download one exact PDF version
+ */
+
+export const getAhaPdfVersionPathSourceRevisionMin = 0;
+
+
+
+export const GetAhaPdfVersionParams = zod.object({
+  "ahaId": zod.coerce.string().min(1),
+  "sourceRevision": zod.coerce.number().int().min(getAhaPdfVersionPathSourceRevisionMin)
+})
+
+export const GetAhaPdfVersionQueryParams = zod.object({
+  "generatedAt": zod.coerce.string().datetime({"offset":true})
+})
+
+export const GetAhaPdfVersionResponse = zod.unknown()
 
 

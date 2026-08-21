@@ -174,6 +174,20 @@ test("AHA validation rejects non-canonical energy examples and date drift", () =
   assert.throws(() => localDateSchema.parse("2026-02-30"));
 });
 
+test("legacy AHA payloads receive empty correction history defaults", () => {
+  const current = createBlankAha(
+    job,
+    "2026-08-18",
+    dependencies(["legacy-aha"]),
+  );
+  const legacy = { ...current } as Record<string, unknown>;
+  delete legacy.documentEvents;
+  delete legacy.pendingCompletedUpdate;
+  const parsed = ahaSchema.parse(legacy);
+  assert.deepEqual(parsed.documentEvents, []);
+  assert.equal(parsed.pendingCompletedUpdate, null);
+});
+
 test("corrupt saved records fail safely without exposing validation internals", () => {
   assert.throws(
     () => parseStoredAha({ id: "damaged" }),

@@ -13,10 +13,7 @@ import {
   useParams,
   type NavigateOptions,
 } from "react-router";
-import {
-  type Aha,
-  type Job,
-} from "@workspace/aha-domain";
+import { type Aha, type Job } from "@workspace/aha-domain";
 
 import {
   dismissPrefillBanner,
@@ -50,6 +47,7 @@ interface EditorContextValue {
   job: Job;
   metadata: DraftMetadata;
   pdf: AhaPdfState;
+  isCompletedLocked: boolean;
   editorMode: AhaEditorMode;
   editorBasePath: string;
   saveState: SaveState;
@@ -546,6 +544,24 @@ export function AhaEditorLayout() {
         message="Local storage is unavailable."
         onRetry={() => void load()}
       />
+    );
+  }
+
+  if (editorMode === "completed_update" && snapshot.isCompletedLocked) {
+    return (
+      <main className="min-h-screen bg-background px-5 py-12 text-center">
+        <h1 className="text-2xl font-bold">This AHA is read-only</h1>
+        <p className="mx-auto mt-3 max-w-md text-base font-medium text-muted-foreground">
+          A later AHA has already started for this job. Its signed checkpoint,
+          PDFs, and document history remain available.
+        </p>
+        <Button
+          className="mt-6 min-h-12"
+          onClick={() => navigate(`/ahas/${snapshot.aha.id}/completed`)}
+        >
+          Return to Completed
+        </Button>
+      </main>
     );
   }
 

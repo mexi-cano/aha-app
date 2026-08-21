@@ -2,11 +2,7 @@ import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Check, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router";
-import {
-  canStartSigning,
-  getReviewReport,
-  type Aha,
-} from "@workspace/aha-domain";
+import { canStartSigning, type Aha } from "@workspace/aha-domain";
 
 import { AppLogo } from "@/components/aha/app-logo";
 import { BackupStatus } from "@/components/aha/backup-status";
@@ -249,21 +245,7 @@ export default function Home() {
           }}
           onViewCompleted={() => {
             if (!snapshot.todayAha) return;
-            if (snapshot.todayPdfStatus === "current") {
-              navigate(`/ahas/${snapshot.todayAha.id}/pdf`, {
-                state: createPdfNavigationState("home"),
-              });
-            } else {
-              navigate(
-                !getReviewReport(snapshot.todayAha).canStartSigning
-                  ? `/ahas/${snapshot.todayAha.id}/update/review`
-                  : `/ahas/${snapshot.todayAha.id}/completed`,
-              );
-            }
-          }}
-          onUpdateCompleted={() => {
-            if (!snapshot.todayAha) return;
-            navigate(`/ahas/${snapshot.todayAha.id}/update/details`);
+            navigate(`/ahas/${snapshot.todayAha.id}/completed`);
           }}
         />
       </div>

@@ -45,12 +45,11 @@ test("Home distinguishes an unreadable preserved PDF from a missing PDF", () => 
       onOpenEditor: () => undefined,
       onResumeInProgress: () => undefined,
       onViewCompleted: () => undefined,
-      onUpdateCompleted: () => undefined,
     }),
   );
 
   assert.ok(html.includes("stored PDF cannot be opened"));
   assert.ok(html.includes("existing file was not deleted"));
-  assert.ok(html.includes("REPAIR PDF"));
+  assert.ok(html.includes("OPEN TODAY&#x27;S AHA"));
   assert.ok(!html.includes("still needs to be created"));
 });

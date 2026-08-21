@@ -18,6 +18,9 @@ import AhaDetails from "@/pages/aha-details";
 import AhaCompleted from "@/pages/aha-completed";
 import AhaEnergy from "@/pages/aha-energy";
 import AhaLateWorker from "@/pages/aha-late-worker";
+import AhaDocumentHistory from "@/pages/aha-document-history";
+import AhaCrewManagement from "@/pages/aha-crew-management";
+import AhaSignatureCorrection from "@/pages/aha-signature-correction";
 import AhaPdfView from "@/pages/aha-pdf-view";
 import AhaReview from "@/pages/aha-review";
 import AhaSigning from "@/pages/aha-signing";
@@ -85,6 +88,12 @@ function AppRoutes() {
           <Route path="completed" element={<AhaCompleted />} />
           <Route path="pdf" element={<AhaPdfView />} />
           <Route path="add-worker" element={<AhaLateWorker />} />
+          <Route path="document-history" element={<AhaDocumentHistory />} />
+          <Route path="crew" element={<AhaCrewManagement />} />
+          <Route
+            path="crew/:workerId/replace-signature"
+            element={<AhaSignatureCorrection />}
+          />
           <Route path="update/details" element={<AhaDetails />} />
           <Route path="update/work" element={<AhaWork />} />
           <Route path="update/energy" element={<AhaEnergy />} />

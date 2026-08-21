@@ -32,6 +32,13 @@ const pdfQuerySchema = z
     generatedAt: z.string().datetime(),
   })
   .strict();
+const pdfVersionParamsSchema = z.object({
+  ahaId: z.string().min(1),
+  sourceRevision: z.coerce.number().int().nonnegative(),
+});
+const pdfVersionQuerySchema = z
+  .object({ generatedAt: z.string().datetime() })
+  .strict();
 
 function pdfMetadata(record: {
   ahaId: string;
@@ -51,6 +58,22 @@ function pdfMetadata(record: {
     sha256: record.sha256,
     backedUpAt: record.backedUpAt,
   };
+}
+
+function sendPdf(
+  response: Response,
+  record: Parameters<typeof pdfMetadata>[0],
+) {
+  response
+    .set({
+      "X-AHA-Filename": encodeURIComponent(record.filename),
+      "X-AHA-Source-Revision": String(record.sourceRevision),
+      "X-AHA-Generated-At": record.generatedAt,
+      "X-Content-SHA256": record.sha256,
+      "Cache-Control": "no-store",
+    })
+    .type("application/pdf")
+    .send(record.bytes);
 }
 
 function sendBackupWriteFailure(
@@ -223,16 +246,7 @@ export function createDataRouter(
         );
         return;
       }
-      response
-        .set({
-          "X-AHA-Filename": encodeURIComponent(record.filename),
-          "X-AHA-Source-Revision": String(record.sourceRevision),
-          "X-AHA-Generated-At": record.generatedAt,
-          "X-Content-SHA256": record.sha256,
-          "Cache-Control": "no-store",
-        })
-        .type("application/pdf")
-        .send(record.bytes);
+      sendPdf(response, record);
     } catch (error) {
       request.log.error(
         { err: error instanceof Error ? { name: error.name } : undefined },
@@ -247,6 +261,72 @@ export function createDataRouter(
       );
     }
   });
+
+  router.get("/ahas/:ahaId/pdf/versions", async (request, response) => {
+    try {
+      response.json(await store.listPdfVersions(request.params.ahaId!));
+    } catch (error) {
+      request.log.error(
+        { err: error instanceof Error ? { name: error.name } : undefined },
+        "PDF version listing failed",
+      );
+      sendProblem(
+        response,
+        503,
+        "backup-unavailable",
+        "Backup unavailable",
+        "Try again later.",
+      );
+    }
+  });
+
+  router.get(
+    "/ahas/:ahaId/pdf/versions/:sourceRevision",
+    async (request, response) => {
+      const params = pdfVersionParamsSchema.safeParse(request.params);
+      const query = pdfVersionQuerySchema.safeParse(request.query);
+      if (!params.success || !query.success) {
+        sendProblem(
+          response,
+          400,
+          "invalid-pdf-version",
+          "PDF version not accepted",
+          "The requested PDF version is invalid.",
+        );
+        return;
+      }
+      try {
+        const record = await store.getPdfVersion(
+          params.data.ahaId,
+          params.data.sourceRevision,
+          query.data.generatedAt,
+        );
+        if (!record) {
+          sendProblem(
+            response,
+            404,
+            "pdf-version-not-found",
+            "PDF version not found",
+            "That saved PDF version is not available.",
+          );
+          return;
+        }
+        sendPdf(response, record);
+      } catch (error) {
+        request.log.error(
+          { err: error instanceof Error ? { name: error.name } : undefined },
+          "PDF version restore failed",
+        );
+        sendProblem(
+          response,
+          503,
+          "backup-unavailable",
+          "Backup unavailable",
+          "Try again later.",
+        );
+      }
+    },
+  );
 
   router.put("/ahas/:ahaId/pdf", async (request, response) => {
     const query = pdfQuerySchema.safeParse(request.query);
@@ -278,6 +358,7 @@ export function createDataRouter(
       });
       response.json({
         accepted: result.accepted,
+        isCurrent: result.isCurrent,
         record: pdfMetadata(result.record),
       });
     } catch (error) {

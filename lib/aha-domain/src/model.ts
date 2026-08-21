@@ -169,6 +169,73 @@ export const ahaCrewMemberSchema = z
 
 export type AhaCrewMember = z.infer<typeof ahaCrewMemberSchema>;
 
+export const ahaDocumentEventKindSchema = z.enum([
+  "initial_completion",
+  "late_worker_added",
+  "signature_replaced",
+  "worker_removed",
+  "safety_update",
+  "administrative_update",
+]);
+
+export type AhaDocumentEventKind = z.infer<typeof ahaDocumentEventKindSchema>;
+
+export const ahaDocumentEventReasonSchema = z.enum([
+  "initial_completion",
+  "late_arrival",
+  "wrong_person_signed",
+  "signature_unclear",
+  "worker_not_on_site",
+  "duplicate_entry",
+  "added_by_mistake",
+  "work_conditions_changed",
+  "administrative_correction",
+]);
+
+export type AhaDocumentEventReason = z.infer<
+  typeof ahaDocumentEventReasonSchema
+>;
+
+export const completedCrewReviewConfirmationSchema = z.object({
+  confirmedAt: z.string().datetime(),
+  personInChargeName: z.string(),
+});
+
+export type CompletedCrewReviewConfirmation = z.infer<
+  typeof completedCrewReviewConfirmationSchema
+>;
+
+export const ahaDocumentEventSchema = z.object({
+  id: z.string().min(1),
+  kind: ahaDocumentEventKindSchema,
+  reason: ahaDocumentEventReasonSchema,
+  note: z.string().max(250).nullable(),
+  occurredAt: z.string().datetime(),
+  fromDocumentRevision: z.number().int().nonnegative().nullable(),
+  toDocumentRevision: z.number().int().nonnegative(),
+  affectedWorkers: z.array(
+    z.object({
+      workerId: z.string().min(1),
+      name: z.string(),
+    }),
+  ),
+  crewReviewConfirmation: completedCrewReviewConfirmationSchema.nullable(),
+});
+
+export type AhaDocumentEvent = z.infer<typeof ahaDocumentEventSchema>;
+
+export const pendingCompletedUpdateSchema = z.object({
+  id: z.string().min(1),
+  startedAt: z.string().datetime(),
+  baselineDocumentRevision: z.number().int().nonnegative(),
+  kind: z.enum(["safety", "administrative"]),
+  crewReviewConfirmation: completedCrewReviewConfirmationSchema.nullable(),
+});
+
+export type PendingCompletedUpdate = z.infer<
+  typeof pendingCompletedUpdateSchema
+>;
+
 export const ahaSchema = z
   .object({
     id: z.string().min(1),
@@ -193,6 +260,10 @@ export const ahaSchema = z
     documentRevision: z.number().int().nonnegative().default(0),
     completedAt: z.string().datetime().nullable(),
     updatedAfterCompletionAt: z.array(z.string().datetime()),
+    documentEvents: z.array(ahaDocumentEventSchema).default([]),
+    pendingCompletedUpdate: pendingCompletedUpdateSchema
+      .nullable()
+      .default(null),
     sync: z.object({
       savedLocallyAt: z.string().datetime(),
       backedUpAt: z.string().datetime().nullable(),

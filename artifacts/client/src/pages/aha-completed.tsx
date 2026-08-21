@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
 import { Check, Home as HomeIcon } from "lucide-react";
 import { useLocation } from "react-router";
-import { getReviewReport } from "@workspace/aha-domain";
+import {
+  finalizeCompletedUpdate,
+  getReviewReport,
+} from "@workspace/aha-domain";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -10,9 +12,9 @@ import {
   PdfShareFeedback,
   usePdfShare,
 } from "@/components/aha/pdf-share";
-import { getAhaPdfState } from "@/data/aha-repository";
 import type { AhaPdfRecord } from "@/data/database";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
+import { useAhaPdfState } from "@/hooks/use-aha-pdf-state";
 import { formatEditorDate, formatTime } from "@/lib/date-format";
 import {
   PDF_FAILURE_MESSAGE,
@@ -25,12 +27,10 @@ import {
 } from "@/pdf";
 
 export default function AhaCompleted() {
-  const { aha, job, commitAha, navigateSafely } = useAhaEditor();
+  const { aha, job, commitAha, navigateSafely, isCompletedLocked } =
+    useAhaEditor();
   const location = useLocation();
-  const pdf = useLiveQuery(
-    () => getAhaPdfState(aha),
-    [aha.id, aha.documentRevision],
-  );
+  const pdf = useAhaPdfState(aha);
   const [isGenerating, setIsGenerating] = useState(false);
   const [freshlyStoredPdf, setFreshlyStoredPdf] = useState<AhaPdfRecord | null>(
     null,
@@ -46,6 +46,8 @@ export default function AhaCompleted() {
         ? freshlyStoredPdf
         : null;
   const nativePdfUrl = usePdfObjectUrl(currentPdfRecord);
+  const previousPdfRecord = pdf?.status === "stale" ? pdf.record : null;
+  const previousPdfUrl = usePdfObjectUrl(previousPdfRecord);
   const shareController = usePdfShare(currentPdfRecord);
 
   const regenerate = async () => {
@@ -54,7 +56,7 @@ export default function AhaCompleted() {
     try {
       const result = await saveAhaAndGeneratePdf({
         commitAha,
-        update: (current) => current,
+        update: (current) => finalizeCompletedUpdate(current, new Date()),
         job,
       });
       if (result.status === "fit_failed") {
@@ -93,6 +95,12 @@ export default function AhaCompleted() {
   const pdfCurrent = currentPdfRecord !== null;
   const hasUpdatedChip = aha.updatedAfterCompletionAt.length > 0;
   const pendingUpdateNeedsReview = !getReviewReport(aha).canStartSigning;
+  const pendingSafetyConfirmation =
+    aha.pendingCompletedUpdate?.kind === "safety" &&
+    !aha.pendingCompletedUpdate.crewReviewConfirmation;
+  const hasPendingCompletedUpdate = Boolean(aha.pendingCompletedUpdate);
+  const correctionActionsDisabled =
+    isCompletedLocked || !pdfCurrent || Boolean(aha.pendingCompletedUpdate);
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -155,7 +163,7 @@ export default function AhaCompleted() {
               className="min-h-[72px] w-full rounded-[14px] text-xl font-bold tracking-wide"
             >
               <a href={nativePdfUrl} target="_blank" rel="noopener noreferrer">
-                VIEW PDF
+                VIEW CURRENT PDF
               </a>
             </Button>
           ) : (
@@ -163,7 +171,7 @@ export default function AhaCompleted() {
               className="min-h-[72px] w-full rounded-[14px] text-xl font-bold tracking-wide"
               onClick={() => void navigateSafely(`/ahas/${aha.id}/pdf`)}
             >
-              VIEW PDF
+              VIEW CURRENT PDF
             </Button>
           )
         ) : fitIssues.length === 0 ? (
@@ -180,24 +188,40 @@ export default function AhaCompleted() {
               </p>
             ) : pdf?.status === "stale" ? (
               <p className="mt-2 text-sm font-medium text-warning-foreground">
-                The saved PDF is out of date and will not be shown as current.
+                The previous PDF is preserved but does not include the saved
+                update.
               </p>
             ) : null}
             <Button
               className="mt-4 min-h-14 w-full text-lg font-bold"
               disabled={isGenerating}
               onClick={() =>
-                pendingUpdateNeedsReview
+                pendingUpdateNeedsReview || pendingSafetyConfirmation
                   ? void navigateSafely(`/ahas/${aha.id}/update/review`)
                   : void regenerate()
               }
             >
               {isGenerating
                 ? "CREATING PDF…"
-                : pendingUpdateNeedsReview
-                  ? "REVIEW UPDATE"
+                : hasPendingCompletedUpdate
+                  ? "FINISH SAVED UPDATE"
                   : "TRY AGAIN"}
             </Button>
+            {previousPdfRecord && previousPdfUrl ? (
+              <Button
+                asChild
+                variant="outline"
+                className="mt-3 min-h-12 w-full border-warning/40 bg-card text-warning-foreground"
+              >
+                <a
+                  href={previousPdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  VIEW PREVIOUS PDF
+                </a>
+              </Button>
+            ) : null}
           </section>
         ) : null}
 
@@ -260,20 +284,47 @@ export default function AhaCompleted() {
           </p>
         </div>
         <PdfShareFeedback controller={shareController} />
+        {isCompletedLocked ? (
+          <section className="rounded-xl border border-card-border bg-card px-4 py-4 text-center">
+            <p className="font-bold">This AHA is now read-only.</p>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">
+              A later AHA has been started for this job. The PDF and document
+              history remain available.
+            </p>
+          </section>
+        ) : null}
         <Button
           variant="outline"
           className="min-h-14 w-full border-[#C6CDE8] text-[17px] text-primary"
-          onClick={() => void navigateSafely(`/ahas/${aha.id}/update/details`)}
+          disabled={correctionActionsDisabled}
+          onClick={() => void navigateSafely(`/ahas/${aha.id}/crew`)}
         >
-          Update today's AHA
+          Manage crew &amp; signatures
         </Button>
         <Button
           variant="outline"
           className="min-h-14 w-full border-[#C6CDE8] text-[17px] text-primary"
-          disabled={aha.crew.length >= 10}
+          disabled={correctionActionsDisabled || aha.crew.length >= 10}
           onClick={() => void navigateSafely(`/ahas/${aha.id}/add-worker`)}
         >
-          + Add worker &amp; sign
+          Add late worker
+        </Button>
+        <Button
+          variant="outline"
+          className="min-h-14 w-full border-[#C6CDE8] text-[17px] text-primary"
+          disabled={correctionActionsDisabled}
+          onClick={() => void navigateSafely(`/ahas/${aha.id}/update/details`)}
+        >
+          Update work or hazards
+        </Button>
+        <Button
+          variant="outline"
+          className="min-h-14 w-full border-[#C6CDE8] text-[17px] text-primary"
+          onClick={() =>
+            void navigateSafely(`/ahas/${aha.id}/document-history`)
+          }
+        >
+          Document history
         </Button>
         {aha.crew.length >= 10 ? (
           <p className="text-center text-sm font-semibold text-muted-foreground">

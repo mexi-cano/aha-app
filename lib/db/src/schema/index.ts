@@ -5,6 +5,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -76,6 +77,39 @@ export const ahaPdfsTable = pgTable("aha_pdfs", {
   backedUpAt: backedUpAtColumn(),
 });
 
+export const ahaPdfRevisionsTable = pgTable(
+  "aha_pdf_revisions",
+  {
+    ahaId: text("aha_id")
+      .notNull()
+      .references(() => ahasTable.id),
+    filename: text("filename").notNull(),
+    sourceRevision: integer("source_revision").notNull(),
+    generatedAt: timestamp("generated_at", {
+      withTimezone: true,
+      mode: "string",
+    }).notNull(),
+    bytes: bytea("bytes").notNull(),
+    byteLength: integer("byte_length").notNull(),
+    sha256: text("sha256").notNull(),
+    backedUpAt: backedUpAtColumn(),
+    supersededAt: timestamp("superseded_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      name: "aha_pdf_revisions_pk",
+      columns: [table.ahaId, table.sourceRevision, table.generatedAt],
+    }),
+    index("aha_pdf_revisions_history_idx").on(table.ahaId, table.generatedAt),
+  ],
+);
+
 export type JobRow = typeof jobsTable.$inferSelect;
 export type AhaRow = typeof ahasTable.$inferSelect;
 export type AhaPdfRow = typeof ahaPdfsTable.$inferSelect;
+export type AhaPdfRevisionRow = typeof ahaPdfRevisionsTable.$inferSelect;

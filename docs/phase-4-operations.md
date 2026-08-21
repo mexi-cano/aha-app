@@ -43,13 +43,16 @@ pnpm --filter @workspace/db run migrate
 ```
 
 The second run validates the already-migrated/idempotent state. Inspect the
-three tables and exercise backup/restore before pilot approval.
+four application tables (`jobs`, `ahas`, `aha_pdfs`, and
+`aha_pdf_revisions`) and exercise backup/restore before pilot approval. If
+preview data must be retained, create an isolated Neon branch before running
+evidence-version tests; otherwise use the existing `its-aha-preview` project.
 
-After the Phase 4 PR merges, create the permanent `its-aha-production` Neon
-project with its own root branch. Keep the Replit Project Editor connected to
-preview. To migrate production without replacing the preview connection, add a
-temporary Project Editor secret named `PRODUCTION_DATABASE_URL`, run both
-verified migration passes, and then remove that temporary secret:
+Before a production migration, create a Neon recovery point or isolated
+recovery branch. Keep the Replit Project Editor connected to preview. To
+migrate production without replacing the preview connection, add a temporary
+Project Editor secret named `PRODUCTION_DATABASE_URL`, run both verified
+migration passes, and then remove that temporary secret:
 
 ```sh
 DATABASE_URL="$PRODUCTION_DATABASE_URL" pnpm --filter @workspace/db run migrate
@@ -64,9 +67,42 @@ Do not use `push` against production.
 The repository-owned `migrate` runner resolves the checked-in migration folder
 from its own module location rather than the shell working directory. It exits
 successfully only after verifying that the non-empty journal is represented in
-`drizzle.__drizzle_migrations` and that `jobs`, `ahas`, and `aha_pdfs` exist.
+`drizzle.__drizzle_migrations` and that `jobs`, `ahas`, `aha_pdfs`, and
+`aha_pdf_revisions` exist.
 Treat any other result as a failed migration; do not rely on a CLI success
 message without this verification.
+
+## PDF evidence storage review
+
+Run this read-only query monthly during the ITS pilot. Keep the result with the
+release operations record, and configure capacity alerts using the subscribed
+Neon plan's storage limits. Do not automatically delete evidence before ITS
+adopts a legal and insurance retention policy.
+
+```sql
+select
+  'current' as storage_class,
+  count(*) as pdf_count,
+  coalesce(sum(byte_length), 0) as total_bytes,
+  coalesce(avg(byte_length), 0)::bigint as average_bytes,
+  coalesce(max(byte_length), 0) as maximum_bytes
+from aha_pdfs
+union all
+select
+  'superseded' as storage_class,
+  count(*) as pdf_count,
+  coalesce(sum(byte_length), 0) as total_bytes,
+  coalesce(avg(byte_length), 0)::bigint as average_bytes,
+  coalesce(max(byte_length), 0) as maximum_bytes
+from aha_pdf_revisions;
+```
+
+Preview evidence validation must prove, in order: current upload; newer upload
+with prior-current archival; older out-of-order upload; exact retry; checksum
+conflict returning 409 without a row change; current/history metadata listing;
+exact historical download; and empty-device restore with lazy historical-byte
+download. Run the checked-in migration a second time after this test. Do not
+connect a local or preview build to `its-aha-production`.
 
 ## Production recovery points
 
@@ -102,6 +138,8 @@ obsolete-cache cleanup; and prompt-only service-worker activation.
 Record evidence, not secrets or payloads, for:
 
 - migration generation, preview first migration, and second no-op migration;
+- current/history PDF counts, newer and out-of-order uploads, idempotent retry,
+  integrity-conflict rollback, exact historical download, and lazy restore;
 - wrong/right access code, five-failure rate limit, token tamper/expiry, and
   immediate invalidation after access-code rotation;
 - offline job/AHA/PDF queueing, reconnect processing, interruption/retry, 401

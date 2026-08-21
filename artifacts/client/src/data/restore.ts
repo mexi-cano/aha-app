@@ -12,12 +12,23 @@ import {
 
 import { getStoredAuthToken } from "./auth-storage";
 import {
+  AUTHORIZATION_REQUIRED_EVENT,
+  parseRestoredPdfMetadata,
+  sha256Hex,
+} from "./pdf-backup-metadata";
+import { refreshPdfVersionMetadata } from "./pdf-version-repository";
+import {
   ahaDatabase,
   RESTORE_NEEDS_JOB_CHOICE_SETTING,
   RESTORE_PROGRESS_SETTING,
 } from "./database";
 
-export const AUTHORIZATION_REQUIRED_EVENT = "aha-authorization-required";
+export {
+  AUTHORIZATION_REQUIRED_EVENT,
+  parseRemotePdfVersionMetadata,
+  parseRestoredPdfMetadata,
+  sha256Hex,
+} from "./pdf-backup-metadata";
 
 export interface RestoreProgress {
   version: 1;
@@ -103,56 +114,6 @@ async function authenticatedPdfFetch(ahaId: string): Promise<Response> {
   return response;
 }
 
-async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("");
-}
-
-export function parseRestoredPdfMetadata(
-  headers: Headers,
-  computedChecksum: string,
-): {
-  filename: string;
-  sourceRevision: number;
-  generatedAt: string;
-} {
-  const expectedChecksum = headers.get("X-Content-SHA256")?.trim();
-  if (
-    !expectedChecksum ||
-    !/^[a-f0-9]{64}$/i.test(expectedChecksum) ||
-    computedChecksum.toLowerCase() !== expectedChecksum.toLowerCase()
-  ) {
-    throw new Error("A restored PDF did not pass its checksum check.");
-  }
-
-  const filenameHeader = headers.get("X-AHA-Filename");
-  const revisionHeader = headers.get("X-AHA-Source-Revision");
-  const generatedAt = headers.get("X-AHA-Generated-At");
-  const sourceRevision =
-    revisionHeader === null ? Number.NaN : Number(revisionHeader);
-  if (
-    !filenameHeader ||
-    !Number.isInteger(sourceRevision) ||
-    sourceRevision < 0 ||
-    !generatedAt ||
-    Number.isNaN(Date.parse(generatedAt))
-  ) {
-    throw new Error("A restored PDF has invalid metadata.");
-  }
-
-  let filename: string;
-  try {
-    filename = decodeURIComponent(filenameHeader);
-  } catch {
-    throw new Error("A restored PDF has invalid metadata.");
-  }
-  if (!filename) throw new Error("A restored PDF has invalid metadata.");
-
-  return { filename, sourceRevision, generatedAt };
-}
-
 async function restorePdf(ahaId: string): Promise<void> {
   const response = await authenticatedPdfFetch(ahaId);
   if (response.status === 404) return;
@@ -224,6 +185,7 @@ export async function resumeRestore(
       `Restoring saved PDFs (${index + 1} of ${progress.ahaIds.length})…`,
     );
     await restorePdf(progress.ahaIds[index]!);
+    await refreshPdfVersionMetadata(progress.ahaIds[index]!);
     progress = { ...progress, pdfIndex: index + 1 };
     await saveProgress(progress);
   }

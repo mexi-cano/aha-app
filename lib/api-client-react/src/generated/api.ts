@@ -27,11 +27,13 @@ import type {
   AuthResponse,
   BackupAhaPdfParams,
   DbHealthStatus,
+  GetAhaPdfVersionParams,
   HealthStatus,
   JobBackupRecord,
   JobBackupRequest,
   JobWriteResult,
   ListAhasParams,
+  PdfVersionMetadata,
   PdfWriteResult,
   ProblemResponse
 } from './api.schemas';
@@ -133,13 +135,6 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
   return withQueryKey(query, queryOptions.queryKey);
 }
-
-
-
-
-
-
-
 export const getHealthCheckDbUrl = () => {
 
 
@@ -210,12 +205,6 @@ export function useHealthCheckDb<TData = Awaited<ReturnType<typeof healthCheckDb
 
   return withQueryKey(query, queryOptions.queryKey);
 }
-
-
-
-
-
-
 
 export const getAuthenticateUrl = () => {
 
@@ -358,13 +347,6 @@ export function useListJobs<TData = Awaited<ReturnType<typeof listJobs>>, TError
 
   return withQueryKey(query, queryOptions.queryKey);
 }
-
-
-
-
-
-
-
 export const getBackupJobUrl = () => {
 
 
@@ -513,13 +495,6 @@ export function useListAhas<TData = Awaited<ReturnType<typeof listAhas>>, TError
 
   return withQueryKey(query, queryOptions.queryKey);
 }
-
-
-
-
-
-
-
 export const getBackupAhaUrl = () => {
 
 
@@ -820,4 +795,169 @@ export const useBackupAhaPdf = <TError = ErrorType<ProblemResponse>,
       > => {
       return useMutation(getBackupAhaPdfMutationOptions(options));
     }
+
+export const getListAhaPdfVersionsUrl = (ahaId: string,) => {
+
+
+
+
+  return `/api/ahas/${ahaId}/pdf/versions`
+}
+
+/**
+ * @summary List current and superseded PDF metadata
+ */
+export const listAhaPdfVersions = async (ahaId: string, options?: Parameters<typeof customFetch>[1]): Promise<PdfVersionMetadata[]> => {
+
+  return customFetch<PdfVersionMetadata[]>(getListAhaPdfVersionsUrl(ahaId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAhaPdfVersionsQueryKey = (ahaId: string,) => {
+    return [
+    `/api/ahas/${ahaId}/pdf/versions`
+    ] as const;
+    }
+
+
+export const getListAhaPdfVersionsQueryOptions = <TData = Awaited<ReturnType<typeof listAhaPdfVersions>>, TError = ErrorType<ProblemResponse>>(ahaId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAhaPdfVersions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAhaPdfVersionsQueryKey(ahaId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAhaPdfVersions>>> = ({ signal }) => listAhaPdfVersions(ahaId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: ahaId !== null && ahaId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAhaPdfVersions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAhaPdfVersionsQueryResult = NonNullable<Awaited<ReturnType<typeof listAhaPdfVersions>>>
+export type ListAhaPdfVersionsQueryError = ErrorType<ProblemResponse>
+
+
+/**
+ * @summary List current and superseded PDF metadata
+ */
+
+export function useListAhaPdfVersions<TData = Awaited<ReturnType<typeof listAhaPdfVersions>>, TError = ErrorType<ProblemResponse>>(
+ ahaId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAhaPdfVersions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAhaPdfVersionsQueryOptions(ahaId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAhaPdfVersionUrl = (ahaId: string,
+    sourceRevision: number,
+    params: GetAhaPdfVersionParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/ahas/${ahaId}/pdf/versions/${sourceRevision}?${stringifiedParams}` : `/api/ahas/${ahaId}/pdf/versions/${sourceRevision}`
+}
+
+/**
+ * @summary Download one exact PDF version
+ */
+export const getAhaPdfVersion = async (ahaId: string,
+    sourceRevision: number,
+    params: GetAhaPdfVersionParams, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetAhaPdfVersionUrl(ahaId,sourceRevision,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAhaPdfVersionQueryKey = (ahaId: string,
+    sourceRevision: number,
+    params?: GetAhaPdfVersionParams,) => {
+    return [
+    `/api/ahas/${ahaId}/pdf/versions/${sourceRevision}`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAhaPdfVersionQueryOptions = <TData = Awaited<ReturnType<typeof getAhaPdfVersion>>, TError = ErrorType<ProblemResponse>>(ahaId: string,
+    sourceRevision: number,
+    params: GetAhaPdfVersionParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAhaPdfVersion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAhaPdfVersionQueryKey(ahaId,sourceRevision,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAhaPdfVersion>>> = ({ signal }) => getAhaPdfVersion(ahaId,sourceRevision,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: ahaId !== null && ahaId !== undefined && sourceRevision !== null && sourceRevision !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAhaPdfVersion>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAhaPdfVersionQueryResult = NonNullable<Awaited<ReturnType<typeof getAhaPdfVersion>>>
+export type GetAhaPdfVersionQueryError = ErrorType<ProblemResponse>
+
+
+/**
+ * @summary Download one exact PDF version
+ */
+
+export function useGetAhaPdfVersion<TData = Awaited<ReturnType<typeof getAhaPdfVersion>>, TError = ErrorType<ProblemResponse>>(
+ ahaId: string,
+    sourceRevision: number,
+    params: GetAhaPdfVersionParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAhaPdfVersion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAhaPdfVersionQueryOptions(ahaId,sourceRevision,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
 

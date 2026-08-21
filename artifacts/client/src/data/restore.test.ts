@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseRestoredPdfMetadata } from "./restore";
+import {
+  parseRemotePdfVersionMetadata,
+  parseRestoredPdfMetadata,
+} from "./restore";
 
 const checksum = "ab".repeat(32);
 
@@ -50,5 +53,24 @@ test("restored PDF metadata rejects a well-formed mismatched checksum", () => {
         checksum,
       ),
     /checksum check/,
+  );
+});
+
+test("remote PDF history metadata requires checksums and valid version identity", () => {
+  const value = {
+    ahaId: "aha-1",
+    filename: "AHA_Test.pdf",
+    sourceRevision: 3,
+    generatedAt: "2026-08-20T12:00:00.000Z",
+    byteLength: 1024,
+    sha256: checksum,
+    backedUpAt: "2026-08-20T12:00:01.000Z",
+    supersededAt: "2026-08-20T13:00:00.000Z",
+    isCurrent: false,
+  };
+  assert.deepEqual(parseRemotePdfVersionMetadata(value), value);
+  assert.throws(
+    () => parseRemotePdfVersionMetadata({ ...value, sha256: "bad" }),
+    /history is invalid/,
   );
 });

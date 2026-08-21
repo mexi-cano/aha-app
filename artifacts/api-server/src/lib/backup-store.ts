@@ -37,6 +37,24 @@ export interface PdfBackupRecord extends PdfBackupInput {
   backedUpAt: string;
 }
 
+export interface PdfVersionMetadata {
+  ahaId: string;
+  filename: string;
+  sourceRevision: number;
+  generatedAt: string;
+  byteLength: number;
+  sha256: string;
+  backedUpAt: string;
+  supersededAt: string | null;
+  isCurrent: boolean;
+}
+
+export interface PdfBackupWriteResult {
+  accepted: boolean;
+  isCurrent: boolean;
+  record: PdfBackupRecord;
+}
+
 export interface BackupStore {
   listJobs(): Promise<JobBackupRecord[]>;
   putJob(
@@ -46,7 +64,13 @@ export interface BackupStore {
   listAhas(cursor: string | null, limit: number): Promise<AhaPage>;
   putAha(aha: Aha): Promise<BackupWriteResult<Aha>>;
   getPdf(ahaId: string): Promise<PdfBackupRecord | null>;
-  putPdf(input: PdfBackupInput): Promise<BackupWriteResult<PdfBackupRecord>>;
+  listPdfVersions(ahaId: string): Promise<PdfVersionMetadata[]>;
+  getPdfVersion(
+    ahaId: string,
+    sourceRevision: number,
+    generatedAt: string,
+  ): Promise<PdfBackupRecord | null>;
+  putPdf(input: PdfBackupInput): Promise<PdfBackupWriteResult>;
 }
 
 interface RestoreCursor {
@@ -133,6 +157,32 @@ function asPdfRecord(row: {
     bytes: row.bytes,
     sha256: row.sha256,
     backedUpAt: row.backedUpAt,
+  };
+}
+
+function asPdfVersionMetadata(
+  row: {
+    ahaId: string;
+    filename: string;
+    sourceRevision: number;
+    generatedAt: string;
+    byteLength: number;
+    sha256: string;
+    backedUpAt: string;
+    supersededAt?: string | null;
+  },
+  isCurrent: boolean,
+): PdfVersionMetadata {
+  return {
+    ahaId: row.ahaId,
+    filename: row.filename,
+    sourceRevision: row.sourceRevision,
+    generatedAt: row.generatedAt,
+    byteLength: row.byteLength,
+    sha256: row.sha256,
+    backedUpAt: row.backedUpAt,
+    supersededAt: row.supersededAt ?? null,
+    isCurrent,
   };
 }
 
@@ -286,51 +336,90 @@ export function createNeonBackupStore(): BackupStore {
       return row ? asPdfRecord(row) : null;
     },
 
+    async listPdfVersions(ahaId) {
+      const { db, ahaPdfRevisionsTable, ahaPdfsTable } =
+        await import("@workspace/db");
+      const [currentRows, revisionRows] = await Promise.all([
+        db
+          .select()
+          .from(ahaPdfsTable)
+          .where(eq(ahaPdfsTable.ahaId, ahaId))
+          .limit(1),
+        db
+          .select()
+          .from(ahaPdfRevisionsTable)
+          .where(eq(ahaPdfRevisionsTable.ahaId, ahaId)),
+      ]);
+      return [
+        ...currentRows.map((row) => asPdfVersionMetadata(row, true)),
+        ...revisionRows.map((row) => asPdfVersionMetadata(row, false)),
+      ].sort(
+        (left, right) =>
+          right.sourceRevision - left.sourceRevision ||
+          Date.parse(right.generatedAt) - Date.parse(left.generatedAt),
+      );
+    },
+
+    async getPdfVersion(ahaId, sourceRevision, generatedAt) {
+      const { db, ahaPdfRevisionsTable, ahaPdfsTable } =
+        await import("@workspace/db");
+      const current = (
+        await db
+          .select()
+          .from(ahaPdfsTable)
+          .where(
+            and(
+              eq(ahaPdfsTable.ahaId, ahaId),
+              eq(ahaPdfsTable.sourceRevision, sourceRevision),
+              eq(ahaPdfsTable.generatedAt, generatedAt),
+            ),
+          )
+          .limit(1)
+      )[0];
+      if (current) return asPdfRecord(current);
+      const revision = (
+        await db
+          .select()
+          .from(ahaPdfRevisionsTable)
+          .where(
+            and(
+              eq(ahaPdfRevisionsTable.ahaId, ahaId),
+              eq(ahaPdfRevisionsTable.sourceRevision, sourceRevision),
+              eq(ahaPdfRevisionsTable.generatedAt, generatedAt),
+            ),
+          )
+          .limit(1)
+      )[0];
+      return revision ? asPdfRecord(revision) : null;
+    },
+
     async putPdf(input) {
-      const { db, ahaPdfsTable } = await import("@workspace/db");
+      const { sql: neonSql } = await import("@workspace/db");
       const acceptedAt = new Date().toISOString();
-      let rows;
       try {
-        rows = await db
-          .insert(ahaPdfsTable)
-          .values({
-            ahaId: input.ahaId,
-            filename: input.filename,
-            sourceRevision: input.sourceRevision,
-            generatedAt: input.generatedAt,
-            bytes: input.bytes,
-            byteLength: input.bytes.byteLength,
-            sha256: input.sha256,
+        const outcomeRows = await neonSql`
+          select store_aha_pdf_version(
+            ${input.ahaId}, ${input.filename}, ${input.sourceRevision},
+            ${input.generatedAt}, ${input.bytes}, ${input.bytes.byteLength},
+            ${input.sha256}, ${acceptedAt}
+          ) as "isCurrent"
+        `;
+        const outcome = outcomeRows[0] as { isCurrent: boolean } | undefined;
+        if (!outcome) {
+          throw new BackupConstraintError({ code: "pdf-version-conflict" });
+        }
+        return {
+          accepted: true,
+          isCurrent: outcome.isCurrent,
+          record: {
+            ...input,
             backedUpAt: acceptedAt,
-          })
-          .onConflictDoUpdate({
-            target: ahaPdfsTable.ahaId,
-            set: {
-              filename: input.filename,
-              sourceRevision: input.sourceRevision,
-              generatedAt: input.generatedAt,
-              bytes: input.bytes,
-              byteLength: input.bytes.byteLength,
-              sha256: input.sha256,
-              backedUpAt: acceptedAt,
-            },
-            setWhere: lte(ahaPdfsTable.generatedAt, input.generatedAt),
-          })
-          .returning();
+          },
+        };
       } catch (error) {
+        if (error instanceof BackupConstraintError) throw error;
         throw translateBackupStoreError(error);
       }
-      const accepted = rows.length > 0;
-      const row =
-        rows[0] ??
-        (
-          await db
-            .select()
-            .from(ahaPdfsTable)
-            .where(eq(ahaPdfsTable.ahaId, input.ahaId))
-            .limit(1)
-        )[0]!;
-      return { accepted, record: asPdfRecord(row) };
     },
   };
 }

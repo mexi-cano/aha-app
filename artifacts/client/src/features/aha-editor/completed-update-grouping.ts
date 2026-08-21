@@ -1,10 +1,6 @@
 import { applyAhaMutationRules, type Aha } from "@workspace/aha-domain";
 
-import {
-  deriveAhaPdfState,
-  hasRecordedCompletedUpdateSincePdf,
-  type AhaPdfState,
-} from "@/data/aha-repository";
+import { deriveAhaPdfState, type AhaPdfState } from "@/data/aha-repository";
 
 export type AhaEditorMode = "initial" | "completed_update";
 
@@ -25,9 +21,10 @@ export function applyEditorMutationRules(
 
   return applyAhaMutationRules(current, next, {
     recordCompletedUpdateAt:
-      editorMode === "completed_update" &&
-      !hasRecordedCompletedUpdateSincePdf(current, currentPdfState)
+      editorMode === "completed_update" && !current.pendingCompletedUpdate
         ? now
         : undefined,
+    completedUpdateBaselineRevision:
+      currentPdfState.record?.sourceRevision ?? current.documentRevision,
   });
 }

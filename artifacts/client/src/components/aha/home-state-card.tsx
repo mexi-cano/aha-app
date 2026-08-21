@@ -3,7 +3,6 @@ import {
   canFinishAha,
   canStartSigning,
   countSignedCrew,
-  getReviewReport,
   type Aha,
 } from "@workspace/aha-domain";
 
@@ -19,7 +18,6 @@ interface HomeStateCardProps {
   onOpenEditor: () => void;
   onResumeInProgress: () => void;
   onViewCompleted: () => void;
-  onUpdateCompleted: () => void;
 }
 
 export function HomeStateCard({
@@ -31,7 +29,6 @@ export function HomeStateCard({
   onOpenEditor,
   onResumeInProgress,
   onViewCompleted,
-  onUpdateCompleted,
 }: HomeStateCardProps) {
   if (!todayAha) {
     return (
@@ -126,27 +123,14 @@ export function HomeStateCard({
           ? "The completed AHA and current PDF are saved on this iPad."
           : todayPdfStatus === "unreadable"
             ? "The AHA is saved, but its stored PDF cannot be opened. The existing file was not deleted."
-          : "The AHA is saved. Its current PDF still needs to be created."}
+            : "The AHA is saved. Its current PDF still needs to be created."}
       </p>
       <div className="mt-7 flex flex-col gap-3">
         <Button
           className="min-h-[72px] w-full rounded-[14px] text-xl font-bold tracking-wide"
           onClick={onViewCompleted}
         >
-          {todayPdfStatus === "current"
-            ? "VIEW AHA"
-            : todayPdfStatus === "unreadable"
-              ? "REPAIR PDF"
-            : getReviewReport(todayAha).canStartSigning
-              ? "FINISH PDF"
-              : "FINISH UPDATE"}
-        </Button>
-        <Button
-          variant="outline"
-          className="min-h-14 w-full border-[#C6CDE8] text-[17px] text-primary"
-          onClick={onUpdateCompleted}
-        >
-          Update today's AHA
+          OPEN TODAY'S AHA
         </Button>
       </div>
     </section>

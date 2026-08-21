@@ -7,6 +7,7 @@ import { ApiError, customFetch } from "@workspace/api-client-react";
 
 import { getStoredAuthToken } from "./auth-storage";
 import {
+  ahaPdfRevisionKey,
   ahaDatabase,
   type BackupEntityKind,
   type BackupQueueItem,
@@ -34,7 +35,7 @@ export interface BackupSnapshot {
 export class LocalBackupRecordError extends Error {
   readonly name = "LocalBackupRecordError";
 
-  constructor(kind: "job" | "aha", cause: unknown) {
+  constructor(kind: "job" | "aha" | "pdf", cause: unknown) {
     super(`A saved ${kind} could not be prepared for backup.`, { cause });
   }
 }
@@ -104,16 +105,12 @@ export async function selectNextBackupItem(
 ): Promise<BackupQueueItem | null> {
   const rejectedJobIds = new Set(
     items
-      .filter(
-        (item) => item.kind === "job" && item.lastFailure === "rejected",
-      )
+      .filter((item) => item.kind === "job" && item.lastFailure === "rejected")
       .map((item) => item.entityId),
   );
   const rejectedAhaIds = new Set(
     items
-      .filter(
-        (item) => item.kind === "aha" && item.lastFailure === "rejected",
-      )
+      .filter((item) => item.kind === "aha" && item.lastFailure === "rejected")
       .map((item) => item.entityId),
   );
 
@@ -183,6 +180,7 @@ export async function getBackupSnapshot(): Promise<BackupSnapshot> {
 async function upload(item: BackupQueueItem): Promise<{
   accepted: boolean;
   backedUpAt: string;
+  pdfMetadata?: { sha256: string; byteLength: number };
 }> {
   if (item.kind === "job") {
     const value = await ahaDatabase.jobs.get(item.entityId);
@@ -218,7 +216,24 @@ async function upload(item: BackupQueueItem): Promise<{
     };
   }
 
-  const value = await ahaDatabase.ahaPdfs.get(item.entityId);
+  if (!Number.isInteger(item.sourceRevision) || !item.generatedAt) {
+    throw new LocalBackupRecordError(
+      "pdf",
+      new Error("The queued PDF version identity is missing."),
+    );
+  }
+  const current = await ahaDatabase.ahaPdfs.get(item.entityId);
+  const revision = await ahaDatabase.ahaPdfRevisions.get(
+    ahaPdfRevisionKey(item.entityId, item.sourceRevision!, item.generatedAt),
+  );
+  const value =
+    current &&
+    current.sourceRevision === item.sourceRevision &&
+    current.generatedAt === item.generatedAt
+      ? current
+      : revision?.bytes
+        ? { ...revision, bytes: revision.bytes }
+        : null;
   if (!value) return { accepted: true, backedUpAt: new Date().toISOString() };
   const query = new URLSearchParams({
     filename: value.filename,
@@ -227,24 +242,33 @@ async function upload(item: BackupQueueItem): Promise<{
   });
   const result = await customFetch<{
     accepted: boolean;
-    record: { backedUpAt: string };
+    record: { backedUpAt: string; sha256: string; byteLength: number };
   }>(`/api/ahas/${encodeURIComponent(item.entityId)}/pdf?${query}`, {
     method: "PUT",
     responseType: "json",
     headers: { "Content-Type": "application/pdf" },
     body: value.bytes,
   });
-  return { accepted: result.accepted, backedUpAt: result.record.backedUpAt };
+  return {
+    accepted: result.accepted,
+    backedUpAt: result.record.backedUpAt,
+    pdfMetadata: {
+      sha256: result.record.sha256,
+      byteLength: result.record.byteLength,
+    },
+  };
 }
 
 async function acknowledge(
   captured: BackupQueueItem,
   backedUpAt: string,
+  pdfMetadata?: { sha256: string; byteLength: number },
 ): Promise<void> {
   await ahaDatabase.transaction(
     "rw",
     ahaDatabase.backupQueue,
     ahaDatabase.ahas,
+    ahaDatabase.ahaPdfRevisions,
     ahaDatabase.settings,
     async () => {
       const current = await ahaDatabase.backupQueue.get(captured.key);
@@ -263,6 +287,26 @@ async function acknowledge(
               }),
             );
           }
+        }
+      } else if (
+        captured.kind === "pdf" &&
+        Number.isInteger(captured.sourceRevision) &&
+        captured.generatedAt &&
+        pdfMetadata
+      ) {
+        const key = ahaPdfRevisionKey(
+          captured.entityId,
+          captured.sourceRevision!,
+          captured.generatedAt,
+        );
+        const revision = await ahaDatabase.ahaPdfRevisions.get(key);
+        if (revision) {
+          await ahaDatabase.ahaPdfRevisions.put({
+            ...revision,
+            backedUpAt,
+            sha256: pdfMetadata.sha256,
+            byteLength: pdfMetadata.byteLength,
+          });
         }
       }
       await ahaDatabase.backupQueue.delete(captured.key);
@@ -336,7 +380,7 @@ async function run(): Promise<void> {
           await retainFailure(item, "rejected", 409);
           continue;
         }
-        await acknowledge(item, result.backedUpAt);
+        await acknowledge(item, result.backedUpAt, result.pdfMetadata);
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) {
           await ahaDatabase.settings.put({

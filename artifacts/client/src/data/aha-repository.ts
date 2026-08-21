@@ -2,6 +2,7 @@ import Dexie from "dexie";
 import {
   ahaSchema,
   createBlankAha,
+  isCompletedAhaLocked,
   parseStoredAha,
   parseStoredJob,
   planStartToday,
@@ -12,11 +13,13 @@ import {
 
 import {
   ACTIVE_JOB_SETTING,
+  ahaPdfRevisionKey,
   ahaDatabase,
   createBackupQueueItem,
   ensureLaterTimestamp,
   RESTORE_NEEDS_JOB_CHOICE_SETTING,
   type AhaPdfRecord,
+  type AhaPdfRevisionRecord,
 } from "./database";
 import {
   createBlankDraftMetadata,
@@ -70,6 +73,7 @@ export interface EditorSnapshot {
   aha: Aha;
   metadata: DraftMetadata;
   pdf: AhaPdfState;
+  isCompletedLocked: boolean;
 }
 
 export type AhaPdfStatus = "missing" | "stale" | "current" | "unreadable";
@@ -307,6 +311,10 @@ export async function getEditorSnapshot(
     throw new Error("The job for this AHA is missing.");
   }
 
+  const { records: jobAhas } = partitionReadableAhas(
+    await ahaDatabase.ahas.where("jobId").equals(aha.jobId).toArray(),
+  );
+
   return {
     aha,
     job: parseStoredJob(jobRecord),
@@ -314,6 +322,7 @@ export async function getEditorSnapshot(
       (await ahaDatabase.draftMetadata.get(ahaId)) ??
       createBlankDraftMetadata(ahaId),
     pdf: await getAhaPdfState(aha),
+    isCompletedLocked: isCompletedAhaLocked(aha, jobAhas),
   };
 }
 
@@ -381,6 +390,7 @@ export async function storeAhaPdf(
   await ahaDatabase.transaction(
     "rw",
     ahaDatabase.ahaPdfs,
+    ahaDatabase.ahaPdfRevisions,
     ahaDatabase.backupQueue,
     async () => {
       const previous = await ahaDatabase.ahaPdfs.get(aha.id);
@@ -392,10 +402,42 @@ export async function storeAhaPdf(
             previous.generatedAt,
           ),
         };
+        const archived: AhaPdfRevisionRecord = {
+          key: ahaPdfRevisionKey(
+            previous.ahaId,
+            previous.sourceRevision,
+            previous.generatedAt,
+          ),
+          ahaId: previous.ahaId,
+          filename: previous.filename,
+          bytes: previous.bytes,
+          generatedAt: previous.generatedAt,
+          sourceRevision: previous.sourceRevision,
+          byteLength: previous.bytes.byteLength,
+          sha256: null,
+          backedUpAt: null,
+          supersededAt: record.generatedAt,
+        };
+        await ahaDatabase.ahaPdfRevisions.put(archived);
+        await ahaDatabase.backupQueue.put(
+          createBackupQueueItem(
+            "pdf",
+            archived.ahaId,
+            archived.generatedAt,
+            undefined,
+            {
+              sourceRevision: archived.sourceRevision,
+              generatedAt: archived.generatedAt,
+            },
+          ),
+        );
       }
       await ahaDatabase.ahaPdfs.put(record);
       await ahaDatabase.backupQueue.put(
-        createBackupQueueItem("pdf", aha.id, record.generatedAt),
+        createBackupQueueItem("pdf", aha.id, record.generatedAt, undefined, {
+          sourceRevision: record.sourceRevision,
+          generatedAt: record.generatedAt,
+        }),
       );
     },
   );
@@ -502,5 +544,6 @@ export async function replaceWithBlankAha(
     job,
     metadata,
     pdf: { status: "missing", record: null },
+    isCompletedLocked: false,
   };
 }

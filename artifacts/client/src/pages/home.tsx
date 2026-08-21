@@ -81,7 +81,7 @@ function EmptyJobState({
 
 export default function Home() {
   const navigate = useNavigate();
-  const { isPaused, resumeRecovery } = useRecoveryState();
+  const { isPaused, isWriteBlocked, resumeRecovery } = useRecoveryState();
   const today = useToday();
   const snapshot = useLiveQuery(() => getHomeSnapshot(today), [today]);
   const [isStarting, setIsStarting] = useState(false);
@@ -101,7 +101,7 @@ export default function Home() {
     return (
       <EmptyJobState
         hasJobs={snapshot.jobCount > 0}
-        isReadOnly={isPaused}
+        isReadOnly={isWriteBlocked}
         onSetup={() => navigate("/setup")}
         onChoose={() => navigate("/jobs")}
         onResumeRecovery={resumeRecovery}
@@ -112,7 +112,7 @@ export default function Home() {
 
   const openEditor = (ahaId: string) => navigate(`/ahas/${ahaId}/details`);
   const handleStart = async () => {
-    if (isStarting) return;
+    if (isStarting || isWriteBlocked) return;
     setIsStarting(true);
     setStartError(null);
     try {
@@ -254,7 +254,7 @@ export default function Home() {
           </div>
         ) : null}
 
-        {isPaused ? (
+        {isWriteBlocked ? (
           <section className="rounded-xl border border-[#C6CDE8] bg-secondary px-4 py-4 text-secondary-foreground">
             <p className="text-base font-bold">Safety records are read-only.</p>
             <p className="mt-1 text-sm font-medium leading-relaxed">
@@ -266,6 +266,7 @@ export default function Home() {
               variant="outline"
               className="mt-3 min-h-12 w-full border-[#C6CDE8] bg-card text-primary"
               onClick={resumeRecovery}
+              disabled={!isPaused}
             >
               RESUME RECOVERY
             </Button>
@@ -277,7 +278,7 @@ export default function Home() {
           todayPdfStatus={snapshot.todayPdfStatus}
           hasRecentAha={snapshot.recentAhas.length > 0}
           isStarting={isStarting}
-          isReadOnly={isPaused}
+          isReadOnly={isWriteBlocked}
           onStart={() => void handleStart()}
           onOpenEditor={() =>
             snapshot.todayAha && openEditor(snapshot.todayAha.id)

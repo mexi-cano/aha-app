@@ -376,7 +376,9 @@ function correctionEventId(
   occurredAt: string,
   workerId?: string,
 ): string {
-  return [kind, aha.id, workerId, occurredAt].filter(Boolean).join(":");
+  return [kind, aha.id, aha.documentRevision, workerId, occurredAt]
+    .filter((value) => value !== undefined && value !== "")
+    .join(":");
 }
 
 function correctionNote(note: string | null | undefined): string | null {

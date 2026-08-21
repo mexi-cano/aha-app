@@ -296,7 +296,9 @@ export interface PdfBackupMetadata {
 }
 
 export interface PdfWriteResult {
+  /** True when the artifact was safely retained as either the current PDF or a historical version. */
   accepted: boolean;
+  /** True when this artifact won version comparison and is now the current PDF. */
   isCurrent: boolean;
   record: PdfBackupMetadata;
 }

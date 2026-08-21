@@ -1,16 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Check, Download, ExternalLink, History } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  Download,
+  ExternalLink,
+  History,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ahaDatabase, type AhaPdfRevisionRecord } from "@/data/database";
 import {
   PdfVersionOpenError,
+  getPdfVersionIntegrityState,
+  isPdfRevisionAffectedByIntegrityConflict,
   openPdfRevision,
   refreshPdfVersionMetadata,
 } from "@/data/pdf-version-repository";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import { useAhaPdfState } from "@/hooks/use-aha-pdf-state";
+import { useOnlineStatus } from "@/hooks/use-online-status";
 import { downloadPdf, getCurrentPdfOpenMode, usePdfObjectUrl } from "@/pdf";
 
 const reasonLabels: Record<string, string> = {
@@ -35,6 +44,15 @@ function formatVersionTime(value: string, includeSeconds = false): string {
   }).format(new Date(value));
 }
 
+function historyRefreshErrorMessage(error: unknown, isOnline: boolean): string {
+  if (!isOnline) {
+    return "Connect to refresh document history. Saved offline versions are still available.";
+  }
+  return error instanceof PdfVersionOpenError
+    ? error.message
+    : "Document history could not be refreshed. Saved offline versions are still available.";
+}
+
 export default function AhaDocumentHistory() {
   const { aha, navigateSafely } = useAhaEditor();
   const current = useAhaPdfState(aha);
@@ -52,6 +70,10 @@ export default function AhaDocumentHistory() {
       ),
     [aha.id],
   );
+  const integrityState = useLiveQuery(
+    () => getPdfVersionIntegrityState(aha.id),
+    [aha.id],
+  );
   const [selected, setSelected] = useState<
     (AhaPdfRevisionRecord & { bytes: ArrayBuffer }) | null
   >(null);
@@ -59,19 +81,30 @@ export default function AhaDocumentHistory() {
   const [message, setMessage] = useState<string | null>(null);
   const [failedRevision, setFailedRevision] =
     useState<AhaPdfRevisionRecord | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const isOnline = useOnlineStatus();
   const selectedUrl = usePdfObjectUrl(selected);
   const pdfOpenMode = getCurrentPdfOpenMode();
 
+  const refreshHistory = async () => {
+    if (!isOnline || isRefreshing) return;
+    setIsRefreshing(true);
+    setMessage(null);
+    try {
+      await refreshPdfVersionMetadata(aha.id);
+    } catch (error) {
+      setMessage(historyRefreshErrorMessage(error, navigator.onLine));
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   useEffect(() => {
-    if (!navigator.onLine) return;
+    if (!isOnline) return;
     void refreshPdfVersionMetadata(aha.id).catch((error: unknown) => {
-      setMessage(
-        error instanceof PdfVersionOpenError
-          ? error.message
-          : "Document history could not be refreshed. Saved offline versions are still available.",
-      );
+      setMessage(historyRefreshErrorMessage(error, navigator.onLine));
     });
-  }, [aha.id]);
+  }, [aha.id, isOnline]);
 
   const revisionCounts = useMemo(() => {
     const counts = new Map<number, number>();
@@ -196,6 +229,52 @@ export default function AhaDocumentHistory() {
           </div>
         ) : null}
 
+        {integrityState?.conflicts.length ? (
+          <section
+            className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-4 text-warning-foreground"
+            role="alert"
+          >
+            <div className="flex items-start gap-3">
+              <AlertTriangle
+                className="mt-0.5 size-5 shrink-0"
+                aria-hidden="true"
+              />
+              <div>
+                <h2 className="font-bold">PDF history needs verification</h2>
+                <p className="mt-1 text-sm font-semibold leading-relaxed">
+                  Conflicting checksum details were found for the saved
+                  {integrityState.conflicts.length === 1
+                    ? " version below"
+                    : " versions below"}
+                  . Nothing was removed, and other documents remain available.
+                </p>
+                <ul className="mt-2 text-sm font-semibold">
+                  {integrityState.conflicts.map((conflict) => (
+                    <li key={conflict.key}>
+                      Revision {conflict.sourceRevision} · Generated{" "}
+                      {formatVersionTime(conflict.generatedAt, true)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-3 min-h-12 w-full border-warning/40 bg-card text-warning-foreground"
+              disabled={!isOnline || isRefreshing}
+              onClick={() => void refreshHistory()}
+            >
+              {isRefreshing ? "CHECKING…" : "CHECK AGAIN"}
+            </Button>
+            {!isOnline ? (
+              <p className="mt-2 text-center text-sm font-semibold">
+                Connect to check this saved version again.
+              </p>
+            ) : null}
+          </section>
+        ) : null}
+
         {current?.record ? (
           <button
             type="button"
@@ -216,6 +295,10 @@ export default function AhaDocumentHistory() {
 
         {(revisions ?? []).map((revision) => {
           const event = eventsByVersionKey.get(revision.key);
+          const hasIntegrityConflict = isPdfRevisionAffectedByIntegrityConflict(
+            revision,
+            integrityState ?? null,
+          );
           const hasSameRevisionVersions =
             (revisionCounts.get(revision.sourceRevision) ?? 0) > 1;
           return (
@@ -223,7 +306,7 @@ export default function AhaDocumentHistory() {
               type="button"
               key={revision.key}
               className="min-h-24 rounded-2xl border border-card-border bg-card p-5 text-left shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
-              disabled={Boolean(isOpening)}
+              disabled={Boolean(isOpening) || hasIntegrityConflict}
               onClick={() => void openRevision(revision)}
             >
               <span className="flex items-center gap-2 text-sm font-bold text-muted-foreground">
@@ -233,11 +316,13 @@ export default function AhaDocumentHistory() {
                 Revision {revision.sourceRevision}
               </span>
               <span className="mt-1 block text-sm font-medium text-muted-foreground">
-                {event
-                  ? (reasonLabels[event.reason] ?? "Completed AHA update")
-                  : hasSameRevisionVersions
-                    ? "Regenerated PDF"
-                    : "Earlier finalized PDF"}
+                {hasIntegrityConflict
+                  ? "Integrity conflict"
+                  : event
+                    ? (reasonLabels[event.reason] ?? "Completed AHA update")
+                    : hasSameRevisionVersions
+                      ? "Regenerated PDF"
+                      : "Earlier finalized PDF"}
                 {" · "}
                 {formatVersionTime(
                   revision.generatedAt,

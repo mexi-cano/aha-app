@@ -20,6 +20,9 @@ export interface AhaPdfRecord {
   bytes: ArrayBuffer;
   generatedAt: string;
   sourceRevision: number;
+  byteLength?: number;
+  sha256?: string | null;
+  backedUpAt?: string | null;
 }
 
 export interface AhaPdfRevisionRecord {

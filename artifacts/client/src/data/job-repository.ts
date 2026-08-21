@@ -12,7 +12,10 @@ import {
 import { isDevFixtureId } from "./dev-fixture";
 import { sortJobsForSelection } from "./job-selection";
 import { partitionReadableJobs } from "./stored-records";
-import { assertRecoveryMutationAllowed } from "./recovery-mutation-guard";
+import {
+  assertRecoveryMutationAllowed,
+  assertRecoveryMutationAllowedInTransaction,
+} from "./recovery-mutation-guard";
 
 export interface JobListSnapshot {
   jobs: Job[];
@@ -76,6 +79,7 @@ export async function createJob(
     ahaDatabase.settings,
     ahaDatabase.backupQueue,
     async () => {
+      await assertRecoveryMutationAllowedInTransaction();
       await ahaDatabase.jobs.add(job);
       await ahaDatabase.settings.put({
         key: ACTIVE_JOB_SETTING,
@@ -110,6 +114,7 @@ export async function updateJobConfiguration(
     "rw",
     ahaDatabase.jobs,
     ahaDatabase.backupQueue,
+    ahaDatabase.settings,
     async () => {
       const queued = await ahaDatabase.backupQueue.get(
         backupQueueKey("job", updated.id),
@@ -118,6 +123,7 @@ export async function updateJobConfiguration(
         changedAt,
         queued?.clientUpdatedAt,
       );
+      await assertRecoveryMutationAllowedInTransaction();
       await ahaDatabase.jobs.put(updated);
       await ahaDatabase.backupQueue.put(
         createBackupQueueItem("job", updated.id, monotonicChangedAt),

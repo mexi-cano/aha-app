@@ -8,6 +8,7 @@ import { getStoredAuthToken } from "./auth-storage";
 import {
   ahaDatabase,
   ahaPdfRevisionKey,
+  type AppSetting,
   type AhaPdfRevisionRecord,
 } from "./database";
 import {
@@ -66,6 +67,116 @@ export interface PdfRevisionReconciliationPlan {
   puts: AhaPdfRevisionRecord[];
   deleteKeys: string[];
   conflictKeys: string[];
+  conflicts: PdfVersionIntegrityConflict[];
+}
+
+export interface PdfVersionIntegrityConflict {
+  key: string;
+  sourceRevision: number;
+  generatedAt: string;
+  localKeys: string[];
+}
+
+export interface PdfVersionIntegrityState {
+  version: 1;
+  ahaId: string;
+  detectedAt: string;
+  conflicts: PdfVersionIntegrityConflict[];
+}
+
+export interface PdfVersionMetadataRefreshResult {
+  conflicts: PdfVersionIntegrityConflict[];
+}
+
+const PDF_VERSION_INTEGRITY_SETTING_PREFIX = "pdfVersionIntegrity:";
+
+function pdfVersionIntegritySettingKey(ahaId: string): string {
+  return `${PDF_VERSION_INTEGRITY_SETTING_PREFIX}${ahaId}`;
+}
+
+function parsePdfVersionIntegritySetting(
+  setting: AppSetting | undefined,
+): PdfVersionIntegrityState | null {
+  if (!setting) return null;
+  try {
+    const value = JSON.parse(
+      setting.value,
+    ) as Partial<PdfVersionIntegrityState>;
+    if (
+      value.version !== 1 ||
+      typeof value.ahaId !== "string" ||
+      typeof value.detectedAt !== "string" ||
+      !Array.isArray(value.conflicts)
+    ) {
+      return null;
+    }
+    const conflicts = value.conflicts.filter(
+      (conflict): conflict is PdfVersionIntegrityConflict =>
+        Boolean(conflict) &&
+        typeof conflict.key === "string" &&
+        Number.isInteger(conflict.sourceRevision) &&
+        typeof conflict.generatedAt === "string" &&
+        Array.isArray(conflict.localKeys) &&
+        conflict.localKeys.every((key) => typeof key === "string"),
+    );
+    return {
+      version: 1,
+      ahaId: value.ahaId,
+      detectedAt: value.detectedAt,
+      conflicts,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function getPdfVersionIntegrityState(
+  ahaId: string,
+): Promise<PdfVersionIntegrityState | null> {
+  return parsePdfVersionIntegritySetting(
+    await ahaDatabase.settings.get(pdfVersionIntegritySettingKey(ahaId)),
+  );
+}
+
+export function isPdfRevisionAffectedByIntegrityConflict(
+  revision: Pick<
+    AhaPdfRevisionRecord,
+    "key" | "ahaId" | "sourceRevision" | "generatedAt"
+  >,
+  state: PdfVersionIntegrityState | null,
+): boolean {
+  if (!state || state.ahaId !== revision.ahaId) return false;
+  let canonicalKey: string | null = null;
+  try {
+    canonicalKey = ahaPdfRevisionKey(
+      revision.ahaId,
+      revision.sourceRevision,
+      revision.generatedAt,
+    );
+  } catch {
+    // Invalid legacy aliases can still be identified by their stored key.
+  }
+  return state.conflicts.some(
+    (conflict) =>
+      conflict.key === canonicalKey ||
+      conflict.localKeys.includes(revision.key),
+  );
+}
+
+export function mergePdfVersionIntegrityConflicts(
+  detected: readonly PdfVersionIntegrityConflict[],
+  previous: readonly PdfVersionIntegrityConflict[],
+  remoteKeys: ReadonlySet<string>,
+): PdfVersionIntegrityConflict[] {
+  const conflictsByKey = new Map(
+    detected.map((conflict) => [conflict.key, conflict]),
+  );
+  for (const conflict of previous) {
+    if (!remoteKeys.has(conflict.key) && !conflictsByKey.has(conflict.key)) {
+      conflictsByKey.set(conflict.key, conflict);
+    }
+  }
+  return [...conflictsByKey.values()];
 }
 
 export function isStorageQuotaError(error: unknown): boolean {
@@ -179,10 +290,26 @@ export async function planPdfRevisionReconciliation(
     puts,
     deleteKeys: [...deleteKeys],
     conflictKeys: [...conflictKeys],
+    conflicts: [...conflictKeys].flatMap((key) => {
+      const remote = remoteByKey.get(key);
+      if (!remote) return [];
+      return [
+        {
+          key,
+          sourceRevision: remote.sourceRevision,
+          generatedAt: remote.generatedAt,
+          localKeys: existing
+            .filter((record) => isCanonicalAlias(record, remote))
+            .map((record) => record.key),
+        },
+      ];
+    }),
   };
 }
 
-export async function refreshPdfVersionMetadata(ahaId: string): Promise<void> {
+export async function refreshPdfVersionMetadata(
+  ahaId: string,
+): Promise<PdfVersionMetadataRefreshResult> {
   const values = await customFetch<unknown[]>(
     `/api/ahas/${encodeURIComponent(ahaId)}/pdf/versions`,
     { responseType: "json" },
@@ -195,21 +322,54 @@ export async function refreshPdfVersionMetadata(ahaId: string): Promise<void> {
     .equals(ahaId)
     .toArray();
   const plan = await planPdfRevisionReconciliation(existing, revisions);
+  const remoteKeys = new Set(
+    revisions.map((revision) =>
+      ahaPdfRevisionKey(
+        revision.ahaId,
+        revision.sourceRevision,
+        revision.generatedAt,
+      ),
+    ),
+  );
 
-  await ahaDatabase.transaction("rw", ahaDatabase.ahaPdfRevisions, async () => {
-    for (const record of plan.puts) {
-      await ahaDatabase.ahaPdfRevisions.put(record);
-    }
-    if (plan.deleteKeys.length) {
-      await ahaDatabase.ahaPdfRevisions.bulkDelete(plan.deleteKeys);
-    }
-  });
-
-  if (plan.conflictKeys.length) {
-    throw new PdfVersionIntegrityError(
-      "Some saved PDF history did not match its verified checksum. Nothing conflicting was removed.",
-    );
-  }
+  const integritySettingKey = pdfVersionIntegritySettingKey(ahaId);
+  let persistedConflicts = plan.conflicts;
+  await ahaDatabase.transaction(
+    "rw",
+    ahaDatabase.ahaPdfRevisions,
+    ahaDatabase.settings,
+    async () => {
+      for (const record of plan.puts) {
+        await ahaDatabase.ahaPdfRevisions.put(record);
+      }
+      if (plan.deleteKeys.length) {
+        await ahaDatabase.ahaPdfRevisions.bulkDelete(plan.deleteKeys);
+      }
+      const previous = parsePdfVersionIntegritySetting(
+        await ahaDatabase.settings.get(integritySettingKey),
+      );
+      persistedConflicts = mergePdfVersionIntegrityConflicts(
+        plan.conflicts,
+        previous?.conflicts ?? [],
+        remoteKeys,
+      );
+      if (persistedConflicts.length) {
+        const state: PdfVersionIntegrityState = {
+          version: 1,
+          ahaId,
+          detectedAt: previous?.detectedAt ?? new Date().toISOString(),
+          conflicts: persistedConflicts,
+        };
+        await ahaDatabase.settings.put({
+          key: integritySettingKey,
+          value: JSON.stringify(state),
+        });
+      } else {
+        await ahaDatabase.settings.delete(integritySettingKey);
+      }
+    },
+  );
+  return { conflicts: persistedConflicts };
 }
 
 async function fetchExactPdfVersion(
@@ -283,6 +443,16 @@ async function fetchExactPdfVersion(
 export async function openPdfRevision(
   revision: AhaPdfRevisionRecord,
 ): Promise<PdfVersionOpenResult> {
+  if (
+    isPdfRevisionAffectedByIntegrityConflict(
+      revision,
+      await getPdfVersionIntegrityState(revision.ahaId),
+    )
+  ) {
+    throw new PdfVersionIntegrityError(
+      "This PDF version has conflicting verification details. It was not opened or changed.",
+    );
+  }
   if (revision.bytes) {
     if (
       revision.sha256 &&

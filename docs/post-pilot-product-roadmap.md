@@ -16,6 +16,10 @@ increments must update the master specification before implementation.
 - Partition local IndexedDB data by authorized scope. `Change crew` must be an
   explicit code-authorized transition and must never merge or expose another
   crew's locally cached records.
+- Scope durable recovery progress, PDF-integrity warnings, backup queues, and
+  the transactional recovery write guard to the same organization/crew
+  namespace. A recovery in one scope must neither block nor authorize writes in
+  another scope.
 - Prove cross-crew isolation for list, restore, direct-ID access, offline cache,
   backup queues, PDFs, and historical downloads before enabling a second code.
 

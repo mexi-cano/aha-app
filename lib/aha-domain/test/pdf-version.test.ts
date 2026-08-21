@@ -14,6 +14,7 @@ test("PDF version timestamps canonicalize database and RFC 3339 aliases", () => 
     expected,
     "2026-08-21 14:22:00+00",
     "2026-08-21T10:22:00-04:00",
+    "2026-08-21T10:22:00-0400",
   ]) {
     assert.equal(canonicalizePdfTimestamp(value), expected);
     assert.equal(
@@ -21,6 +22,17 @@ test("PDF version timestamps canonicalize database and RFC 3339 aliases", () => 
       pdfVersionIdentityKey("aha-1", 45, expected),
     );
   }
+});
+
+test("PDF version timestamps explicitly truncate PostgreSQL microseconds", () => {
+  assert.equal(
+    canonicalizePdfTimestamp("2026-08-21 14:22:00.123456+00"),
+    "2026-08-21T14:22:00.123Z",
+  );
+  assert.equal(
+    pdfVersionIdentityKey("aha-1", 45, "2026-08-21T14:22:00.123999Z"),
+    pdfVersionIdentityKey("aha-1", 45, "2026-08-21T14:22:00.123Z"),
+  );
 });
 
 test("PDF version timestamp validation rejects invalid identities", () => {

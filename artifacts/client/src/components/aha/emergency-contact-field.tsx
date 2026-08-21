@@ -41,7 +41,11 @@ export function EmergencyContactField({
       description={description}
       feedback={
         showWarning
-          ? { tone: "warning", message: EMERGENCY_CONTACT_WARNING }
+          ? {
+              tone: "warning",
+              message: EMERGENCY_CONTACT_WARNING,
+              announce: true,
+            }
           : undefined
       }
       requirement="required"

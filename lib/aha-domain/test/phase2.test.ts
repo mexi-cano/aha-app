@@ -508,6 +508,41 @@ test("completed signature correction replaces only one signature and records no 
   );
 });
 
+test("same-millisecond corrections remain distinct across document revisions", () => {
+  const occurredAt = new Date("2026-08-18T14:10:00.000Z");
+  const completed = completedAha();
+  const first = applyAhaMutationRules(
+    completed,
+    replaceCompletedSignature(
+      completed,
+      "worker-2",
+      replacementPng,
+      "signature_unclear",
+      null,
+      occurredAt,
+    ),
+  );
+  const second = applyAhaMutationRules(
+    first,
+    replaceCompletedSignature(
+      first,
+      "worker-2",
+      png,
+      "wrong_person_signed",
+      null,
+      occurredAt,
+    ),
+  );
+
+  const events = second.documentEvents.filter(
+    ({ kind }) => kind === "signature_replaced",
+  );
+  assert.equal(events.length, 2);
+  assert.notEqual(events[0]?.id, events[1]?.id);
+  assert.equal(events[0]?.fromDocumentRevision, first.documentRevision - 1);
+  assert.equal(events[1]?.fromDocumentRevision, first.documentRevision);
+});
+
 test("completed worker removal preserves the printed Person in charge and blocks the final worker", () => {
   const completed = completedAha();
   const removed = applyAhaMutationRules(

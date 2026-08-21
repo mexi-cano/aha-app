@@ -734,8 +734,8 @@ export const backupAhaPdfResponseRecordSourceRevisionMin = 0;
 
 
 export const BackupAhaPdfResponse = zod.object({
-  "accepted": zod.boolean(),
-  "isCurrent": zod.boolean(),
+  "accepted": zod.boolean().describe('True when the artifact was safely retained as either the current PDF or a historical version.'),
+  "isCurrent": zod.boolean().describe('True when this artifact won version comparison and is now the current PDF.'),
   "record": zod.object({
   "ahaId": zod.string(),
   "filename": zod.string(),

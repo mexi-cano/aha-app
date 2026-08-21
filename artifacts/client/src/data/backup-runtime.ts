@@ -11,6 +11,8 @@ import { getStoredAuthToken } from "./auth-storage";
 import {
   ahaPdfRevisionKey,
   ahaDatabase,
+  type AhaPdfRecord,
+  type AhaPdfRevisionRecord,
   type BackupEntityKind,
   type BackupQueueItem,
 } from "./database";
@@ -45,6 +47,24 @@ export class LocalBackupRecordError extends Error {
 export interface ClassifiedBackupFailure {
   failure: "retryable" | "rejected";
   status: number | null;
+}
+
+export interface PdfBackupAcknowledgment {
+  backedUpAt: string;
+  sha256: string;
+  byteLength: number;
+}
+
+export function applyPdfBackupAcknowledgment<
+  T extends AhaPdfRecord | AhaPdfRevisionRecord,
+>(
+  record: T,
+  identity: { sourceRevision: number; generatedAt: string },
+  acknowledgment: PdfBackupAcknowledgment,
+): T | null {
+  return isSamePdfVersionIdentity(record, identity)
+    ? { ...record, ...acknowledgment }
+    : null;
 }
 
 let running = false;
@@ -272,6 +292,7 @@ async function acknowledge(
     "rw",
     ahaDatabase.backupQueue,
     ahaDatabase.ahas,
+    ahaDatabase.ahaPdfs,
     ahaDatabase.ahaPdfRevisions,
     ahaDatabase.settings,
     async () => {
@@ -298,20 +319,42 @@ async function acknowledge(
         captured.generatedAt &&
         pdfMetadata
       ) {
-        const key = ahaPdfRevisionKey(
-          captured.entityId,
-          captured.sourceRevision!,
-          captured.generatedAt,
-        );
-        const revision = await ahaDatabase.ahaPdfRevisions.get(key);
-        if (revision) {
-          await ahaDatabase.ahaPdfRevisions.put({
-            ...revision,
-            backedUpAt,
-            sha256: pdfMetadata.sha256,
-            byteLength: pdfMetadata.byteLength,
-          });
+        const identity = {
+          sourceRevision: captured.sourceRevision!,
+          generatedAt: captured.generatedAt,
+        };
+        const metadata = { backedUpAt, ...pdfMetadata };
+        const currentPdf = await ahaDatabase.ahaPdfs.get(captured.entityId);
+        const acknowledgedCurrent = currentPdf
+          ? applyPdfBackupAcknowledgment(currentPdf, identity, metadata)
+          : null;
+        if (acknowledgedCurrent) {
+          await ahaDatabase.ahaPdfs.put(acknowledgedCurrent);
+        } else {
+          const key = ahaPdfRevisionKey(
+            captured.entityId,
+            captured.sourceRevision!,
+            captured.generatedAt,
+          );
+          const revision = await ahaDatabase.ahaPdfRevisions.get(key);
+          const acknowledgedRevision = revision
+            ? applyPdfBackupAcknowledgment(revision, identity, metadata)
+            : null;
+          if (!acknowledgedRevision) {
+            throw new LocalBackupRecordError(
+              "pdf",
+              new Error(
+                "The acknowledged PDF version is no longer available locally.",
+              ),
+            );
+          }
+          await ahaDatabase.ahaPdfRevisions.put(acknowledgedRevision);
         }
+      } else if (captured.kind === "pdf") {
+        throw new LocalBackupRecordError(
+          "pdf",
+          new Error("The PDF acknowledgment metadata is missing."),
+        );
       }
       await ahaDatabase.backupQueue.delete(captured.key);
       await ahaDatabase.settings.put({

@@ -652,8 +652,12 @@ components:
       type: object
       required: [accepted, isCurrent, record]
       properties:
-        accepted: { type: boolean }
-        isCurrent: { type: boolean }
+        accepted:
+          type: boolean
+          description: True when the artifact was safely retained as either the current PDF or a historical version.
+        isCurrent:
+          type: boolean
+          description: True when this artifact won version comparison and is now the current PDF.
         record: { $ref: "#/components/schemas/PdfBackupMetadata" }
     PdfVersionMetadata:
       allOf:

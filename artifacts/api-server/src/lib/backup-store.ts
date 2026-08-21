@@ -345,12 +345,29 @@ export function createNeonBackupStore(): BackupStore {
         await import("@workspace/db");
       const [currentRows, revisionRows] = await Promise.all([
         db
-          .select()
+          .select({
+            ahaId: ahaPdfsTable.ahaId,
+            filename: ahaPdfsTable.filename,
+            sourceRevision: ahaPdfsTable.sourceRevision,
+            generatedAt: ahaPdfsTable.generatedAt,
+            byteLength: ahaPdfsTable.byteLength,
+            sha256: ahaPdfsTable.sha256,
+            backedUpAt: ahaPdfsTable.backedUpAt,
+          })
           .from(ahaPdfsTable)
           .where(eq(ahaPdfsTable.ahaId, ahaId))
           .limit(1),
         db
-          .select()
+          .select({
+            ahaId: ahaPdfRevisionsTable.ahaId,
+            filename: ahaPdfRevisionsTable.filename,
+            sourceRevision: ahaPdfRevisionsTable.sourceRevision,
+            generatedAt: ahaPdfRevisionsTable.generatedAt,
+            byteLength: ahaPdfRevisionsTable.byteLength,
+            sha256: ahaPdfRevisionsTable.sha256,
+            backedUpAt: ahaPdfRevisionsTable.backedUpAt,
+            supersededAt: ahaPdfRevisionsTable.supersededAt,
+          })
           .from(ahaPdfRevisionsTable)
           .where(eq(ahaPdfRevisionsTable.ahaId, ahaId)),
       ]);

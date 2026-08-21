@@ -235,7 +235,7 @@ export default function History() {
                             type="button"
                             variant="outline"
                             className="mt-3 min-h-12 w-full border-warning/40 bg-card text-warning-foreground"
-                            disabled={Boolean(recreatingId)}
+                            disabled={Boolean(recreatingId) || isPaused}
                             onClick={() => void recreate(item)}
                           >
                             Retry

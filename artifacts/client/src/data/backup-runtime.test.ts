@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  applyPdfBackupAcknowledgment,
   calculateRetryDelay,
   classifyBackupError,
   classifyBackupFailure,
@@ -14,6 +15,7 @@ import {
   ensureLaterTimestamp,
   type BackupEntityKind,
   type BackupQueueItem,
+  type AhaPdfRecord,
 } from "./database";
 
 test("backup retry delay is exponential, jittered, and capped at five minutes", () => {
@@ -210,4 +212,34 @@ test("PDF backup queue keys retain every generated revision", () => {
   assert.notEqual(first, second);
   assert.match(first, /^pdf:/);
   assert.ok(first.includes(encodeURIComponent("aha:1")));
+});
+
+test("PDF acknowledgments update only the exact current or historical identity", () => {
+  const current: AhaPdfRecord = {
+    ahaId: "aha-1",
+    filename: "AHA.pdf",
+    bytes: new Uint8Array([1, 2, 3]).buffer,
+    sourceRevision: 4,
+    generatedAt: "2026-08-20T12:00:00.000Z",
+  };
+  const metadata = {
+    backedUpAt: "2026-08-20T12:00:01.000Z",
+    sha256: "ab".repeat(32),
+    byteLength: 3,
+  };
+  const acknowledged = applyPdfBackupAcknowledgment(
+    current,
+    { sourceRevision: 4, generatedAt: "2026-08-20 12:00:00+00" },
+    metadata,
+  );
+
+  assert.deepEqual(acknowledged, { ...current, ...metadata });
+  assert.equal(
+    applyPdfBackupAcknowledgment(
+      current,
+      { sourceRevision: 5, generatedAt: current.generatedAt },
+      metadata,
+    ),
+    null,
+  );
 });

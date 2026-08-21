@@ -191,12 +191,19 @@ export function RestoreGate({ children }: { children: ReactNode }) {
           return;
         }
       } catch (caught) {
-        if (!cancelled && caught instanceof InvalidRestoreProgressError) {
-          setState({
-            phase: "invalid_progress",
-            error:
-              "Saved recovery progress could not be read. Restart recovery to verify the available backup again.",
-          });
+        if (!cancelled) {
+          setState(
+            caught instanceof InvalidRestoreProgressError
+              ? {
+                  phase: "invalid_progress",
+                  error:
+                    "Saved recovery progress could not be read. Restart recovery to verify the available backup again.",
+                }
+              : {
+                  phase: "discovery_failed",
+                  error: recoveryErrorMessage(caught, navigator.onLine),
+                },
+          );
         }
         return;
       }

@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 export interface FieldFeedback {
   message: string;
   tone: "warning";
+  announce?: boolean;
 }
 
 export interface FieldAssistiveAction extends Omit<
@@ -111,6 +112,7 @@ function FieldFrame({
       {feedback ? (
         <p
           id={feedbackId}
+          aria-live={feedback.announce ? "polite" : undefined}
           className="flex items-start gap-2 text-sm font-semibold leading-relaxed text-warning-foreground"
         >
           <span aria-hidden="true">⚠</span>

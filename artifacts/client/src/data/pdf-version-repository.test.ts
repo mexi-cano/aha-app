@@ -4,7 +4,9 @@ import test from "node:test";
 import type { AhaPdfRevisionRecord } from "./database";
 import type { RemotePdfVersionMetadata } from "./pdf-backup-metadata";
 import {
+  isPdfRevisionAffectedByIntegrityConflict,
   isStorageQuotaError,
+  mergePdfVersionIntegrityConflicts,
   planPdfRevisionReconciliation,
 } from "./pdf-version-repository";
 
@@ -77,6 +79,23 @@ test("PDF history reconciliation preserves checksum conflicts", async () => {
   assert.equal(plan.puts.length, 0);
   assert.equal(plan.deleteKeys.length, 0);
   assert.equal(plan.conflictKeys.length, 1);
+  assert.deepEqual(plan.conflicts, [
+    {
+      key: plan.conflictKeys[0],
+      sourceRevision: remote.sourceRevision,
+      generatedAt: remote.generatedAt,
+      localKeys: [local.key],
+    },
+  ]);
+  assert.equal(
+    isPdfRevisionAffectedByIntegrityConflict(local, {
+      version: 1,
+      ahaId: local.ahaId,
+      detectedAt: "2026-08-21T14:30:00.000Z",
+      conflicts: plan.conflicts,
+    }),
+    true,
+  );
 });
 
 test("PDF history reconciliation retains distinct generation times", async () => {
@@ -92,4 +111,26 @@ test("PDF history reconciliation retains distinct generation times", async () =>
 
   assert.equal(plan.deleteKeys.length, 0);
   assert.equal(plan.puts[0]?.bytes, null);
+});
+
+test("integrity warnings persist until the conflicting remote identity can be rechecked", () => {
+  const conflict = {
+    key: "aha-1:45:generated",
+    sourceRevision: 45,
+    generatedAt: canonicalGeneratedAt,
+    localKeys: ["legacy-key"],
+  };
+
+  assert.deepEqual(
+    mergePdfVersionIntegrityConflicts([], [conflict], new Set()),
+    [conflict],
+  );
+  assert.deepEqual(
+    mergePdfVersionIntegrityConflicts(
+      [],
+      [conflict],
+      new Set([conflict.key]),
+    ),
+    [],
+  );
 });

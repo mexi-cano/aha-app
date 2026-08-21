@@ -186,6 +186,7 @@ async function restorePdf(ahaId: string): Promise<void> {
     ahaId,
     ...metadata,
     bytes,
+    byteLength: bytes.byteLength,
   });
 }
 

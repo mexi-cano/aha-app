@@ -53,8 +53,14 @@ export function canonicalizePdfTimestamp(value: string): string {
   }
   const canonicalZone =
     zone === "Z" ? "Z" : `${zone!.slice(0, 3)}:${offsetMinute ?? "00"}`;
+  // PDF identity is millisecond-precise throughout the client, API, and
+  // database. PostgreSQL may return microseconds, so truncate them explicitly
+  // instead of relying on engine-specific Date.parse behavior.
+  const millisecondFraction = fraction
+    ? `.${fraction.slice(1).padEnd(3, "0").slice(0, 3)}`
+    : "";
   const milliseconds = Date.parse(
-    `${year}-${month}-${day}T${hour}:${minute}:${second}${fraction ?? ""}${canonicalZone}`,
+    `${year}-${month}-${day}T${hour}:${minute}:${second}${millisecondFraction}${canonicalZone}`,
   );
   if (!Number.isFinite(milliseconds)) {
     throw new InvalidPdfVersionTimestampError(value);

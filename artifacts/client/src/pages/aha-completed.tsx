@@ -100,7 +100,8 @@ export default function AhaCompleted() {
   const pendingSafetyConfirmation =
     aha.pendingCompletedUpdate?.kind === "safety" &&
     !aha.pendingCompletedUpdate.crewReviewConfirmation;
-  const hasPendingCompletedUpdate = Boolean(aha.pendingCompletedUpdate);
+  const needsUpdateReview =
+    pendingUpdateNeedsReview || pendingSafetyConfirmation;
   const correctionActionsDisabled =
     isPaused ||
     isCompletedLocked ||
@@ -210,14 +211,14 @@ export default function AhaCompleted() {
               className="mt-4 min-h-14 w-full text-lg font-bold"
               disabled={isGenerating || isPaused}
               onClick={() =>
-                pendingUpdateNeedsReview || pendingSafetyConfirmation
+                needsUpdateReview
                   ? void navigateSafely(`/ahas/${aha.id}/update/review`)
                   : void regenerate()
               }
             >
               {isGenerating
                 ? "CREATING PDF…"
-                : hasPendingCompletedUpdate
+                : needsUpdateReview
                   ? "FINISH SAVED UPDATE"
                   : "TRY AGAIN"}
             </Button>

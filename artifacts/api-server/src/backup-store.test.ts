@@ -220,6 +220,19 @@ test("PDF version routes list metadata and return one exact no-store artifact", 
       "completed history.pdf",
     );
     assert.deepEqual(Buffer.from(await versionResponse.arrayBuffer()), bytes);
+
+    const invalidResponse = await fetch(
+      `http://127.0.0.1:${port}/ahas/aha-1/pdf/versions/2?generatedAt=not-a-date`,
+      { headers },
+    );
+    assert.equal(invalidResponse.status, 400);
+
+    const missingQuery = new URLSearchParams({ generatedAt });
+    const missingResponse = await fetch(
+      `http://127.0.0.1:${port}/ahas/aha-1/pdf/versions/3?${missingQuery}`,
+      { headers },
+    );
+    assert.equal(missingResponse.status, 404);
   } finally {
     server.close();
     await once(server, "close");

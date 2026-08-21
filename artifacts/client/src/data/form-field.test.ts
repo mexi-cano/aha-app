@@ -40,6 +40,7 @@ test("field feedback and assistive actions are accessible and touch sized", () =
       feedback: {
         tone: "warning",
         message: "Check that this includes the number the crew should call.",
+        announce: true,
       },
       assistiveAction: {
         label: "Use job default",
@@ -49,6 +50,7 @@ test("field feedback and assistive actions are accessible and touch sized", () =
   );
   assert.match(input, /aria-describedby="emergency-number-feedback"/);
   assert.match(input, /id="emergency-number-feedback"/);
+  assert.match(input, /aria-live="polite"/);
   assert.match(input, /Check that this includes the number/);
   assert.match(input, /min-h-12/);
   assert.match(input, />Use job default</);

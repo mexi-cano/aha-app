@@ -58,3 +58,14 @@ increments must update the master specification before implementation.
 - Validate crew reassignment, shared jobs, overnight work, inactive crews, and
   device replacement with ITS before choosing roles, permissions, or workflow
   terminology.
+
+## Task-specific Energy evidence
+
+- Validate with ITS whether associating Energy categories with each task is
+  required company evidence or whether the official form's one day-wide Energy
+  Wheel is sufficient. The v1 Work helper intentionally updates only the global
+  AHA selection and does not imply a task association that disappears from the
+  finalized PDF.
+- If task-specific evidence is required, treat it as a coordinated domain,
+  API, recovery, audit, and official-PDF policy change. Do not infer categories
+  from task text or add a hidden client-only association.

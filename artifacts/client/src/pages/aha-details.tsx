@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router";
 
 import { EditorContinue } from "@/components/aha/editor-continue";
 import { EditorShell } from "@/components/aha/editor-shell";
+import { EmergencyContactField } from "@/components/aha/emergency-contact-field";
 import {
   FieldRequirementBadge,
   TextAreaField,
@@ -15,9 +16,10 @@ import { formatLongDate } from "@/lib/date-format";
 import { cn } from "@/lib/utils";
 import { scrollToAndFocus } from "@/features/aha-editor/editor-navigation";
 import { shouldShowPrefillBanner } from "@/features/aha-editor/completed-update-grouping";
+import { jobDefaultLocationSuggestion } from "@/features/location-assistance";
 
 export default function AhaDetails() {
-  const { aha, updateAha, navigateSafely, editorBasePath, editorMode } =
+  const { aha, job, updateAha, navigateSafely, editorBasePath, editorMode } =
     useAhaEditor();
   const [searchParams] = useSearchParams();
 
@@ -48,6 +50,10 @@ export default function AhaDetails() {
         : current.notApplicable,
     }));
   };
+  const jobDefaultLocation = jobDefaultLocationSuggestion(
+    job.defaults.location,
+    aha.header.location,
+  );
 
   return (
     <EditorShell>
@@ -74,6 +80,15 @@ export default function AhaDetails() {
               requirement="required"
               value={aha.header.location}
               onChange={(event) => updateHeader("location", event.target.value)}
+              assistiveAction={
+                jobDefaultLocation
+                  ? {
+                      label: "Use job default",
+                      onClick: () =>
+                        updateHeader("location", jobDefaultLocation),
+                    }
+                  : undefined
+              }
             />
             <PersonInChargeField aha={aha} updateAha={updateAha} />
             <TextField
@@ -85,15 +100,10 @@ export default function AhaDetails() {
                 updateHeader("closestEmergencyCentre", event.target.value)
               }
             />
-            <TextField
+            <EmergencyContactField
               id="emergency-number"
-              label="Emergency number"
-              requirement="required"
-              inputMode="tel"
               value={aha.header.emergencyNumber}
-              onChange={(event) =>
-                updateHeader("emergencyNumber", event.target.value)
-              }
+              onValueChange={(value) => updateHeader("emergencyNumber", value)}
             />
             <TextField
               id="work-order-permit"

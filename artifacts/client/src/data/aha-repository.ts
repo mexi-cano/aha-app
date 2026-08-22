@@ -2,6 +2,7 @@ import Dexie from "dexie";
 import {
   ahaSchema,
   createBlankAha,
+  isCompletedAhaLocked,
   parseStoredAha,
   parseStoredJob,
   planStartToday,
@@ -12,11 +13,13 @@ import {
 
 import {
   ACTIVE_JOB_SETTING,
+  ahaPdfRevisionKey,
   ahaDatabase,
   createBackupQueueItem,
   ensureLaterTimestamp,
   RESTORE_NEEDS_JOB_CHOICE_SETTING,
   type AhaPdfRecord,
+  type AhaPdfRevisionRecord,
 } from "./database";
 import {
   createBlankDraftMetadata,
@@ -28,6 +31,10 @@ import {
 import { isDevFixtureId } from "./dev-fixture";
 import { openLocalDataWithRecovery } from "./local-data-initialization";
 import { partitionReadableAhas, partitionReadableJobs } from "./stored-records";
+import {
+  assertRecoveryMutationAllowed,
+  assertRecoveryMutationAllowedInTransaction,
+} from "./recovery-mutation-guard";
 
 export interface HomeSnapshot {
   job: Job | null;
@@ -70,6 +77,7 @@ export interface EditorSnapshot {
   aha: Aha;
   metadata: DraftMetadata;
   pdf: AhaPdfState;
+  isCompletedLocked: boolean;
 }
 
 export type AhaPdfStatus = "missing" | "stale" | "current" | "unreadable";
@@ -98,6 +106,50 @@ export async function writeBlankAhaReplacement(
   await writer.putAha(replacement);
   await writer.putMetadata(metadata);
   await writer.deletePdf(replacement.id);
+}
+
+export function createArchivedPdfRevisionRecord(
+  previous: AhaPdfRecord,
+  supersededAt: string,
+): AhaPdfRevisionRecord {
+  return {
+    key: ahaPdfRevisionKey(
+      previous.ahaId,
+      previous.sourceRevision,
+      previous.generatedAt,
+    ),
+    ahaId: previous.ahaId,
+    filename: previous.filename,
+    bytes: previous.bytes,
+    generatedAt: previous.generatedAt,
+    sourceRevision: previous.sourceRevision,
+    byteLength: previous.byteLength ?? previous.bytes.byteLength,
+    sha256: previous.sha256 ?? null,
+    backedUpAt: previous.backedUpAt ?? null,
+    supersededAt,
+  };
+}
+
+async function archiveCurrentPdf(
+  previous: AhaPdfRecord,
+  supersededAt: string,
+): Promise<void> {
+  const archived = createArchivedPdfRevisionRecord(previous, supersededAt);
+  await ahaDatabase.ahaPdfRevisions.put(archived);
+  if (!archived.backedUpAt || !archived.sha256) {
+    await ahaDatabase.backupQueue.put(
+      createBackupQueueItem(
+        "pdf",
+        archived.ahaId,
+        archived.generatedAt,
+        undefined,
+        {
+          sourceRevision: archived.sourceRevision,
+          generatedAt: archived.generatedAt,
+        },
+      ),
+    );
+  }
 }
 
 export function createLocalId(): string {
@@ -229,12 +281,14 @@ export async function startToday(
   job: Job,
   today: LocalDate,
 ): Promise<StartTodayResult> {
+  await assertRecoveryMutationAllowed();
   try {
     return await ahaDatabase.transaction(
       "rw",
       ahaDatabase.ahas,
       ahaDatabase.draftMetadata,
       ahaDatabase.backupQueue,
+      ahaDatabase.settings,
       async () => {
         const existing = await ahaDatabase.ahas
           .where("[jobId+date]")
@@ -271,6 +325,7 @@ export async function startToday(
               )
             : createBlankDraftMetadata(aha.id);
 
+        await assertRecoveryMutationAllowedInTransaction();
         await ahaDatabase.ahas.add(aha);
         await ahaDatabase.backupQueue.put(
           createBackupQueueItem("aha", aha.id, aha.sync.savedLocallyAt),
@@ -307,6 +362,10 @@ export async function getEditorSnapshot(
     throw new Error("The job for this AHA is missing.");
   }
 
+  const { records: jobAhas } = partitionReadableAhas(
+    await ahaDatabase.ahas.where("jobId").equals(aha.jobId).toArray(),
+  );
+
   return {
     aha,
     job: parseStoredJob(jobRecord),
@@ -314,6 +373,7 @@ export async function getEditorSnapshot(
       (await ahaDatabase.draftMetadata.get(ahaId)) ??
       createBlankDraftMetadata(ahaId),
     pdf: await getAhaPdfState(aha),
+    isCompletedLocked: isCompletedAhaLocked(aha, jobAhas),
   };
 }
 
@@ -367,6 +427,7 @@ export async function storeAhaPdf(
   bytes: Uint8Array,
   generatedAt = new Date(),
 ): Promise<AhaPdfRecord> {
+  await assertRecoveryMutationAllowed();
   if (!filename.trim() || !bytes.byteLength) {
     throw new Error("A generated PDF filename and bytes are required");
   }
@@ -377,11 +438,16 @@ export async function storeAhaPdf(
     bytes: copiedBytes.buffer as ArrayBuffer,
     generatedAt: generatedAt.toISOString(),
     sourceRevision: aha.documentRevision,
+    byteLength: copiedBytes.byteLength,
+    sha256: null,
+    backedUpAt: null,
   };
   await ahaDatabase.transaction(
     "rw",
     ahaDatabase.ahaPdfs,
+    ahaDatabase.ahaPdfRevisions,
     ahaDatabase.backupQueue,
+    ahaDatabase.settings,
     async () => {
       const previous = await ahaDatabase.ahaPdfs.get(aha.id);
       if (previous) {
@@ -393,9 +459,16 @@ export async function storeAhaPdf(
           ),
         };
       }
+      await assertRecoveryMutationAllowedInTransaction();
+      if (previous) {
+        await archiveCurrentPdf(previous, record.generatedAt);
+      }
       await ahaDatabase.ahaPdfs.put(record);
       await ahaDatabase.backupQueue.put(
-        createBackupQueueItem("pdf", aha.id, record.generatedAt),
+        createBackupQueueItem("pdf", aha.id, record.generatedAt, undefined, {
+          sourceRevision: record.sourceRevision,
+          generatedAt: record.generatedAt,
+        }),
       );
     },
   );
@@ -403,6 +476,7 @@ export async function storeAhaPdf(
 }
 
 export async function persistEditedAha(aha: Aha): Promise<Aha> {
+  await assertRecoveryMutationAllowed();
   const candidateTimestamp = new Date().toISOString();
   let saved: Aha | null = null;
 
@@ -411,8 +485,12 @@ export async function persistEditedAha(aha: Aha): Promise<Aha> {
     ahaDatabase.ahas,
     ahaDatabase.draftMetadata,
     ahaDatabase.backupQueue,
+    ahaDatabase.settings,
     async () => {
       const stored = await ahaDatabase.ahas.get(aha.id);
+      const metadata =
+        (await ahaDatabase.draftMetadata.get(aha.id)) ??
+        createBlankDraftMetadata(aha.id);
       const previousTimestamp = stored
         ? parseStoredAha(stored).sync.savedLocallyAt
         : aha.sync.savedLocallyAt;
@@ -426,13 +504,11 @@ export async function persistEditedAha(aha: Aha): Promise<Aha> {
           backedUpAt: null,
         },
       });
+      await assertRecoveryMutationAllowedInTransaction();
       await ahaDatabase.ahas.put(saved);
       await ahaDatabase.backupQueue.put(
         createBackupQueueItem("aha", saved.id, saved.sync.savedLocallyAt),
       );
-      const metadata =
-        (await ahaDatabase.draftMetadata.get(aha.id)) ??
-        createBlankDraftMetadata(aha.id);
       await ahaDatabase.draftMetadata.put(markDraftEdited(metadata));
     },
   );
@@ -453,15 +529,20 @@ export async function replaceWithBlankAha(
   job: Job,
   date: LocalDate,
 ): Promise<EditorSnapshot> {
+  await assertRecoveryMutationAllowed();
   const metadata = createBlankDraftMetadata(ahaId);
   let replacement: Aha | null = null;
 
   await ahaDatabase.transaction(
     "rw",
-    ahaDatabase.ahas,
-    ahaDatabase.draftMetadata,
-    ahaDatabase.ahaPdfs,
-    ahaDatabase.backupQueue,
+    [
+      ahaDatabase.ahas,
+      ahaDatabase.draftMetadata,
+      ahaDatabase.ahaPdfs,
+      ahaDatabase.ahaPdfRevisions,
+      ahaDatabase.backupQueue,
+      ahaDatabase.settings,
+    ],
     async () => {
       const blank = createBlankAha(job, date, dependencies());
       const previous = await ahaDatabase.ahas.get(ahaId);
@@ -476,6 +557,11 @@ export async function replaceWithBlankAha(
           ),
         },
       });
+      const previousPdf = await ahaDatabase.ahaPdfs.get(ahaId);
+      await assertRecoveryMutationAllowedInTransaction();
+      if (previousPdf) {
+        await archiveCurrentPdf(previousPdf, replacement.sync.savedLocallyAt);
+      }
       await writeBlankAhaReplacement(
         {
           putAha: (value) => ahaDatabase.ahas.put(value),
@@ -502,5 +588,6 @@ export async function replaceWithBlankAha(
     job,
     metadata,
     pdf: { status: "missing", record: null },
+    isCompletedLocked: false,
   };
 }

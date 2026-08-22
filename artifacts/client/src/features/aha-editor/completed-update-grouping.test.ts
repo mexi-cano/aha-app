@@ -83,6 +83,37 @@ test("completed PDF-visible edits share one timestamp until a new PDF is stored"
   assert.equal(second.documentRevision, first.documentRevision + 1);
 });
 
+test("a new edit after failed PDF generation starts a new pending update", () => {
+  const first = applyEditorMutationRules(
+    completed,
+    { ...completed, description: "First saved update" },
+    "completed_update",
+    storedPdf,
+    new Date("2026-08-19T12:10:00.000Z"),
+  );
+  const failedGenerationCheckpoint: Aha = {
+    ...first,
+    pendingCompletedUpdate: null,
+  };
+  const next = applyEditorMutationRules(
+    failedGenerationCheckpoint,
+    { ...failedGenerationCheckpoint, meetingNotes: "Fit correction" },
+    "completed_update",
+    storedPdf,
+    new Date("2026-08-19T12:15:00.000Z"),
+  );
+
+  assert.equal(next.pendingCompletedUpdate?.kind, "safety");
+  assert.equal(
+    next.pendingCompletedUpdate?.baselineDocumentRevision,
+    storedPdf.record.sourceRevision,
+  );
+  assert.deepEqual(next.updatedAfterCompletionAt, [
+    "2026-08-19T12:10:00.000Z",
+    "2026-08-19T12:15:00.000Z",
+  ]);
+});
+
 test("a failed-save retry derives the completed update timestamp again", () => {
   const firstAttempt = applyEditorMutationRules(
     completed,

@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import {
   beginSigning,
+  confirmCompletedCrewReview,
+  finalizeCompletedUpdate,
   getReviewReport,
   resolvePersonInChargeWorkerId,
   type ReviewIssue,
@@ -33,6 +35,15 @@ export default function AhaReview() {
   const report = useMemo(() => getReviewReport(aha), [aha]);
   const focusCrew = searchParams.get("focus") === "crew";
   const foremanWorkerId = resolvePersonInChargeWorkerId(aha);
+  const pendingSafetyUpdate =
+    editorMode === "completed_update" &&
+    aha.pendingCompletedUpdate?.kind === "safety"
+      ? aha.pendingCompletedUpdate
+      : null;
+  const crewReviewConfirmed = Boolean(
+    pendingSafetyUpdate?.crewReviewConfirmation,
+  );
+  const hasPendingCompletedUpdate = Boolean(aha.pendingCompletedUpdate);
 
   const fixIssue = (issue: ReviewIssue) => {
     const initialPath = reviewTargetPath(aha.id, issue.target);
@@ -46,7 +57,15 @@ export default function AhaReview() {
   const markNotApplicable = (
     issue: Extract<ReviewIssue, { tier: "warning" }>,
   ) => {
-    const field = issue.target.field;
+    const field =
+      issue.code === "work_order_permit"
+        ? "workOrderPermit"
+        : issue.code === "jha_procedures"
+          ? "jhaProcedureNumbers"
+          : issue.code === "meeting_notes"
+            ? "meetingNotes"
+            : null;
+    if (!field) return;
     updateAha((current) => ({
       ...current,
       notApplicable: { ...current.notApplicable, [field]: true },
@@ -55,14 +74,19 @@ export default function AhaReview() {
 
   const startSigning = async () => {
     if (!report.canStartSigning || isStarting) return;
+    if (editorMode === "completed_update" && !hasPendingCompletedUpdate) {
+      setStartError("Make a saved change before creating a replacement PDF.");
+      return;
+    }
     setIsStarting(true);
     setStartError(null);
     setFitIssues([]);
     if (editorMode === "completed_update") {
       try {
+        const finalizedAt = new Date();
         const result = await saveAhaAndGeneratePdf({
           commitAha,
-          update: (current) => current,
+          update: (current) => finalizeCompletedUpdate(current, finalizedAt),
           job,
         });
         if (result.status === "save_failed") {
@@ -192,9 +216,54 @@ export default function AhaReview() {
               </ul>
             </div>
           ) : null}
+          {pendingSafetyUpdate ? (
+            <section className="rounded-2xl border border-[#C6CDE8] bg-card p-5 text-left shadow-sm">
+              <p className="text-sm font-bold tracking-[0.08em] text-muted-foreground">
+                PERSON IN CHARGE CONFIRMATION
+              </p>
+              <p className="mt-2 text-base font-semibold">
+                {aha.header.personInCharge || "The Person in charge"} should
+                confirm the updated safety information was reviewed with today's
+                crew.
+              </p>
+              <Button
+                type="button"
+                variant={crewReviewConfirmed ? "secondary" : "outline"}
+                className="mt-4 min-h-14 w-full whitespace-normal px-4 text-base font-bold"
+                disabled={
+                  isStarting || aha.safetyCheck !== "yes" || crewReviewConfirmed
+                }
+                onClick={() =>
+                  updateAha((current) =>
+                    confirmCompletedCrewReview(current, new Date()),
+                  )
+                }
+              >
+                {crewReviewConfirmed
+                  ? "✓ Reviewed with today's crew"
+                  : "I reviewed these updates with today's crew"}
+              </Button>
+              {aha.safetyCheck !== "yes" ? (
+                <p className="mt-2 text-sm font-semibold text-warning-foreground">
+                  Answer the Energy Wheel safety check Yes first.
+                </p>
+              ) : null}
+            </section>
+          ) : null}
+          {editorMode === "completed_update" && !hasPendingCompletedUpdate ? (
+            <p className="text-center text-sm font-semibold text-muted-foreground">
+              No correction is saved yet. Edit a section before creating a
+              replacement PDF.
+            </p>
+          ) : null}
           <Button
             className="min-h-[72px] w-full rounded-[14px] text-xl font-bold tracking-wide"
-            disabled={!report.canStartSigning || isStarting}
+            disabled={
+              !report.canStartSigning ||
+              isStarting ||
+              Boolean(pendingSafetyUpdate && !crewReviewConfirmed) ||
+              (editorMode === "completed_update" && !hasPendingCompletedUpdate)
+            }
             onClick={() => void startSigning()}
           >
             {isStarting
@@ -202,7 +271,9 @@ export default function AhaReview() {
                 ? "CREATING PDF…"
                 : "STARTING…"
               : editorMode === "completed_update"
-                ? "REGENERATE PDF"
+                ? hasPendingCompletedUpdate
+                  ? "REGENERATE PDF"
+                  : "NO CHANGES TO SAVE"
                 : aha.status === "in_progress"
                   ? "CONTINUE SIGNING"
                   : "START SIGNING"}

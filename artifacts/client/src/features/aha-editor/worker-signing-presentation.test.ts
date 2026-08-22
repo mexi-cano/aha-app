@@ -86,6 +86,8 @@ test("worker presentation contains the safety review and omits the crew roster",
     "Locates verified and marked. Spotter for all digging.",
     "Gravity",
     "Excavation cave-in",
+    "ENERGY WHEEL",
+    "1 of 11 selected",
     "Safety check:",
     "Coordinate truck access with the adjacent paving crew.",
     "Acknowledgment and signature",
@@ -110,6 +112,7 @@ test("roster overview keeps the crew section", () => {
   assert.ok(html.includes("TODAY&#x27;S CREW — 2"));
   assert.ok(html.includes("Miguel Rodriguez"));
   assert.ok(html.includes("Jordan Reed"));
+  assert.ok(!html.includes("ENERGY WHEEL"));
 });
 
 test("added-worker presentation requires a name and begins with disabled confirmation", () => {
@@ -134,4 +137,18 @@ test("added-worker presentation requires a name and begins with disabled confirm
     /<button[^>]*disabled=""[^>]*>CONFIRM SIGNATURE<\/button>/,
   );
   assert.ok(html.includes(WORKER_ACKNOWLEDGMENT));
+});
+
+test("worker signing wheel handles no selected energy categories", () => {
+  const html = renderToStaticMarkup(
+    createElement(WorkerReviewAndSign, {
+      aha: ahaSchema.parse({ ...aha, energySelections: [] }),
+      job,
+      signerName: "Jordan Reed",
+      onConfirm: () => undefined,
+    }),
+  );
+
+  assert.ok(html.includes("0 of 11 selected"));
+  assert.ok(html.includes("No energy categories marked."));
 });

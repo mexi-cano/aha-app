@@ -1,16 +1,32 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Check, ChevronRight, Plus } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 
 import { AppLogo } from "@/components/aha/app-logo";
 import { Button } from "@/components/ui/button";
 import { getJobListSnapshot, setActiveJob } from "@/data/job-repository";
+import { useRecoveryState } from "@/features/restore/restore-gate";
+
+interface JobsLocationState {
+  recoveryCompleted?: boolean;
+}
 
 export default function Jobs() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { isWriteBlocked } = useRecoveryState();
   const snapshot = useLiveQuery(getJobListSnapshot);
   const [activateError, setActivateError] = useState<string | null>(null);
+  const [recoveryNotice] = useState(() => {
+    const value = location.state as JobsLocationState | null;
+    return Boolean(value?.recoveryCompleted);
+  });
+
+  useEffect(() => {
+    if (!location.state) return;
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, location.state, navigate]);
 
   if (!snapshot) {
     return (
@@ -48,13 +64,30 @@ export default function Jobs() {
         </header>
         <div>
           <p className="text-sm font-bold tracking-[0.1em] text-muted-foreground">
-            JOBS ON THIS IPAD
+            {isWriteBlocked ? "VERIFIED SAVED JOBS" : "JOBS ON THIS IPAD"}
           </p>
           <h1 className="mt-1 text-3xl font-bold">Choose a job</h1>
           <p className="mt-2 text-base font-medium text-muted-foreground">
-            Each job keeps its own defaults, roster, and AHA history.
+            {isWriteBlocked
+              ? "Recovery is paused. Choose a job to view saved documents; setup and editing remain unavailable."
+              : "Each job keeps its own defaults, roster, and AHA history."}
           </p>
         </div>
+
+        {recoveryNotice ? (
+          <div
+            className="rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-success"
+            role="status"
+          >
+            <p className="flex items-center gap-2 text-base font-bold">
+              <Check className="size-5" strokeWidth={3} aria-hidden="true" />
+              Recovery complete
+            </p>
+            <p className="mt-1 text-sm font-semibold text-foreground">
+              Choose the job to use on this device.
+            </p>
+          </div>
+        ) : null}
 
         {snapshot.unreadableCount ? (
           <div
@@ -112,6 +145,7 @@ export default function Jobs() {
                   <Button
                     variant="ghost"
                     className="min-h-12 shrink-0 text-base text-primary"
+                    disabled={isWriteBlocked}
                     onClick={() => navigate(`/jobs/${job.id}/setup`)}
                   >
                     Defaults{" "}
@@ -130,6 +164,7 @@ export default function Jobs() {
         <Button
           variant="outline"
           className="min-h-14 border-dashed text-base text-primary"
+          disabled={isWriteBlocked}
           onClick={() => navigate("/setup")}
         >
           <Plus className="size-5" aria-hidden="true" /> Set up another job

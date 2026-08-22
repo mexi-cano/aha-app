@@ -55,6 +55,12 @@ test("backup constraints return a generic 409 problem", async () => {
     async getPdf() {
       return null;
     },
+    async listPdfVersions() {
+      return [];
+    },
+    async getPdfVersion() {
+      return null;
+    },
     async putPdf() {
       throw new BackupConstraintError({ code: "23505" });
     },
@@ -104,6 +110,129 @@ test("backup constraints return a generic 409 problem", async () => {
         "The backup conflicts with an existing record and was not applied.",
       code: "backup-conflict",
     });
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
+});
+
+test("PDF version routes list metadata and return one exact no-store artifact", async () => {
+  const generatedAt = "2026-08-20T12:00:00.000Z";
+  const databaseGeneratedAt = "2026-08-20 12:00:00+00";
+  const bytes = Buffer.from("%PDF-history");
+  const sha256 = "ab".repeat(32);
+  const store: BackupStore = {
+    async listJobs() {
+      return [];
+    },
+    async putJob() {
+      throw new Error("not used");
+    },
+    async listAhas() {
+      return { items: [], nextCursor: null };
+    },
+    async putAha() {
+      throw new Error("not used");
+    },
+    async getPdf() {
+      return null;
+    },
+    async listPdfVersions(ahaId) {
+      return [
+        {
+          ahaId,
+          filename: "completed history.pdf",
+          sourceRevision: 2,
+          generatedAt: databaseGeneratedAt,
+          byteLength: bytes.byteLength,
+          sha256,
+          backedUpAt: "2026-08-20 12:01:00+00",
+          supersededAt: "2026-08-20 13:00:00+00",
+          isCurrent: false,
+        },
+      ];
+    },
+    async getPdfVersion(ahaId, sourceRevision, requestedGeneratedAt) {
+      return ahaId === "aha-1" &&
+        sourceRevision === 2 &&
+        requestedGeneratedAt === generatedAt
+        ? {
+            ahaId,
+            filename: "completed history.pdf",
+            sourceRevision,
+            generatedAt,
+            bytes,
+            sha256,
+            backedUpAt: "2026-08-20T12:01:00.000Z",
+          }
+        : null;
+    },
+    async putPdf() {
+      throw new Error("not used");
+    },
+  };
+  const config: AuthConfig = {
+    accessCodeHash: "scrypt:v1:test:test",
+    tokenSecret: "test-token-secret-with-at-least-32-bytes",
+  };
+  const { token } = issueAccessToken(config);
+  const app = express();
+  app.use(createDataRouter(store, () => config));
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+
+  try {
+    const { port } = server.address() as AddressInfo;
+    const headers = { Authorization: `Bearer ${token}` };
+    const listResponse = await fetch(
+      `http://127.0.0.1:${port}/ahas/aha-1/pdf/versions`,
+      { headers },
+    );
+    assert.equal(listResponse.status, 200);
+    assert.deepEqual(await listResponse.json(), [
+      {
+        ahaId: "aha-1",
+        filename: "completed history.pdf",
+        sourceRevision: 2,
+        generatedAt,
+        byteLength: bytes.byteLength,
+        sha256,
+        backedUpAt: "2026-08-20T12:01:00.000Z",
+        supersededAt: "2026-08-20T13:00:00.000Z",
+        isCurrent: false,
+      },
+    ]);
+
+    const query = new URLSearchParams({ generatedAt: databaseGeneratedAt });
+    const versionResponse = await fetch(
+      `http://127.0.0.1:${port}/ahas/aha-1/pdf/versions/2?${query}`,
+      { headers },
+    );
+    assert.equal(versionResponse.status, 200);
+    assert.equal(versionResponse.headers.get("cache-control"), "no-store");
+    assert.equal(versionResponse.headers.get("x-content-sha256"), sha256);
+    assert.equal(
+      versionResponse.headers.get("x-aha-generated-at"),
+      generatedAt,
+    );
+    assert.equal(
+      decodeURIComponent(versionResponse.headers.get("x-aha-filename") ?? ""),
+      "completed history.pdf",
+    );
+    assert.deepEqual(Buffer.from(await versionResponse.arrayBuffer()), bytes);
+
+    const invalidResponse = await fetch(
+      `http://127.0.0.1:${port}/ahas/aha-1/pdf/versions/2?generatedAt=not-a-date`,
+      { headers },
+    );
+    assert.equal(invalidResponse.status, 400);
+
+    const missingQuery = new URLSearchParams({ generatedAt });
+    const missingResponse = await fetch(
+      `http://127.0.0.1:${port}/ahas/aha-1/pdf/versions/3?${missingQuery}`,
+      { headers },
+    );
+    assert.equal(missingResponse.status, 404);
   } finally {
     server.close();
     await once(server, "close");

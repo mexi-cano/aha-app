@@ -100,6 +100,10 @@ test("Spanish worker review translates fixed safety copy and preserves entered v
     "Centro de emergencias más cercano",
     "Se requiere un plan de rescate",
     "Derrumbe de excavación",
+    "RUEDA DE ENERGÍA",
+    "11 de 11 seleccionadas",
+    "Refleja las selecciones de hoy",
+    "Rueda de energía que muestra 11 de 11 categorías seleccionadas",
     "Verificación de seguridad",
     "Reconocimiento y firma",
     WORKER_REVIEW_COPY.es.acknowledgment,
@@ -112,7 +116,10 @@ test("Spanish worker review translates fixed safety copy and preserves entered v
     "Locates verified and marked.",
     "Coordinate truck access with the adjacent paving crew.",
   ]) {
-    assert.ok(html.includes(expected), `expected Spanish review to include ${expected}`);
+    assert.ok(
+      html.includes(expected),
+      `expected Spanish review to include ${expected}`,
+    );
   }
 
   assert.ok(!html.includes(WORKER_ACKNOWLEDGMENT));

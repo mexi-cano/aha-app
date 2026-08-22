@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { initializeLocalData } from "@/data/aha-repository";
+import { requestAppReload } from "@/data/app-reload";
 import {
   classifyLocalDataError,
   type LocalDataFailureKind,
@@ -44,7 +45,7 @@ export function LocalDataGate({ children }: { children: ReactNode }) {
     } catch {
       // A cached offline app can still reload even when update checking fails.
     } finally {
-      window.location.reload();
+      requestAppReload("storage_version_recovery");
     }
   };
 

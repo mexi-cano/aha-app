@@ -1,5 +1,9 @@
+import * as React from "react";
 import { TriangleAlert } from "lucide-react";
-import type { ReviewIssue } from "@workspace/aha-domain";
+import {
+  canMarkReviewWarningNotApplicable,
+  type ReviewIssue,
+} from "@workspace/aha-domain";
 
 import { Button } from "@/components/ui/button";
 import type { ReviewIssueGroup } from "@/features/aha-editor/review-presentation";
@@ -7,6 +11,7 @@ import type { ReviewIssueGroup } from "@/features/aha-editor/review-presentation
 function fixLabel(issue: ReviewIssue): string {
   if (issue.code === "safety_check") return "Answer";
   if (issue.code === "task_controls") return "Add controls";
+  if (issue.code === "emergency_contact_format") return "Check";
   if (issue.tier === "warning") return "Add";
   return "Fix";
 }
@@ -72,7 +77,9 @@ export function ReviewIssueGroupNotice({
               >
                 {fixLabel(issue)}
               </Button>
-              {issue.tier === "warning" && onNotApplicable ? (
+              {issue.tier === "warning" &&
+              canMarkReviewWarningNotApplicable(issue) &&
+              onNotApplicable ? (
                 <Button
                   type="button"
                   variant="outline"

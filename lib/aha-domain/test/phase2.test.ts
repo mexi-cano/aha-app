@@ -10,15 +10,21 @@ import {
   applyAhaMutationRules,
   beginSigning,
   canFinishAha,
+  canMarkReviewWarningNotApplicable,
   canStartSigning,
   completeAha,
+  confirmCompletedCrewReview,
   createBlankAha,
   enterCustomPersonInCharge,
+  finalizeCompletedUpdate,
   getEditorSectionReadiness,
   getReviewReport,
   jobSchema,
+  isCompletedAhaLocked,
   recordSignature,
   removeCrewMember,
+  removeCompletedCrewMember,
+  replaceCompletedSignature,
   renameCrewMember,
   resolvePersonInChargeWorkerId,
   selectPersonInChargeWorker,
@@ -206,6 +212,42 @@ test("entered optional values clear warnings without changing signing readiness"
   assert.equal(filledReport.canStartSigning, true);
 });
 
+test("an ambiguous emergency contact warns without blocking or allowing N/A", () => {
+  const ambiguous: Aha = {
+    ...reviewReadyAha(),
+    header: {
+      ...reviewReadyAha().header,
+      emergencyNumber: "Call the site radio",
+    },
+  };
+  const report = getReviewReport(ambiguous);
+  const warning = report.warnings.find(
+    ({ code }) => code === "emergency_contact_format",
+  );
+  assert.ok(warning);
+  assert.equal(
+    warning.message,
+    "Check that this includes the number the crew should call.",
+  );
+  assert.equal(canMarkReviewWarningNotApplicable(warning), false);
+  assert.equal(report.canStartSigning, true);
+  assert.equal(canStartSigning(ambiguous), true);
+
+  const recognized: Aha = {
+    ...ambiguous,
+    header: {
+      ...ambiguous.header,
+      emergencyNumber: "911 / Site safety: (919) 555-0182",
+    },
+  };
+  assert.equal(
+    getReviewReport(recognized).warnings.some(
+      ({ code }) => code === "emergency_contact_format",
+    ),
+    false,
+  );
+});
+
 test("zero tasks and zero energy categories are not invented blockers", () => {
   const aha = reviewReadyAha();
   assert.equal(aha.tasks.length, 0);
@@ -265,7 +307,7 @@ test("mid-signing safety-sensitive edits clear only the safety answer", () => {
     ...signed,
     meetingNotes: "Notes changed",
   });
-  assert.equal(changedMeetingNotes.safetyCheck, "yes");
+  assert.equal(changedMeetingNotes.safetyCheck, null);
 
   const changedCrew = applyInProgressEditRules(
     signed,
@@ -342,7 +384,208 @@ test("completed updates group timestamps, reset only the safety gate, and retain
     ...newGate,
     header: { ...newGate.header, location: "Updated location" },
   });
-  assert.equal(headerChange.safetyCheck, "yes");
+  assert.equal(headerChange.safetyCheck, null);
+});
+
+test("completed updates classify broad safety fields and administrative references", () => {
+  const completed = completedAha();
+  const changedSafety = applyAhaMutationRules(
+    completed,
+    {
+      ...completed,
+      header: { ...completed.header, emergencyNumber: "919-555-0100" },
+    },
+    {
+      recordCompletedUpdateAt: new Date("2026-08-18T14:00:00.000Z"),
+      completedUpdateBaselineRevision: completed.documentRevision,
+    },
+  );
+  assert.equal(changedSafety.safetyCheck, null);
+  assert.equal(changedSafety.pendingCompletedUpdate?.kind, "safety");
+
+  const changedAdministrative = applyAhaMutationRules(
+    completed,
+    {
+      ...completed,
+      header: { ...completed.header, workOrderPermit: "WO-200" },
+    },
+    {
+      recordCompletedUpdateAt: new Date("2026-08-18T14:01:00.000Z"),
+      completedUpdateBaselineRevision: completed.documentRevision,
+    },
+  );
+  assert.equal(changedAdministrative.safetyCheck, "yes");
+  assert.equal(
+    changedAdministrative.pendingCompletedUpdate?.kind,
+    "administrative",
+  );
+});
+
+test("safety updates require a persisted crew review confirmation before finalizing", () => {
+  const completed = completedAha();
+  const startedAt = new Date("2026-08-18T14:00:00.000Z");
+  const changed = applyAhaMutationRules(
+    completed,
+    { ...completed, description: "Changed completed work" },
+    {
+      recordCompletedUpdateAt: startedAt,
+      completedUpdateBaselineRevision: completed.documentRevision,
+    },
+  );
+  assert.throws(
+    () => finalizeCompletedUpdate(changed, new Date()),
+    /safety check and crew review confirmation/,
+  );
+  const answered = applyAhaMutationRules(changed, {
+    ...changed,
+    safetyCheck: "yes",
+  });
+  assert.throws(
+    () =>
+      confirmCompletedCrewReview(
+        { ...answered, safetyCheck: null },
+        new Date(),
+      ),
+    /answered Yes first/,
+  );
+  const confirmed = confirmCompletedCrewReview(
+    answered,
+    new Date("2026-08-18T14:05:00.000Z"),
+  );
+  const finalized = finalizeCompletedUpdate(
+    confirmed,
+    new Date("2026-08-18T14:06:00.000Z"),
+  );
+  assert.equal(finalized.pendingCompletedUpdate, null);
+  assert.equal(finalized.documentRevision, answered.documentRevision);
+  const event = finalized.documentEvents.at(-1)!;
+  assert.equal(event.kind, "safety_update");
+  assert.equal(event.fromDocumentRevision, completed.documentRevision);
+  assert.equal(event.toDocumentRevision, answered.documentRevision);
+  assert.deepEqual(event.crewReviewConfirmation, {
+    confirmedAt: "2026-08-18T14:05:00.000Z",
+    personInChargeName: completed.header.personInCharge,
+  });
+});
+
+test("completed signature correction replaces only one signature and records no ink in audit metadata", () => {
+  const completed = completedAha();
+  const correctedAt = new Date("2026-08-18T14:10:00.000Z");
+  const corrected = applyAhaMutationRules(
+    completed,
+    replaceCompletedSignature(
+      completed,
+      "worker-2",
+      replacementPng,
+      "wrong_person_signed",
+      "  Selected the wrong row.  ",
+      correctedAt,
+    ),
+  );
+  assert.equal(
+    corrected.crew[0]?.signaturePng,
+    completed.crew[0]?.signaturePng,
+  );
+  assert.equal(corrected.crew[1]?.signaturePng, replacementPng);
+  assert.equal(corrected.crew[1]?.signedAt, correctedAt.toISOString());
+  assert.equal(corrected.documentRevision, completed.documentRevision + 1);
+  const event = corrected.documentEvents.at(-1)!;
+  assert.equal(event.kind, "signature_replaced");
+  assert.equal(event.reason, "wrong_person_signed");
+  assert.equal(event.note, "Selected the wrong row.");
+  assert.equal("signaturePng" in event.affectedWorkers[0]!, false);
+  assert.throws(
+    () =>
+      replaceCompletedSignature(
+        completed,
+        "worker-2",
+        replacementPng,
+        "signature_unclear",
+        "x".repeat(251),
+        correctedAt,
+      ),
+    /cannot exceed 250/,
+  );
+});
+
+test("same-millisecond corrections remain distinct across document revisions", () => {
+  const occurredAt = new Date("2026-08-18T14:10:00.000Z");
+  const completed = completedAha();
+  const first = applyAhaMutationRules(
+    completed,
+    replaceCompletedSignature(
+      completed,
+      "worker-2",
+      replacementPng,
+      "signature_unclear",
+      null,
+      occurredAt,
+    ),
+  );
+  const second = applyAhaMutationRules(
+    first,
+    replaceCompletedSignature(
+      first,
+      "worker-2",
+      png,
+      "wrong_person_signed",
+      null,
+      occurredAt,
+    ),
+  );
+
+  const events = second.documentEvents.filter(
+    ({ kind }) => kind === "signature_replaced",
+  );
+  assert.equal(events.length, 2);
+  assert.notEqual(events[0]?.id, events[1]?.id);
+  assert.equal(events[0]?.fromDocumentRevision, first.documentRevision - 1);
+  assert.equal(events[1]?.fromDocumentRevision, first.documentRevision);
+});
+
+test("completed worker removal preserves the printed Person in charge and blocks the final worker", () => {
+  const completed = completedAha();
+  const removed = applyAhaMutationRules(
+    completed,
+    removeCompletedCrewMember(
+      completed,
+      "worker-1",
+      "worker_not_on_site",
+      null,
+      new Date("2026-08-18T14:20:00.000Z"),
+    ),
+  );
+  assert.equal(removed.crew.length, 1);
+  assert.equal(removed.personInChargeWorkerId, null);
+  assert.equal(removed.header.personInCharge, completed.header.personInCharge);
+  assert.equal(removed.documentEvents.at(-1)?.kind, "worker_removed");
+  assert.throws(
+    () =>
+      removeCompletedCrewMember(
+        { ...completed, crew: [completed.crew[0]!] },
+        "worker-1",
+        "added_by_mistake",
+        null,
+        new Date(),
+      ),
+    /final crew member/,
+  );
+});
+
+test("a later AHA locks only earlier records for the same job", () => {
+  const completed = completedAha();
+  const later = {
+    ...reviewReadyAha(),
+    id: "later",
+    date: "2026-08-19" as const,
+    header: { ...reviewReadyAha().header, date: "2026-08-19" as const },
+  };
+  assert.equal(isCompletedAhaLocked(completed, [completed]), false);
+  assert.equal(isCompletedAhaLocked(completed, [later]), true);
+  assert.equal(
+    isCompletedAhaLocked(completed, [{ ...later, jobId: "another-job" }]),
+    false,
+  );
 });
 
 test("late worker signing preserves completion and does not create an Updated chip timestamp", () => {
@@ -363,6 +606,30 @@ test("late worker signing preserves completion and does not create an Updated ch
   assert.equal(late.documentRevision, completed.documentRevision + 1);
   assert.equal(late.crew.length, completed.crew.length + 1);
   assert.deepEqual(late.crew.slice(0, completed.crew.length), completed.crew);
+});
+
+test("late worker cannot bypass a pending completed update", () => {
+  const completed = completedAha();
+  const pending = {
+    ...completed,
+    pendingCompletedUpdate: {
+      id: "update-1",
+      startedAt: "2026-08-18T14:10:00.000Z",
+      baselineDocumentRevision: completed.documentRevision,
+      kind: "administrative" as const,
+      crewReviewConfirmation: null,
+    },
+  };
+  assert.throws(
+    () =>
+      addLateSignedCrewMember(
+        pending,
+        { id: "worker-late", name: "Late Worker" },
+        replacementPng,
+        new Date("2026-08-18T14:15:00.000Z"),
+      ),
+    /pending completed update/,
+  );
 });
 
 test("crew mutations are AHA-local, trim names, and clear renamed signatures", () => {

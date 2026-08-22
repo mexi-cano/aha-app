@@ -1,5 +1,7 @@
 import {
   ahaSchema,
+  canonicalizePdfTimestamp,
+  isSamePdfVersionIdentity,
   parseStoredAha,
   parseStoredJob,
 } from "@workspace/aha-domain";
@@ -7,7 +9,10 @@ import { ApiError, customFetch } from "@workspace/api-client-react";
 
 import { getStoredAuthToken } from "./auth-storage";
 import {
+  ahaPdfRevisionKey,
   ahaDatabase,
+  type AhaPdfRecord,
+  type AhaPdfRevisionRecord,
   type BackupEntityKind,
   type BackupQueueItem,
 } from "./database";
@@ -34,7 +39,7 @@ export interface BackupSnapshot {
 export class LocalBackupRecordError extends Error {
   readonly name = "LocalBackupRecordError";
 
-  constructor(kind: "job" | "aha", cause: unknown) {
+  constructor(kind: "job" | "aha" | "pdf", cause: unknown) {
     super(`A saved ${kind} could not be prepared for backup.`, { cause });
   }
 }
@@ -42,6 +47,24 @@ export class LocalBackupRecordError extends Error {
 export interface ClassifiedBackupFailure {
   failure: "retryable" | "rejected";
   status: number | null;
+}
+
+export interface PdfBackupAcknowledgment {
+  backedUpAt: string;
+  sha256: string;
+  byteLength: number;
+}
+
+export function applyPdfBackupAcknowledgment<
+  T extends AhaPdfRecord | AhaPdfRevisionRecord,
+>(
+  record: T,
+  identity: { sourceRevision: number; generatedAt: string },
+  acknowledgment: PdfBackupAcknowledgment,
+): T | null {
+  return isSamePdfVersionIdentity(record, identity)
+    ? { ...record, ...acknowledgment }
+    : null;
 }
 
 let running = false;
@@ -104,16 +127,12 @@ export async function selectNextBackupItem(
 ): Promise<BackupQueueItem | null> {
   const rejectedJobIds = new Set(
     items
-      .filter(
-        (item) => item.kind === "job" && item.lastFailure === "rejected",
-      )
+      .filter((item) => item.kind === "job" && item.lastFailure === "rejected")
       .map((item) => item.entityId),
   );
   const rejectedAhaIds = new Set(
     items
-      .filter(
-        (item) => item.kind === "aha" && item.lastFailure === "rejected",
-      )
+      .filter((item) => item.kind === "aha" && item.lastFailure === "rejected")
       .map((item) => item.entityId),
   );
 
@@ -183,6 +202,7 @@ export async function getBackupSnapshot(): Promise<BackupSnapshot> {
 async function upload(item: BackupQueueItem): Promise<{
   accepted: boolean;
   backedUpAt: string;
+  pdfMetadata?: { sha256: string; byteLength: number };
 }> {
   if (item.kind === "job") {
     const value = await ahaDatabase.jobs.get(item.entityId);
@@ -218,33 +238,62 @@ async function upload(item: BackupQueueItem): Promise<{
     };
   }
 
-  const value = await ahaDatabase.ahaPdfs.get(item.entityId);
+  if (!Number.isInteger(item.sourceRevision) || !item.generatedAt) {
+    throw new LocalBackupRecordError(
+      "pdf",
+      new Error("The queued PDF version identity is missing."),
+    );
+  }
+  const current = await ahaDatabase.ahaPdfs.get(item.entityId);
+  const revision = await ahaDatabase.ahaPdfRevisions.get(
+    ahaPdfRevisionKey(item.entityId, item.sourceRevision!, item.generatedAt),
+  );
+  const value =
+    current &&
+    isSamePdfVersionIdentity(current, {
+      sourceRevision: item.sourceRevision!,
+      generatedAt: item.generatedAt,
+    })
+      ? current
+      : revision?.bytes
+        ? { ...revision, bytes: revision.bytes }
+        : null;
   if (!value) return { accepted: true, backedUpAt: new Date().toISOString() };
   const query = new URLSearchParams({
     filename: value.filename,
     sourceRevision: String(value.sourceRevision),
-    generatedAt: value.generatedAt,
+    generatedAt: canonicalizePdfTimestamp(value.generatedAt),
   });
   const result = await customFetch<{
     accepted: boolean;
-    record: { backedUpAt: string };
+    record: { backedUpAt: string; sha256: string; byteLength: number };
   }>(`/api/ahas/${encodeURIComponent(item.entityId)}/pdf?${query}`, {
     method: "PUT",
     responseType: "json",
     headers: { "Content-Type": "application/pdf" },
     body: value.bytes,
   });
-  return { accepted: result.accepted, backedUpAt: result.record.backedUpAt };
+  return {
+    accepted: result.accepted,
+    backedUpAt: result.record.backedUpAt,
+    pdfMetadata: {
+      sha256: result.record.sha256,
+      byteLength: result.record.byteLength,
+    },
+  };
 }
 
 async function acknowledge(
   captured: BackupQueueItem,
   backedUpAt: string,
+  pdfMetadata?: { sha256: string; byteLength: number },
 ): Promise<void> {
   await ahaDatabase.transaction(
     "rw",
     ahaDatabase.backupQueue,
     ahaDatabase.ahas,
+    ahaDatabase.ahaPdfs,
+    ahaDatabase.ahaPdfRevisions,
     ahaDatabase.settings,
     async () => {
       const current = await ahaDatabase.backupQueue.get(captured.key);
@@ -264,6 +313,48 @@ async function acknowledge(
             );
           }
         }
+      } else if (
+        captured.kind === "pdf" &&
+        Number.isInteger(captured.sourceRevision) &&
+        captured.generatedAt &&
+        pdfMetadata
+      ) {
+        const identity = {
+          sourceRevision: captured.sourceRevision!,
+          generatedAt: captured.generatedAt,
+        };
+        const metadata = { backedUpAt, ...pdfMetadata };
+        const currentPdf = await ahaDatabase.ahaPdfs.get(captured.entityId);
+        const acknowledgedCurrent = currentPdf
+          ? applyPdfBackupAcknowledgment(currentPdf, identity, metadata)
+          : null;
+        if (acknowledgedCurrent) {
+          await ahaDatabase.ahaPdfs.put(acknowledgedCurrent);
+        } else {
+          const key = ahaPdfRevisionKey(
+            captured.entityId,
+            captured.sourceRevision!,
+            captured.generatedAt,
+          );
+          const revision = await ahaDatabase.ahaPdfRevisions.get(key);
+          const acknowledgedRevision = revision
+            ? applyPdfBackupAcknowledgment(revision, identity, metadata)
+            : null;
+          if (!acknowledgedRevision) {
+            throw new LocalBackupRecordError(
+              "pdf",
+              new Error(
+                "The acknowledged PDF version is no longer available locally.",
+              ),
+            );
+          }
+          await ahaDatabase.ahaPdfRevisions.put(acknowledgedRevision);
+        }
+      } else if (captured.kind === "pdf") {
+        throw new LocalBackupRecordError(
+          "pdf",
+          new Error("The PDF acknowledgment metadata is missing."),
+        );
       }
       await ahaDatabase.backupQueue.delete(captured.key);
       await ahaDatabase.settings.put({
@@ -336,7 +427,7 @@ async function run(): Promise<void> {
           await retainFailure(item, "rejected", 409);
           continue;
         }
-        await acknowledge(item, result.backedUpAt);
+        await acknowledge(item, result.backedUpAt, result.pdfMetadata);
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) {
           await ahaDatabase.settings.put({

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  applyPdfBackupAcknowledgment,
   calculateRetryDelay,
   classifyBackupError,
   classifyBackupFailure,
@@ -9,10 +10,12 @@ import {
   selectNextBackupItem,
 } from "./backup-runtime";
 import {
+  backupQueueKey,
   createBackupQueueItem,
   ensureLaterTimestamp,
   type BackupEntityKind,
   type BackupQueueItem,
+  type AhaPdfRecord,
 } from "./database";
 
 test("backup retry delay is exponential, jittered, and capped at five minutes", () => {
@@ -154,9 +157,7 @@ test("a rejected PDF does not block independent PDFs and a coalesced write clear
   const resolver = resolveJobId({});
 
   assert.equal(
-    (
-      await selectNextBackupItem([rejectedPdf, independentPdf], resolver)
-    )?.key,
+    (await selectNextBackupItem([rejectedPdf, independentPdf], resolver))?.key,
     independentPdf.key,
   );
 
@@ -196,5 +197,49 @@ test("client timestamps remain monotonic when two writes share a clock tick", ()
       "2026-08-20T12:00:00.002Z",
     ),
     "2026-08-20T12:00:00.003Z",
+  );
+});
+
+test("PDF backup queue keys retain every generated revision", () => {
+  const first = backupQueueKey("pdf", "aha:1", {
+    sourceRevision: 2,
+    generatedAt: "2026-08-20T12:00:00.000Z",
+  });
+  const second = backupQueueKey("pdf", "aha:1", {
+    sourceRevision: 3,
+    generatedAt: "2026-08-20T12:05:00.000Z",
+  });
+  assert.notEqual(first, second);
+  assert.match(first, /^pdf:/);
+  assert.ok(first.includes(encodeURIComponent("aha:1")));
+});
+
+test("PDF acknowledgments update only the exact current or historical identity", () => {
+  const current: AhaPdfRecord = {
+    ahaId: "aha-1",
+    filename: "AHA.pdf",
+    bytes: new Uint8Array([1, 2, 3]).buffer,
+    sourceRevision: 4,
+    generatedAt: "2026-08-20T12:00:00.000Z",
+  };
+  const metadata = {
+    backedUpAt: "2026-08-20T12:00:01.000Z",
+    sha256: "ab".repeat(32),
+    byteLength: 3,
+  };
+  const acknowledged = applyPdfBackupAcknowledgment(
+    current,
+    { sourceRevision: 4, generatedAt: "2026-08-20 12:00:00+00" },
+    metadata,
+  );
+
+  assert.deepEqual(acknowledged, { ...current, ...metadata });
+  assert.equal(
+    applyPdfBackupAcknowledgment(
+      current,
+      { sourceRevision: 5, generatedAt: current.generatedAt },
+      metadata,
+    ),
+    null,
   );
 });

@@ -130,6 +130,84 @@ export interface AhaCrewMember {
   signedAt: string | null;
 }
 
+export interface CompletedCrewReviewConfirmation {
+  confirmedAt: string;
+  personInChargeName: string;
+}
+
+export type AhaDocumentEventKind = typeof AhaDocumentEventKind[keyof typeof AhaDocumentEventKind];
+
+
+export const AhaDocumentEventKind = {
+  initial_completion: 'initial_completion',
+  late_worker_added: 'late_worker_added',
+  signature_replaced: 'signature_replaced',
+  worker_removed: 'worker_removed',
+  safety_update: 'safety_update',
+  administrative_update: 'administrative_update',
+} as const;
+
+export type AhaDocumentEventReason = typeof AhaDocumentEventReason[keyof typeof AhaDocumentEventReason];
+
+
+export const AhaDocumentEventReason = {
+  initial_completion: 'initial_completion',
+  late_arrival: 'late_arrival',
+  wrong_person_signed: 'wrong_person_signed',
+  signature_unclear: 'signature_unclear',
+  worker_not_on_site: 'worker_not_on_site',
+  duplicate_entry: 'duplicate_entry',
+  added_by_mistake: 'added_by_mistake',
+  work_conditions_changed: 'work_conditions_changed',
+  administrative_correction: 'administrative_correction',
+} as const;
+
+export type AhaDocumentEventAffectedWorkersItem = {
+  /** @minLength 1 */
+  workerId: string;
+  name: string;
+};
+
+export interface AhaDocumentEvent {
+  /** @minLength 1 */
+  id: string;
+  kind: AhaDocumentEventKind;
+  reason: AhaDocumentEventReason;
+  /**
+     * @maxLength 250
+     * @nullable
+     */
+  note: string | null;
+  occurredAt: string;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  fromDocumentRevision: number | null;
+  /** @minimum 0 */
+  toDocumentRevision: number;
+  affectedWorkers: AhaDocumentEventAffectedWorkersItem[];
+  crewReviewConfirmation: CompletedCrewReviewConfirmation | null;
+}
+
+export type PendingCompletedUpdateKind = typeof PendingCompletedUpdateKind[keyof typeof PendingCompletedUpdateKind];
+
+
+export const PendingCompletedUpdateKind = {
+  safety: 'safety',
+  administrative: 'administrative',
+} as const;
+
+export interface PendingCompletedUpdate {
+  /** @minLength 1 */
+  id: string;
+  startedAt: string;
+  /** @minimum 0 */
+  baselineDocumentRevision: number;
+  kind: PendingCompletedUpdateKind;
+  crewReviewConfirmation: CompletedCrewReviewConfirmation | null;
+}
+
 export type AhaStatus = typeof AhaStatus[keyof typeof AhaStatus];
 
 
@@ -188,6 +266,8 @@ export interface Aha {
   /** @nullable */
   completedAt: string | null;
   updatedAfterCompletionAt: string[];
+  documentEvents?: AhaDocumentEvent[];
+  pendingCompletedUpdate?: PendingCompletedUpdate | null;
   sync: AhaSync;
 }
 
@@ -207,6 +287,7 @@ export interface PdfBackupMetadata {
   filename: string;
   /** @minimum 0 */
   sourceRevision: number;
+  /** Canonical UTC ISO 8601 timestamp used in PDF version identity. */
   generatedAt: string;
   /** @minimum 1 */
   byteLength: number;
@@ -215,9 +296,18 @@ export interface PdfBackupMetadata {
 }
 
 export interface PdfWriteResult {
+  /** True when the artifact was safely retained as either the current PDF or a historical version. */
   accepted: boolean;
+  /** True when this artifact won version comparison and is now the current PDF. */
+  isCurrent: boolean;
   record: PdfBackupMetadata;
 }
+
+export type PdfVersionMetadata = PdfBackupMetadata & ({
+  /** @nullable */
+  supersededAt: string | null;
+  isCurrent: boolean;
+});
 
 /**
  * Request failed
@@ -243,6 +333,16 @@ filename: string;
  * @minimum 0
  */
 sourceRevision: number;
+/**
+ * PDF generation instant; legacy parseable PostgreSQL timestamps are accepted and normalized to UTC.
+ */
+generatedAt: string;
+};
+
+export type GetAhaPdfVersionParams = {
+/**
+ * Exact generation instant; responses always use canonical UTC ISO 8601.
+ */
 generatedAt: string;
 };
 

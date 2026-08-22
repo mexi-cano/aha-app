@@ -4,7 +4,14 @@ import {
   MAX_CREW_MEMBERS,
   type EnergyCategoryName,
 } from "./canonical";
-import type { Aha, AhaCrewMember, JobWorker } from "./model";
+import { classifyEmergencyContact } from "./input-quality";
+import type {
+  Aha,
+  AhaCrewMember,
+  AhaDocumentEvent,
+  AhaDocumentEventReason,
+  JobWorker,
+} from "./model";
 
 export type RequiredReviewTarget =
   | {
@@ -29,6 +36,7 @@ export type RequiredReviewTarget =
 export type WarningReviewTarget =
   | { section: "details"; field: "workOrderPermit" }
   | { section: "details"; field: "jhaProcedureNumbers" }
+  | { section: "details"; field: "emergencyNumber" }
   | { section: "work"; field: "meetingNotes" };
 
 export type ReviewIssue =
@@ -52,7 +60,11 @@ export type ReviewIssue =
     }
   | {
       tier: "warning";
-      code: "work_order_permit" | "jha_procedures" | "meeting_notes";
+      code:
+        | "work_order_permit"
+        | "jha_procedures"
+        | "meeting_notes"
+        | "emergency_contact_format";
       message: string;
       target: WarningReviewTarget;
     };
@@ -68,6 +80,12 @@ export interface ReviewReport {
   warnings: Extract<ReviewIssue, { tier: "warning" }>[];
   information: ReviewInformation[];
   canStartSigning: boolean;
+}
+
+export function canMarkReviewWarningNotApplicable(
+  issue: Extract<ReviewIssue, { tier: "warning" }>,
+): boolean {
+  return issue.code !== "emergency_contact_format";
 }
 
 export interface EditorSectionReadiness {
@@ -252,7 +270,16 @@ export function hasSafetySensitiveContentChanged(
   next: Aha,
 ): boolean {
   return (
+    current.header.location !== next.header.location ||
+    current.header.personInCharge !== next.header.personInCharge ||
+    current.header.closestEmergencyCentre !==
+      next.header.closestEmergencyCentre ||
+    current.header.emergencyNumber !== next.header.emergencyNumber ||
+    current.header.musterPoint !== next.header.musterPoint ||
+    current.header.rescuePlanRequired !== next.header.rescuePlanRequired ||
     current.description !== next.description ||
+    current.meetingNotes !== next.meetingNotes ||
+    current.notApplicable.meetingNotes !== next.notApplicable.meetingNotes ||
     tasksChanged(current, next) ||
     energyChanged(current, next)
   );
@@ -264,6 +291,11 @@ export function applyInProgressEditRules(current: Aha, next: Aha): Aha {
 
 export interface AhaMutationRuleOptions {
   recordCompletedUpdateAt?: Date;
+  completedUpdateBaselineRevision?: number;
+}
+
+function completedUpdateId(aha: Aha, startedAt: Date): string {
+  return `completed-update:${aha.id}:${startedAt.toISOString()}`;
 }
 
 export function applyAhaMutationRules(
@@ -272,10 +304,14 @@ export function applyAhaMutationRules(
   options: AhaMutationRuleOptions = {},
 ): Aha {
   let adjusted = next;
+  const safetySensitiveChanged = hasSafetySensitiveContentChanged(
+    current,
+    next,
+  );
   if (
     (current.status === "in_progress" || current.status === "completed") &&
     next.status === current.status &&
-    hasSafetySensitiveContentChanged(current, next)
+    safetySensitiveChanged
   ) {
     adjusted = { ...adjusted, safetyCheck: null };
   }
@@ -289,9 +325,42 @@ export function applyAhaMutationRules(
     options.recordCompletedUpdateAt !== undefined &&
     hasNonCrewPdfSourceChanged(current, adjusted);
 
+  let pendingCompletedUpdate = adjusted.pendingCompletedUpdate;
+  if (shouldRecordCompletedUpdate) {
+    const startedAt = options.recordCompletedUpdateAt!;
+    const existing = current.pendingCompletedUpdate;
+    pendingCompletedUpdate = {
+      id: existing?.id ?? completedUpdateId(current, startedAt),
+      startedAt: existing?.startedAt ?? startedAt.toISOString(),
+      baselineDocumentRevision:
+        existing?.baselineDocumentRevision ??
+        options.completedUpdateBaselineRevision ??
+        current.documentRevision,
+      kind:
+        existing?.kind === "safety" || safetySensitiveChanged
+          ? "safety"
+          : "administrative",
+      crewReviewConfirmation: safetySensitiveChanged
+        ? null
+        : (existing?.crewReviewConfirmation ?? null),
+    };
+  } else if (
+    current.status === "completed" &&
+    adjusted.status === "completed" &&
+    current.pendingCompletedUpdate &&
+    safetySensitiveChanged
+  ) {
+    pendingCompletedUpdate = {
+      ...current.pendingCompletedUpdate,
+      kind: "safety",
+      crewReviewConfirmation: null,
+    };
+  }
+
   return {
     ...adjusted,
     documentRevision: current.documentRevision + 1,
+    pendingCompletedUpdate,
     updatedAfterCompletionAt: shouldRecordCompletedUpdate
       ? [
           ...adjusted.updatedAfterCompletionAt,
@@ -299,6 +368,83 @@ export function applyAhaMutationRules(
         ]
       : adjusted.updatedAfterCompletionAt,
   };
+}
+
+function correctionEventId(
+  aha: Aha,
+  kind: AhaDocumentEvent["kind"],
+  occurredAt: string,
+  workerId?: string,
+): string {
+  return [kind, aha.id, aha.documentRevision, workerId, occurredAt]
+    .filter((value) => value !== undefined && value !== "")
+    .join(":");
+}
+
+function correctionNote(note: string | null | undefined): string | null {
+  const normalized = note?.trim() ?? "";
+  if (normalized.length > 250) {
+    throw new Error("Correction notes cannot exceed 250 characters");
+  }
+  return normalized || null;
+}
+
+function appendDocumentEvent(aha: Aha, event: AhaDocumentEvent): Aha {
+  return aha.documentEvents.some(({ id }) => id === event.id)
+    ? aha
+    : { ...aha, documentEvents: [...aha.documentEvents, event] };
+}
+
+export function confirmCompletedCrewReview(aha: Aha, now: Date): Aha {
+  if (
+    aha.status !== "completed" ||
+    aha.pendingCompletedUpdate?.kind !== "safety"
+  ) {
+    throw new Error("A safety-sensitive completed update is not pending");
+  }
+  if (aha.safetyCheck !== "yes") {
+    throw new Error("The safety check must be answered Yes first");
+  }
+  return {
+    ...aha,
+    pendingCompletedUpdate: {
+      ...aha.pendingCompletedUpdate,
+      crewReviewConfirmation: {
+        confirmedAt: now.toISOString(),
+        personInChargeName: aha.header.personInCharge,
+      },
+    },
+  };
+}
+
+export function finalizeCompletedUpdate(aha: Aha, now: Date): Aha {
+  if (aha.status !== "completed" || !aha.pendingCompletedUpdate) {
+    return aha;
+  }
+  const pending = aha.pendingCompletedUpdate;
+  if (
+    pending.kind === "safety" &&
+    (aha.safetyCheck !== "yes" || !pending.crewReviewConfirmation)
+  ) {
+    throw new Error(
+      "Safety-sensitive updates require the safety check and crew review confirmation",
+    );
+  }
+  const event: AhaDocumentEvent = {
+    id: pending.id,
+    kind: pending.kind === "safety" ? "safety_update" : "administrative_update",
+    reason:
+      pending.kind === "safety"
+        ? "work_conditions_changed"
+        : "administrative_correction",
+    note: null,
+    occurredAt: now.toISOString(),
+    fromDocumentRevision: pending.baselineDocumentRevision,
+    toDocumentRevision: aha.documentRevision,
+    affectedWorkers: [],
+    crewReviewConfirmation: pending.crewReviewConfirmation,
+  };
+  return appendDocumentEvent({ ...aha, pendingCompletedUpdate: null }, event);
 }
 
 export function getReviewReport(aha: Aha): ReviewReport {
@@ -343,6 +489,15 @@ export function getReviewReport(aha: Aha): ReviewReport {
         target: { section: "details", field },
       });
     }
+  }
+
+  if (classifyEmergencyContact(aha.header.emergencyNumber) === "unrecognized") {
+    warnings.push({
+      tier: "warning",
+      code: "emergency_contact_format",
+      message: "Check that this includes the number the crew should call.",
+      target: { section: "details", field: "emergencyNumber" },
+    });
   }
 
   if (isBlank(aha.description)) {
@@ -642,6 +797,9 @@ export function addLateSignedCrewMember(
   if (aha.status !== "completed") {
     throw new Error("Late workers can only be added to a completed AHA");
   }
+  if (aha.pendingCompletedUpdate) {
+    throw new Error("Finish the pending completed update first");
+  }
   if (aha.crew.some((member) => member.workerId === worker.id)) {
     throw new Error("Crew member is already on this AHA");
   }
@@ -649,17 +807,137 @@ export function addLateSignedCrewMember(
     throw new Error("This AHA already has 10 signature slots");
   }
   assertPngDataUrl(signaturePng);
-  return {
-    ...aha,
-    crew: [
-      ...aha.crew,
-      {
-        ...normalizedWorker(worker),
-        signaturePng,
-        signedAt: now.toISOString(),
-      },
-    ],
+  const occurredAt = now.toISOString();
+  const member = {
+    ...normalizedWorker(worker),
+    signaturePng,
+    signedAt: occurredAt,
   };
+  return appendDocumentEvent(
+    {
+      ...aha,
+      crew: [...aha.crew, member],
+    },
+    {
+      id: correctionEventId(aha, "late_worker_added", occurredAt, worker.id),
+      kind: "late_worker_added",
+      reason: "late_arrival",
+      note: null,
+      occurredAt,
+      fromDocumentRevision: aha.documentRevision,
+      toDocumentRevision: aha.documentRevision + 1,
+      affectedWorkers: [{ workerId: worker.id, name: member.name }],
+      crewReviewConfirmation: null,
+    },
+  );
+}
+
+export type SignatureReplacementReason = Extract<
+  AhaDocumentEventReason,
+  "wrong_person_signed" | "signature_unclear"
+>;
+
+export function replaceCompletedSignature(
+  aha: Aha,
+  workerId: string,
+  signaturePng: string,
+  reason: SignatureReplacementReason,
+  note: string | null,
+  now: Date,
+): Aha {
+  if (aha.status !== "completed") {
+    throw new Error("Signatures can only be corrected on a completed AHA");
+  }
+  if (aha.pendingCompletedUpdate) {
+    throw new Error("Finish the pending completed update first");
+  }
+  if (!getReviewReport(aha).canStartSigning) {
+    throw new Error("Review items must be fixed before replacing a signature");
+  }
+  if (reason !== "wrong_person_signed" && reason !== "signature_unclear") {
+    throw new Error("A valid signature replacement reason is required");
+  }
+  assertPngDataUrl(signaturePng);
+  const member = aha.crew.find((candidate) => candidate.workerId === workerId);
+  if (!member?.signaturePng || !member.signedAt) {
+    throw new Error("A saved worker signature was not found");
+  }
+  const occurredAt = now.toISOString();
+  return appendDocumentEvent(
+    {
+      ...aha,
+      crew: aha.crew.map((candidate) =>
+        candidate.workerId === workerId
+          ? { ...candidate, signaturePng, signedAt: occurredAt }
+          : candidate,
+      ),
+    },
+    {
+      id: correctionEventId(aha, "signature_replaced", occurredAt, workerId),
+      kind: "signature_replaced",
+      reason,
+      note: correctionNote(note),
+      occurredAt,
+      fromDocumentRevision: aha.documentRevision,
+      toDocumentRevision: aha.documentRevision + 1,
+      affectedWorkers: [{ workerId, name: member.name }],
+      crewReviewConfirmation: null,
+    },
+  );
+}
+
+export type CompletedWorkerRemovalReason = Extract<
+  AhaDocumentEventReason,
+  "worker_not_on_site" | "duplicate_entry" | "added_by_mistake"
+>;
+
+export function removeCompletedCrewMember(
+  aha: Aha,
+  workerId: string,
+  reason: CompletedWorkerRemovalReason,
+  note: string | null,
+  now: Date,
+): Aha {
+  if (aha.status !== "completed") {
+    throw new Error("Workers can only be corrected on a completed AHA");
+  }
+  if (aha.pendingCompletedUpdate) {
+    throw new Error("Finish the pending completed update first");
+  }
+  if (aha.crew.length <= 1) {
+    throw new Error("The final crew member cannot be removed");
+  }
+  if (
+    reason !== "worker_not_on_site" &&
+    reason !== "duplicate_entry" &&
+    reason !== "added_by_mistake"
+  ) {
+    throw new Error("A valid worker removal reason is required");
+  }
+  const member = aha.crew.find((candidate) => candidate.workerId === workerId);
+  if (!member) throw new Error("Crew member was not found");
+  const occurredAt = now.toISOString();
+  return appendDocumentEvent(
+    {
+      ...aha,
+      crew: aha.crew.filter((candidate) => candidate.workerId !== workerId),
+      personInChargeWorkerId:
+        aha.personInChargeWorkerId === workerId
+          ? null
+          : aha.personInChargeWorkerId,
+    },
+    {
+      id: correctionEventId(aha, "worker_removed", occurredAt, workerId),
+      kind: "worker_removed",
+      reason,
+      note: correctionNote(note),
+      occurredAt,
+      fromDocumentRevision: aha.documentRevision,
+      toDocumentRevision: aha.documentRevision + 1,
+      affectedWorkers: [{ workerId, name: member.name }],
+      crewReviewConfirmation: null,
+    },
+  );
 }
 
 export function completeAha(aha: Aha, now: Date): Aha {
@@ -671,11 +949,40 @@ export function completeAha(aha: Aha, now: Date): Aha {
       "Every crew member must sign and all must-fix items must pass",
     );
   }
-  return {
-    ...aha,
-    status: "completed",
-    completedAt: now.toISOString(),
-  };
+  const occurredAt = now.toISOString();
+  return appendDocumentEvent(
+    {
+      ...aha,
+      status: "completed",
+      completedAt: occurredAt,
+    },
+    {
+      id: correctionEventId(aha, "initial_completion", occurredAt),
+      kind: "initial_completion",
+      reason: "initial_completion",
+      note: null,
+      occurredAt,
+      fromDocumentRevision: null,
+      toDocumentRevision: aha.documentRevision,
+      affectedWorkers: aha.crew.map(({ workerId, name }) => ({
+        workerId,
+        name,
+      })),
+      crewReviewConfirmation: null,
+    },
+  );
+}
+
+export function isCompletedAhaLocked(
+  aha: Aha,
+  availableAhas: readonly Aha[],
+): boolean {
+  return availableAhas.some(
+    (candidate) =>
+      candidate.id !== aha.id &&
+      candidate.jobId === aha.jobId &&
+      candidate.date > aha.date,
+  );
 }
 
 export function countSignedCrew(aha: Aha): number {

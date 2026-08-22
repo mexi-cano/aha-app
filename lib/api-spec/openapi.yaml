@@ -200,6 +200,7 @@ paths:
         - name: generatedAt
           in: query
           required: true
+          description: PDF generation instant; legacy parseable PostgreSQL timestamps are accepted and normalized to UTC.
           schema: { type: string, format: date-time }
       requestBody:
         required: true
@@ -215,6 +216,57 @@ paths:
         "400": { $ref: "#/components/responses/Problem" }
         "401": { $ref: "#/components/responses/Problem" }
         "409": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
+  /ahas/{ahaId}/pdf/versions:
+    get:
+      operationId: listAhaPdfVersions
+      tags: [ahas]
+      security: [{ bearerAuth: [] }]
+      summary: List current and superseded PDF metadata
+      parameters:
+        - $ref: "#/components/parameters/AhaId"
+      responses:
+        "200":
+          description: PDF version metadata, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PdfVersionMetadata" }
+        "401": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
+  /ahas/{ahaId}/pdf/versions/{sourceRevision}:
+    get:
+      operationId: getAhaPdfVersion
+      tags: [ahas]
+      security: [{ bearerAuth: [] }]
+      summary: Download one exact PDF version
+      parameters:
+        - $ref: "#/components/parameters/AhaId"
+        - name: sourceRevision
+          in: path
+          required: true
+          schema: { type: integer, minimum: 0 }
+        - name: generatedAt
+          in: query
+          required: true
+          description: Exact generation instant; responses always use canonical UTC ISO 8601.
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Exact PDF version
+          headers:
+            X-AHA-Filename: { schema: { type: string } }
+            X-AHA-Source-Revision: { schema: { type: integer } }
+            X-AHA-Generated-At:
+              schema: { type: string, format: date-time }
+            X-Content-SHA256: { schema: { type: string } }
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
         "503": { $ref: "#/components/responses/Problem" }
 components:
   securitySchemes:
@@ -399,6 +451,86 @@ components:
         signedAt:
           type: [string, "null"]
           format: date-time
+    CompletedCrewReviewConfirmation:
+      type: object
+      additionalProperties: false
+      required: [confirmedAt, personInChargeName]
+      properties:
+        confirmedAt: { type: string, format: date-time }
+        personInChargeName: { type: string }
+    AhaDocumentEvent:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          kind,
+          reason,
+          note,
+          occurredAt,
+          fromDocumentRevision,
+          toDocumentRevision,
+          affectedWorkers,
+          crewReviewConfirmation,
+        ]
+      properties:
+        id: { type: string, minLength: 1 }
+        kind:
+          type: string
+          enum:
+            [
+              initial_completion,
+              late_worker_added,
+              signature_replaced,
+              worker_removed,
+              safety_update,
+              administrative_update,
+            ]
+        reason:
+          type: string
+          enum:
+            [
+              initial_completion,
+              late_arrival,
+              wrong_person_signed,
+              signature_unclear,
+              worker_not_on_site,
+              duplicate_entry,
+              added_by_mistake,
+              work_conditions_changed,
+              administrative_correction,
+            ]
+        note: { type: [string, "null"], maxLength: 250 }
+        occurredAt: { type: string, format: date-time }
+        fromDocumentRevision: { type: [integer, "null"], minimum: 0 }
+        toDocumentRevision: { type: integer, minimum: 0 }
+        affectedWorkers:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [workerId, name]
+            properties:
+              workerId: { type: string, minLength: 1 }
+              name: { type: string }
+        crewReviewConfirmation:
+          oneOf:
+            - $ref: "#/components/schemas/CompletedCrewReviewConfirmation"
+            - type: "null"
+    PendingCompletedUpdate:
+      type: object
+      additionalProperties: false
+      required:
+        [id, startedAt, baselineDocumentRevision, kind, crewReviewConfirmation]
+      properties:
+        id: { type: string, minLength: 1 }
+        startedAt: { type: string, format: date-time }
+        baselineDocumentRevision: { type: integer, minimum: 0 }
+        kind: { type: string, enum: [safety, administrative] }
+        crewReviewConfirmation:
+          oneOf:
+            - $ref: "#/components/schemas/CompletedCrewReviewConfirmation"
+            - type: "null"
     Aha:
       type: object
       additionalProperties: false
@@ -461,6 +593,15 @@ components:
         updatedAfterCompletionAt:
           type: array
           items: { type: string, format: date-time }
+        documentEvents:
+          type: array
+          default: []
+          items: { $ref: "#/components/schemas/AhaDocumentEvent" }
+        pendingCompletedUpdate:
+          oneOf:
+            - $ref: "#/components/schemas/PendingCompletedUpdate"
+            - type: "null"
+          default: null
         sync:
           type: object
           additionalProperties: false
@@ -500,13 +641,31 @@ components:
         ahaId: { type: string }
         filename: { type: string }
         sourceRevision: { type: integer, minimum: 0 }
-        generatedAt: { type: string, format: date-time }
+        generatedAt:
+          type: string
+          format: date-time
+          description: Canonical UTC ISO 8601 timestamp used in PDF version identity.
         byteLength: { type: integer, minimum: 1 }
         sha256: { type: string }
         backedUpAt: { type: string, format: date-time }
     PdfWriteResult:
       type: object
-      required: [accepted, record]
+      required: [accepted, isCurrent, record]
       properties:
-        accepted: { type: boolean }
+        accepted:
+          type: boolean
+          description: True when the artifact was safely retained as either the current PDF or a historical version.
+        isCurrent:
+          type: boolean
+          description: True when this artifact won version comparison and is now the current PDF.
         record: { $ref: "#/components/schemas/PdfBackupMetadata" }
+    PdfVersionMetadata:
+      allOf:
+        - $ref: "#/components/schemas/PdfBackupMetadata"
+        - type: object
+          required: [supersededAt, isCurrent]
+          properties:
+            supersededAt:
+              type: [string, "null"]
+              format: date-time
+            isCurrent: { type: boolean }

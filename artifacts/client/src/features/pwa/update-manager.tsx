@@ -3,6 +3,7 @@ import { useLocation } from "react-router";
 import { RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { requestAppReload } from "@/data/app-reload";
 
 export function UpdateManager() {
   const location = useLocation();
@@ -64,7 +65,7 @@ export function UpdateManager() {
       () => {
         if (reloading) return;
         reloading = true;
-        window.location.reload();
+        requestAppReload("pwa_update");
       },
       { once: true },
     );

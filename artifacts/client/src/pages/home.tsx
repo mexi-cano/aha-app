@@ -2,11 +2,7 @@ import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Check, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router";
-import {
-  canStartSigning,
-  getReviewReport,
-  type Aha,
-} from "@workspace/aha-domain";
+import { canStartSigning, type Aha } from "@workspace/aha-domain";
 
 import { AppLogo } from "@/components/aha/app-logo";
 import { BackupStatus } from "@/components/aha/backup-status";
@@ -14,6 +10,7 @@ import { HomeStateCard } from "@/components/aha/home-state-card";
 import { Button } from "@/components/ui/button";
 import { getHomeSnapshot, startToday } from "@/data/aha-repository";
 import { createPdfNavigationState } from "@/features/aha-editor/pdf-navigation";
+import { useRecoveryState } from "@/features/restore/restore-gate";
 import { useToday } from "@/hooks/use-today";
 import { formatLongDate, formatShortDate } from "@/lib/date-format";
 import { cn } from "@/lib/utils";
@@ -26,12 +23,16 @@ const RECENT_AHA_STATUS_LABELS = {
 
 function EmptyJobState({
   hasJobs,
+  isReadOnly,
   onSetup,
   onChoose,
+  onResumeRecovery,
 }: {
   hasJobs: boolean;
+  isReadOnly: boolean;
   onSetup: () => void;
   onChoose: () => void;
+  onResumeRecovery: () => void;
 }) {
   return (
     <main className="min-h-screen bg-background px-5 py-12">
@@ -40,18 +41,38 @@ function EmptyJobState({
           <AppLogo />
         </div>
         <h1 className="mt-8 text-2xl font-bold">
-          {hasJobs ? "Choose the restored job" : "No job is set up yet"}
+          {isReadOnly && hasJobs
+            ? "Recovery paused"
+            : hasJobs
+              ? "Choose the restored job"
+              : "No job is set up yet"}
         </h1>
         <p className="mt-3 text-base font-medium leading-relaxed text-muted-foreground">
-          {hasJobs
+          {isReadOnly && hasJobs
+            ? "Choose a verified saved job to view its completed documents, or resume recovery from the banner above."
+            : hasJobs
             ? "Recovery is complete. Choose the job to open; the app will not guess for you."
             : "No job has been set up on this iPad. Your existing local data has not been changed."}
         </p>
         <Button
           className="mt-7 min-h-14 w-full text-base font-bold"
-          onClick={hasJobs ? onChoose : onSetup}
+          onClick={
+            isReadOnly
+              ? hasJobs
+                ? onChoose
+                : onResumeRecovery
+              : hasJobs
+                ? onChoose
+                : onSetup
+          }
         >
-          {hasJobs ? "CHOOSE A JOB" : "SET UP A JOB"}
+          {isReadOnly && hasJobs
+            ? "CHOOSE SAVED JOB"
+            : isReadOnly
+              ? "RESUME RECOVERY"
+            : hasJobs
+              ? "CHOOSE A JOB"
+              : "SET UP A JOB"}
         </Button>
       </section>
     </main>
@@ -60,6 +81,7 @@ function EmptyJobState({
 
 export default function Home() {
   const navigate = useNavigate();
+  const { isPaused, isWriteBlocked, resumeRecovery } = useRecoveryState();
   const today = useToday();
   const snapshot = useLiveQuery(() => getHomeSnapshot(today), [today]);
   const [isStarting, setIsStarting] = useState(false);
@@ -79,8 +101,10 @@ export default function Home() {
     return (
       <EmptyJobState
         hasJobs={snapshot.jobCount > 0}
+        isReadOnly={isWriteBlocked}
         onSetup={() => navigate("/setup")}
         onChoose={() => navigate("/jobs")}
+        onResumeRecovery={resumeRecovery}
       />
     );
   }
@@ -88,7 +112,7 @@ export default function Home() {
 
   const openEditor = (ahaId: string) => navigate(`/ahas/${ahaId}/details`);
   const handleStart = async () => {
-    if (isStarting) return;
+    if (isStarting || isWriteBlocked) return;
     setIsStarting(true);
     setStartError(null);
     try {
@@ -129,7 +153,7 @@ export default function Home() {
             className="mt-3 min-h-12 px-0 text-base text-primary"
             onClick={() => navigate("/jobs")}
           >
-            Change job or update defaults
+            {isPaused ? "Choose saved job" : "Change job or update defaults"}
           </Button>
 
           {snapshot.recentAhas.length ? (
@@ -230,11 +254,31 @@ export default function Home() {
           </div>
         ) : null}
 
+        {isWriteBlocked ? (
+          <section className="rounded-xl border border-[#C6CDE8] bg-secondary px-4 py-4 text-secondary-foreground">
+            <p className="text-base font-bold">Safety records are read-only.</p>
+            <p className="mt-1 text-sm font-medium leading-relaxed">
+              Completed documents remain available. Resume recovery before
+              starting or changing an AHA.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-3 min-h-12 w-full border-[#C6CDE8] bg-card text-primary"
+              onClick={resumeRecovery}
+              disabled={!isPaused}
+            >
+              RESUME RECOVERY
+            </Button>
+          </section>
+        ) : null}
+
         <HomeStateCard
           todayAha={snapshot.todayAha}
           todayPdfStatus={snapshot.todayPdfStatus}
           hasRecentAha={snapshot.recentAhas.length > 0}
           isStarting={isStarting}
+          isReadOnly={isWriteBlocked}
           onStart={() => void handleStart()}
           onOpenEditor={() =>
             snapshot.todayAha && openEditor(snapshot.todayAha.id)
@@ -249,21 +293,7 @@ export default function Home() {
           }}
           onViewCompleted={() => {
             if (!snapshot.todayAha) return;
-            if (snapshot.todayPdfStatus === "current") {
-              navigate(`/ahas/${snapshot.todayAha.id}/pdf`, {
-                state: createPdfNavigationState("home"),
-              });
-            } else {
-              navigate(
-                !getReviewReport(snapshot.todayAha).canStartSigning
-                  ? `/ahas/${snapshot.todayAha.id}/update/review`
-                  : `/ahas/${snapshot.todayAha.id}/completed`,
-              );
-            }
-          }}
-          onUpdateCompleted={() => {
-            if (!snapshot.todayAha) return;
-            navigate(`/ahas/${snapshot.todayAha.id}/update/details`);
+            navigate(`/ahas/${snapshot.todayAha.id}/completed`);
           }}
         />
       </div>

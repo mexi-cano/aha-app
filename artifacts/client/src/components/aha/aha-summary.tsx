@@ -11,6 +11,7 @@ import {
 
 import { ReviewIssueGroupNotice } from "@/components/aha/review-issue-notice";
 import { ForemanBadge } from "@/components/aha/foreman-badge";
+import { EnergyWheel } from "@/components/aha/energy-wheel";
 import { Button } from "@/components/ui/button";
 import {
   groupReviewIssues,
@@ -38,6 +39,7 @@ interface AhaSummaryProps {
   onNotApplicable?: (issue: Extract<ReviewIssue, { tier: "warning" }>) => void;
   disabled?: boolean;
   workerReviewLanguage?: WorkerReviewLanguage;
+  showSigningEnergyWheel?: boolean;
 }
 
 function SectionHeader({
@@ -125,6 +127,7 @@ export function AhaSummary({
   onNotApplicable,
   disabled = false,
   workerReviewLanguage = "en",
+  showSigningEnergyWheel = false,
 }: AhaSummaryProps) {
   const copy = getWorkerReviewCopy(workerReviewLanguage);
   const editable = mode === "review";
@@ -317,38 +320,66 @@ export function AhaSummary({
           message={information("energy_count")}
           positive={!energyHasBlocker}
         />
-        <div className="flex flex-col gap-3">
-          {aha.energySelections.map(({ category, examples }) => (
-            <div
-              key={category}
-              className="flex flex-col items-start gap-2 sm:flex-row sm:items-center"
-            >
-              <span className="inline-flex min-h-10 shrink-0 items-center rounded-full border border-[#C6CDE8] bg-secondary px-3.5 text-[15px] font-semibold text-secondary-foreground">
-                {workerReviewEnergyCategory(category, workerReviewLanguage)}
-              </span>
-              <span
-                className={`text-base font-medium ${
-                  examples.length ? "" : "text-muted-foreground"
-                }`}
-              >
-                {examples.length
-                  ? examples
-                      .map((example) =>
-                        workerReviewEnergyExample(
-                          example,
-                          workerReviewLanguage,
-                        ),
-                      )
-                      .join(", ")
-                  : copy.noExamples}
-              </span>
-            </div>
-          ))}
-          {aha.energySelections.length === 0 ? (
-            <p className="text-base font-medium text-muted-foreground">
-              {copy.noEnergy}
-            </p>
+        <div
+          className={
+            showSigningEnergyWheel
+              ? "grid gap-5 md:grid-cols-[180px_minmax(0,1fr)] md:items-start"
+              : undefined
+          }
+        >
+          {showSigningEnergyWheel ? (
+            <EnergyWheel
+              presentation="compact"
+              selectedCategories={aha.energySelections.map(
+                ({ category }) => category,
+              )}
+              labels={{
+                heading: copy.energyWheelHeading,
+                selectionSummary: copy.energyWheelSelection(
+                  aha.energySelections.length,
+                  ENERGY_CATEGORY_NAMES.length,
+                ),
+                helper: copy.energyWheelHelper,
+                accessibilityDescription: copy.energyWheelAccessibility(
+                  aha.energySelections.length,
+                  ENERGY_CATEGORY_NAMES.length,
+                ),
+              }}
+            />
           ) : null}
+          <div className="flex min-w-0 flex-col gap-3">
+            {aha.energySelections.map(({ category, examples }) => (
+              <div
+                key={category}
+                className="flex flex-col items-start gap-2 sm:flex-row sm:items-center"
+              >
+                <span className="inline-flex min-h-10 shrink-0 items-center rounded-full border border-[#C6CDE8] bg-secondary px-3.5 text-[15px] font-semibold text-secondary-foreground">
+                  {workerReviewEnergyCategory(category, workerReviewLanguage)}
+                </span>
+                <span
+                  className={`min-w-0 text-base font-medium ${
+                    examples.length ? "" : "text-muted-foreground"
+                  }`}
+                >
+                  {examples.length
+                    ? examples
+                        .map((example) =>
+                          workerReviewEnergyExample(
+                            example,
+                            workerReviewLanguage,
+                          ),
+                        )
+                        .join(", ")
+                    : copy.noExamples}
+                </span>
+              </div>
+            ))}
+            {aha.energySelections.length === 0 ? (
+              <p className="text-base font-medium text-muted-foreground">
+                {copy.noEnergy}
+              </p>
+            ) : null}
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4 text-base font-semibold">
           {copy.safetyCheck}:{" "}

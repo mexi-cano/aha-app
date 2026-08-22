@@ -18,20 +18,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { createLocalId } from "@/data/aha-repository";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
+import { runCompletedSignatureOperation } from "@/features/aha-editor/completed-signature-operation";
+import { useAhaPdfState } from "@/hooks/use-aha-pdf-state";
 import {
   getWorkerReviewCopy,
   type WorkerReviewErrorKey,
   type WorkerReviewLanguage,
 } from "@/features/aha-editor/worker-review-copy";
-import {
-  analyzeAhaPdfFit,
-  navigateAfterPersistedPdfOperation,
-  saveAhaAndGeneratePdf,
-  type PdfFitIssue,
-} from "@/pdf";
+import { navigateAfterPersistedPdfOperation, type PdfFitIssue } from "@/pdf";
 
 export default function AhaLateWorker() {
-  const { aha, job, commitAha, navigateSafely } = useAhaEditor();
+  const { aha, job, commitAha, navigateSafely, isCompletedLocked } =
+    useAhaEditor();
+  const pdf = useAhaPdfState(aha);
   const [name, setName] = useState("");
   const [workerId] = useState(() => createLocalId());
   const [hasInk, setHasInk] = useState(false);
@@ -59,43 +58,27 @@ export default function AhaLateWorker() {
     setFitIssues([]);
     try {
       const now = new Date();
-      let candidate;
-      try {
-        candidate = addLateSignedCrewMember(
-          aha,
+      const update = (current: typeof aha) =>
+        addLateSignedCrewMember(
+          current,
           { id: workerId, name },
           signaturePng,
           now,
         );
-      } catch (cause) {
-        if (import.meta.env.DEV) {
-          console.error("Late worker domain operation failed", cause);
-        }
+      const result = await runCompletedSignatureOperation({
+        aha,
+        commitAha,
+        update,
+        job,
+      });
+      if (result.status === "candidate_failed") {
         setError("worker_add");
         return;
       }
-      let fit;
-      try {
-        fit = await analyzeAhaPdfFit(candidate, job);
-      } catch {
-        setError("pdf_check");
+      if (result.status === "candidate_fit_failed") {
+        setFitIssues(result.issues);
         return;
       }
-      if (fit.issues.length > 0) {
-        setFitIssues(fit.issues);
-        return;
-      }
-      const result = await saveAhaAndGeneratePdf({
-        commitAha,
-        update: (current) =>
-          addLateSignedCrewMember(
-            current,
-            { id: workerId, name },
-            signaturePng,
-            now,
-          ),
-        job,
-      });
       if (result.status === "save_failed") {
         setError("save_signature");
         return;
@@ -107,12 +90,22 @@ export default function AhaLateWorker() {
     }
   };
 
-  if (aha.status !== "completed" || aha.crew.length >= MAX_CREW_MEMBERS) {
+  if (
+    aha.status !== "completed" ||
+    aha.crew.length >= MAX_CREW_MEMBERS ||
+    isCompletedLocked ||
+    pdf?.status !== "current" ||
+    Boolean(aha.pendingCompletedUpdate)
+  ) {
     return (
       <main className="min-h-screen bg-background px-5 py-12 text-center">
-        <h1 className="text-xl font-bold">No signature slot is available.</h1>
+        <h1 className="text-xl font-bold">A late worker cannot be added.</h1>
         <p className="mt-2 text-base font-medium text-muted-foreground">
-          The official ITS sheet holds no more than ten workers.
+          {aha.crew.length >= MAX_CREW_MEMBERS
+            ? "The official ITS sheet holds no more than ten workers."
+            : isCompletedLocked
+              ? "A later AHA has started, so this signed checkpoint is read-only."
+              : "Finish the current PDF before starting another correction."}
         </p>
         <Button
           className="mt-5 min-h-12"

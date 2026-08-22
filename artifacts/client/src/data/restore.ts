@@ -5,6 +5,7 @@ import {
   type Job,
 } from "@workspace/aha-domain";
 import {
+  ApiError,
   customFetch,
   listJobs,
   type JobBackupRecord,
@@ -12,12 +13,24 @@ import {
 
 import { getStoredAuthToken } from "./auth-storage";
 import {
+  AUTHORIZATION_REQUIRED_EVENT,
+  parseRestoredPdfMetadata,
+  sha256Hex,
+} from "./pdf-backup-metadata";
+import { refreshPdfVersionMetadata } from "./pdf-version-repository";
+import {
+  ACTIVE_JOB_SETTING,
   ahaDatabase,
   RESTORE_NEEDS_JOB_CHOICE_SETTING,
   RESTORE_PROGRESS_SETTING,
 } from "./database";
 
-export const AUTHORIZATION_REQUIRED_EVENT = "aha-authorization-required";
+export {
+  AUTHORIZATION_REQUIRED_EVENT,
+  parseRemotePdfVersionMetadata,
+  parseRestoredPdfMetadata,
+  sha256Hex,
+} from "./pdf-backup-metadata";
 
 export interface RestoreProgress {
   version: 1;
@@ -28,25 +41,73 @@ export interface RestoreProgress {
   pdfIndex: number;
 }
 
-function parseProgress(value: string): RestoreProgress {
-  const parsed = JSON.parse(value) as Partial<RestoreProgress>;
-  if (
-    parsed.version !== 1 ||
-    !["jobs", "ahas", "pdfs"].includes(parsed.stage ?? "") ||
-    !Array.isArray(parsed.jobs) ||
-    !Array.isArray(parsed.ahaIds) ||
-    typeof parsed.pdfIndex !== "number"
-  ) {
-    throw new Error("Saved restore progress is invalid.");
+export class InvalidRestoreProgressError extends Error {
+  readonly name = "InvalidRestoreProgressError";
+
+  constructor(cause?: unknown) {
+    super("Saved recovery progress could not be read.", { cause });
   }
-  return {
-    version: 1,
-    stage: parsed.stage!,
-    jobs: parsed.jobs.map((job) => jobSchema.parse(job)),
-    cursor: typeof parsed.cursor === "string" ? parsed.cursor : null,
-    ahaIds: parsed.ahaIds.filter((id): id is string => typeof id === "string"),
-    pdfIndex: parsed.pdfIndex,
-  };
+}
+
+export function planRestoredJobChoice(
+  jobs: readonly Pick<Job, "id">[],
+): { activeJobId: string | null; needsChoice: boolean } {
+  if (jobs.length === 0) {
+    return { activeJobId: null, needsChoice: false };
+  }
+  if (jobs.length === 1) {
+    return { activeJobId: jobs[0]!.id, needsChoice: false };
+  }
+  return { activeJobId: null, needsChoice: true };
+}
+
+async function applyRestoredJobChoice(jobs: readonly Job[]): Promise<void> {
+  const current = await ahaDatabase.settings.get(ACTIVE_JOB_SETTING);
+  const plan = planRestoredJobChoice(jobs);
+  if (plan.activeJobId) {
+    await ahaDatabase.settings.put({
+      key: ACTIVE_JOB_SETTING,
+      value: plan.activeJobId,
+    });
+  } else if (current) {
+    await ahaDatabase.settings.delete(ACTIVE_JOB_SETTING);
+  }
+  if (plan.needsChoice) {
+    await ahaDatabase.settings.put({
+      key: RESTORE_NEEDS_JOB_CHOICE_SETTING,
+      value: "true",
+    });
+  } else {
+    await ahaDatabase.settings.delete(RESTORE_NEEDS_JOB_CHOICE_SETTING);
+  }
+}
+
+export function parseRestoreProgress(value: string): RestoreProgress {
+  try {
+    const parsed = JSON.parse(value) as Partial<RestoreProgress>;
+    if (
+      parsed.version !== 1 ||
+      !["jobs", "ahas", "pdfs"].includes(parsed.stage ?? "") ||
+      !Array.isArray(parsed.jobs) ||
+      !Array.isArray(parsed.ahaIds) ||
+      typeof parsed.pdfIndex !== "number"
+    ) {
+      throw new InvalidRestoreProgressError();
+    }
+    return {
+      version: 1,
+      stage: parsed.stage!,
+      jobs: parsed.jobs.map((job) => jobSchema.parse(job)),
+      cursor: typeof parsed.cursor === "string" ? parsed.cursor : null,
+      ahaIds: parsed.ahaIds.filter(
+        (id): id is string => typeof id === "string",
+      ),
+      pdfIndex: parsed.pdfIndex,
+    };
+  } catch (cause) {
+    if (cause instanceof InvalidRestoreProgressError) throw cause;
+    throw new InvalidRestoreProgressError(cause);
+  }
 }
 
 async function saveProgress(progress: RestoreProgress): Promise<void> {
@@ -58,7 +119,11 @@ async function saveProgress(progress: RestoreProgress): Promise<void> {
 
 export async function getRestoreProgress(): Promise<RestoreProgress | null> {
   const setting = await ahaDatabase.settings.get(RESTORE_PROGRESS_SETTING);
-  return setting ? parseProgress(setting.value) : null;
+  return setting ? parseRestoreProgress(setting.value) : null;
+}
+
+export async function clearRestoreProgressForRestart(): Promise<void> {
+  await ahaDatabase.settings.delete(RESTORE_PROGRESS_SETTING);
 }
 
 export async function listRemoteJobs(): Promise<JobBackupRecord[]> {
@@ -103,60 +168,15 @@ async function authenticatedPdfFetch(ahaId: string): Promise<Response> {
   return response;
 }
 
-async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("");
-}
-
-export function parseRestoredPdfMetadata(
-  headers: Headers,
-  computedChecksum: string,
-): {
-  filename: string;
-  sourceRevision: number;
-  generatedAt: string;
-} {
-  const expectedChecksum = headers.get("X-Content-SHA256")?.trim();
-  if (
-    !expectedChecksum ||
-    !/^[a-f0-9]{64}$/i.test(expectedChecksum) ||
-    computedChecksum.toLowerCase() !== expectedChecksum.toLowerCase()
-  ) {
-    throw new Error("A restored PDF did not pass its checksum check.");
-  }
-
-  const filenameHeader = headers.get("X-AHA-Filename");
-  const revisionHeader = headers.get("X-AHA-Source-Revision");
-  const generatedAt = headers.get("X-AHA-Generated-At");
-  const sourceRevision =
-    revisionHeader === null ? Number.NaN : Number(revisionHeader);
-  if (
-    !filenameHeader ||
-    !Number.isInteger(sourceRevision) ||
-    sourceRevision < 0 ||
-    !generatedAt ||
-    Number.isNaN(Date.parse(generatedAt))
-  ) {
-    throw new Error("A restored PDF has invalid metadata.");
-  }
-
-  let filename: string;
-  try {
-    filename = decodeURIComponent(filenameHeader);
-  } catch {
-    throw new Error("A restored PDF has invalid metadata.");
-  }
-  if (!filename) throw new Error("A restored PDF has invalid metadata.");
-
-  return { filename, sourceRevision, generatedAt };
-}
-
 async function restorePdf(ahaId: string): Promise<void> {
   const response = await authenticatedPdfFetch(ahaId);
   if (response.status === 404) return;
-  if (!response.ok) throw new Error("A saved PDF could not be restored.");
+  if (!response.ok) {
+    throw new ApiError(response, null, {
+      method: "GET",
+      url: `/api/ahas/${encodeURIComponent(ahaId)}/pdf`,
+    });
+  }
   const bytes = await response.arrayBuffer();
   const metadata = parseRestoredPdfMetadata(
     response.headers,
@@ -166,6 +186,7 @@ async function restorePdf(ahaId: string): Promise<void> {
     ahaId,
     ...metadata,
     bytes,
+    byteLength: bytes.byteLength,
   });
 }
 
@@ -178,9 +199,15 @@ export async function resumeRestore(
 
   if (progress.stage === "jobs") {
     onProgress?.("Restoring job setup…");
-    await ahaDatabase.transaction("rw", ahaDatabase.jobs, async () => {
-      for (const job of progress!.jobs) await ahaDatabase.jobs.put(job);
-    });
+    await ahaDatabase.transaction(
+      "rw",
+      ahaDatabase.jobs,
+      ahaDatabase.settings,
+      async () => {
+        for (const job of progress!.jobs) await ahaDatabase.jobs.put(job);
+        await applyRestoredJobChoice(progress!.jobs);
+      },
+    );
     progress = { ...progress, stage: "ahas", cursor: null };
     await saveProgress(progress);
   }
@@ -224,15 +251,13 @@ export async function resumeRestore(
       `Restoring saved PDFs (${index + 1} of ${progress.ahaIds.length})…`,
     );
     await restorePdf(progress.ahaIds[index]!);
+    await refreshPdfVersionMetadata(progress.ahaIds[index]!);
     progress = { ...progress, pdfIndex: index + 1 };
     await saveProgress(progress);
   }
 
   await ahaDatabase.transaction("rw", ahaDatabase.settings, async () => {
     await ahaDatabase.settings.delete(RESTORE_PROGRESS_SETTING);
-    await ahaDatabase.settings.put({
-      key: RESTORE_NEEDS_JOB_CHOICE_SETTING,
-      value: "true",
-    });
+    await applyRestoredJobChoice(progress.jobs);
   });
 }

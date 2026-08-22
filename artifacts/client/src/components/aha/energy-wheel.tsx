@@ -3,7 +3,10 @@ import {
   type EnergyCategoryName,
 } from "@workspace/aha-domain";
 
-import wheelImage from "../../../../../assets/aha-energy-wheel-recolored.png";
+const wheelImage = new URL(
+  "../../../../../assets/aha-energy-wheel-recolored.png",
+  import.meta.url,
+).href;
 
 const HUMAN_FACTORS_CATEGORY =
   ENERGY_CATEGORY_NAMES[ENERGY_CATEGORY_NAMES.length - 1]!;
@@ -34,21 +37,45 @@ function getWheelSectorPath(
 
 export function EnergyWheel({
   selectedCategories,
+  presentation = "card",
+  labels,
 }: {
   selectedCategories: readonly EnergyCategoryName[];
+  presentation?: "card" | "compact";
+  labels?: {
+    heading: string;
+    selectionSummary: string;
+    helper: string;
+    accessibilityDescription: string;
+  };
 }) {
   const selected = new Set(selectedCategories);
   const humanFactorsSelected = selected.has(HUMAN_FACTORS_CATEGORY);
+  const compact = presentation === "compact";
+  const resolvedLabels = labels ?? {
+    heading: "ENERGY WHEEL",
+    selectionSummary: `${selected.size} of ${ENERGY_CATEGORY_NAMES.length} selected`,
+    helper: "Mirrors your selections",
+    accessibilityDescription: `${selected.size} of ${ENERGY_CATEGORY_NAMES.length} energy categories selected`,
+  };
 
   return (
-    <div className="rounded-[14px] border border-card-border bg-card p-4">
+    <div
+      className={
+        compact
+          ? "mx-auto w-full max-w-[160px] md:max-w-[180px]"
+          : "rounded-[14px] border border-card-border bg-card p-4"
+      }
+    >
       <p className="text-xs font-bold tracking-[0.1em] text-muted-foreground">
-        ENERGY WHEEL
+        {resolvedLabels.heading}
       </p>
       <div
-        className="relative mx-auto mt-2 aspect-square w-full max-w-[210px]"
+        className={`relative mx-auto mt-2 aspect-square w-full ${
+          compact ? "max-w-[160px] md:max-w-[180px]" : "max-w-[210px]"
+        }`}
         role="img"
-        aria-label={`${selected.size} of ${ENERGY_CATEGORY_NAMES.length} energy categories selected`}
+        aria-label={resolvedLabels.accessibilityDescription}
       >
         <img src={wheelImage} alt="" className="size-full" aria-hidden="true" />
         <svg
@@ -87,9 +114,9 @@ export function EnergyWheel({
         </svg>
       </div>
       <p className="mt-2 text-center text-sm font-medium leading-5 text-muted-foreground">
-        {selected.size} of {ENERGY_CATEGORY_NAMES.length} selected
+        {resolvedLabels.selectionSummary}
         <br />
-        Mirrors your selections
+        {resolvedLabels.helper}
       </p>
     </div>
   );

@@ -1,5 +1,11 @@
 import Dexie, { type EntityTable } from "dexie";
-import type { Aha, Job } from "@workspace/aha-domain";
+import {
+  canonicalizePdfTimestamp,
+  pdfVersionIdentityKey,
+  type Aha,
+  type Job,
+  type PdfVersionIdentity,
+} from "@workspace/aha-domain";
 
 import type { DraftMetadata } from "./draft-metadata";
 
@@ -14,6 +20,22 @@ export interface AhaPdfRecord {
   bytes: ArrayBuffer;
   generatedAt: string;
   sourceRevision: number;
+  byteLength?: number;
+  sha256?: string | null;
+  backedUpAt?: string | null;
+}
+
+export interface AhaPdfRevisionRecord {
+  key: string;
+  ahaId: string;
+  filename: string;
+  bytes: ArrayBuffer | null;
+  generatedAt: string;
+  sourceRevision: number;
+  byteLength: number;
+  sha256: string | null;
+  backedUpAt: string | null;
+  supersededAt: string;
 }
 
 export type BackupEntityKind = "job" | "aha" | "pdf";
@@ -29,13 +51,30 @@ export interface BackupQueueItem {
   nextAttemptAt: string;
   lastFailure: BackupFailureKind;
   lastStatus: number | null;
+  sourceRevision?: number;
+  generatedAt?: string;
+}
+
+export function ahaPdfRevisionKey(
+  ahaId: string,
+  sourceRevision: number,
+  generatedAt: string,
+): string {
+  return pdfVersionIdentityKey(ahaId, sourceRevision, generatedAt);
 }
 
 export function backupQueueKey(
   kind: BackupEntityKind,
   entityId: string,
+  pdfVersion?: PdfVersionIdentity,
 ): string {
-  return `${kind}:${entityId}`;
+  return kind === "pdf" && pdfVersion
+    ? `${kind}:${ahaPdfRevisionKey(
+        entityId,
+        pdfVersion.sourceRevision,
+        pdfVersion.generatedAt,
+      )}`
+    : `${kind}:${entityId}`;
 }
 
 export function createBackupQueueItem(
@@ -43,16 +82,55 @@ export function createBackupQueueItem(
   entityId: string,
   clientUpdatedAt: string,
   nextAttemptAt = new Date().toISOString(),
+  pdfVersion?: PdfVersionIdentity,
 ): BackupQueueItem {
+  const canonicalPdfVersion = pdfVersion
+    ? {
+        ...pdfVersion,
+        generatedAt: canonicalizePdfTimestamp(pdfVersion.generatedAt),
+      }
+    : undefined;
   return {
-    key: backupQueueKey(kind, entityId),
+    key: backupQueueKey(kind, entityId, canonicalPdfVersion),
     kind,
     entityId,
-    clientUpdatedAt,
+    clientUpdatedAt:
+      kind === "pdf" && canonicalPdfVersion
+        ? canonicalPdfVersion.generatedAt
+        : clientUpdatedAt,
     attempts: 0,
     nextAttemptAt,
     lastFailure: null,
     lastStatus: null,
+    ...(canonicalPdfVersion
+      ? {
+          sourceRevision: canonicalPdfVersion.sourceRevision,
+          generatedAt: canonicalPdfVersion.generatedAt,
+        }
+      : {}),
+  };
+}
+
+export function convertLegacyPdfQueueItem(
+  queued: BackupQueueItem,
+  current: AhaPdfRecord | undefined,
+): BackupQueueItem | null {
+  if (!current) return null;
+  const converted = createBackupQueueItem(
+    "pdf",
+    current.ahaId,
+    current.generatedAt,
+    queued.nextAttemptAt,
+    {
+      sourceRevision: current.sourceRevision,
+      generatedAt: current.generatedAt,
+    },
+  );
+  return {
+    ...converted,
+    attempts: queued.attempts,
+    lastFailure: queued.lastFailure,
+    lastStatus: queued.lastStatus,
   };
 }
 
@@ -76,6 +154,7 @@ class AhaDatabase extends Dexie {
   settings!: EntityTable<AppSetting, "key">;
   draftMetadata!: EntityTable<DraftMetadata, "ahaId">;
   ahaPdfs!: EntityTable<AhaPdfRecord, "ahaId">;
+  ahaPdfRevisions!: EntityTable<AhaPdfRevisionRecord, "key">;
   backupQueue!: EntityTable<BackupQueueItem, "key">;
 
   constructor() {
@@ -162,6 +241,38 @@ class AhaDatabase extends Dexie {
               createBackupQueueItem("pdf", record.ahaId, record.generatedAt),
             );
           }
+        }
+      });
+
+    this.version(4)
+      .stores({
+        jobs: "&id",
+        ahas: "&id, &[jobId+date], jobId, date, status, sync.savedLocallyAt",
+        settings: "&key",
+        draftMetadata: "&ahaId, sourceAhaId",
+        ahaPdfs: "&ahaId, sourceRevision, generatedAt",
+        ahaPdfRevisions:
+          "&key, ahaId, [ahaId+sourceRevision+generatedAt], sourceRevision, generatedAt, backedUpAt",
+        backupQueue:
+          "&key, kind, entityId, clientUpdatedAt, nextAttemptAt, lastFailure",
+      })
+      .upgrade(async (transaction) => {
+        const queue = transaction.table("backupQueue");
+        const pdfTable = transaction.table("ahaPdfs");
+        const queuedPdfs = await queue.where("kind").equals("pdf").toArray();
+        for (const value of queuedPdfs) {
+          const queued = value as BackupQueueItem;
+          if (
+            typeof queued.entityId !== "string" ||
+            (Number.isInteger(queued.sourceRevision) && queued.generatedAt)
+          ) {
+            continue;
+          }
+          const current = (await pdfTable.get(queued.entityId)) as
+            AhaPdfRecord | undefined;
+          await queue.delete(queued.key);
+          const converted = convertLegacyPdfQueueItem(queued, current);
+          if (converted) await queue.put(converted);
         }
       });
   }

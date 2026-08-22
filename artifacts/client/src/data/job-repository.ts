@@ -10,7 +10,12 @@ import {
   RESTORE_NEEDS_JOB_CHOICE_SETTING,
 } from "./database";
 import { isDevFixtureId } from "./dev-fixture";
+import { sortJobsForSelection } from "./job-selection";
 import { partitionReadableJobs } from "./stored-records";
+import {
+  assertRecoveryMutationAllowed,
+  assertRecoveryMutationAllowedInTransaction,
+} from "./recovery-mutation-guard";
 
 export interface JobListSnapshot {
   jobs: Job[];
@@ -26,11 +31,11 @@ export async function getJobListSnapshot(): Promise<JobListSnapshot> {
   const { records: jobs, unreadableCount } = partitionReadableJobs(
     records.filter(({ id }) => !isDevFixtureId(id)),
   );
-  jobs.sort((left, right) => left.name.localeCompare(right.name));
-  const activeJobId = jobs.some(({ id }) => id === activeSetting?.value)
+  const orderedJobs = sortJobsForSelection(jobs);
+  const activeJobId = orderedJobs.some(({ id }) => id === activeSetting?.value)
     ? activeSetting!.value
     : null;
-  return { jobs, activeJobId, unreadableCount };
+  return { jobs: orderedJobs, activeJobId, unreadableCount };
 }
 
 export async function getJob(jobId: string): Promise<Job | null> {
@@ -65,6 +70,7 @@ export async function createJob(
   input: Omit<Job, "id">,
   now = new Date(),
 ): Promise<Job> {
+  await assertRecoveryMutationAllowed();
   const job = jobSchema.parse({ ...input, id: createLocalId() });
   const changedAt = now.toISOString();
   await ahaDatabase.transaction(
@@ -73,6 +79,7 @@ export async function createJob(
     ahaDatabase.settings,
     ahaDatabase.backupQueue,
     async () => {
+      await assertRecoveryMutationAllowedInTransaction();
       await ahaDatabase.jobs.add(job);
       await ahaDatabase.settings.put({
         key: ACTIVE_JOB_SETTING,
@@ -95,6 +102,7 @@ export async function updateJobConfiguration(
   >,
   now = new Date(),
 ): Promise<Job> {
+  await assertRecoveryMutationAllowed();
   const existingValue = await ahaDatabase.jobs.get(jobId);
   if (!existingValue || isDevFixtureId(jobId)) {
     throw new Error("That job is not available on this iPad.");
@@ -106,6 +114,7 @@ export async function updateJobConfiguration(
     "rw",
     ahaDatabase.jobs,
     ahaDatabase.backupQueue,
+    ahaDatabase.settings,
     async () => {
       const queued = await ahaDatabase.backupQueue.get(
         backupQueueKey("job", updated.id),
@@ -114,6 +123,7 @@ export async function updateJobConfiguration(
         changedAt,
         queued?.clientUpdatedAt,
       );
+      await assertRecoveryMutationAllowedInTransaction();
       await ahaDatabase.jobs.put(updated);
       await ahaDatabase.backupQueue.put(
         createBackupQueueItem("job", updated.id, monotonicChangedAt),

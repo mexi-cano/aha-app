@@ -14,6 +14,7 @@ import {
   type AhaPdfRecord,
   type AhaPdfRevisionRecord,
   type BackupEntityKind,
+  type BackupFailureCode,
   type BackupQueueItem,
 } from "./database";
 
@@ -34,6 +35,18 @@ export type BackupViewState =
 export interface BackupSnapshot {
   state: BackupViewState;
   pendingCount: number;
+}
+
+export interface BackupSupportItem {
+  key: string;
+  kind: BackupEntityKind;
+  title: string;
+  identity: string;
+  state: "waiting" | "will_retry" | "needs_support" | "authorization";
+  failureCode: BackupFailureCode | null;
+  cause: string;
+  lastAttemptAt: string | null;
+  localCopyState: "safe" | "preserved_needs_support";
 }
 
 export class LocalBackupRecordError extends Error {
@@ -104,6 +117,109 @@ export function classifyBackupError(error: unknown): ClassifiedBackupFailure {
         : classifyBackupFailure(status),
     status,
   };
+}
+
+export function classifyBackupFailureCode(error: unknown): BackupFailureCode {
+  if (error instanceof LocalBackupRecordError) return "invalid_local_data";
+  if (error instanceof ApiError) {
+    if (error.status === 401) return "authorization";
+    if (error.status === 409) return "integrity_conflict";
+    if (error.status >= 500 || error.status === 408 || error.status === 429) {
+      return "service_failure";
+    }
+    return "rejected_request";
+  }
+  return "unknown_failure";
+}
+
+const backupCauseCopy: Record<BackupFailureCode, string> = {
+  remote_newer:
+    "A newer saved version already exists online. The local copy was not overwritten.",
+  integrity_conflict:
+    "This PDF identity already exists online with different verified bytes.",
+  invalid_local_data:
+    "The saved local record could not be prepared safely for backup.",
+  rejected_request: "The backup service rejected this saved record.",
+  authorization:
+    "The access code must be entered again before backup can continue.",
+  service_failure:
+    "The backup service is temporarily unavailable and can be retried.",
+  unknown_failure: "The backup could not be completed for an unknown reason.",
+};
+
+export async function getBackupSupportItems(): Promise<BackupSupportItem[]> {
+  const queue = ordered(await ahaDatabase.backupQueue.toArray());
+  return Promise.all(
+    queue.map(async (item) => {
+      const aha =
+        item.kind === "job" ? null : await ahaDatabase.ahas.get(item.entityId);
+      const jobId = item.kind === "job" ? item.entityId : aha?.jobId;
+      const job = jobId ? await ahaDatabase.jobs.get(jobId) : null;
+      const failureCode = item.failureCode ?? null;
+      const state =
+        failureCode === "authorization"
+          ? "authorization"
+          : item.lastFailure === "rejected"
+            ? "needs_support"
+            : item.lastFailure === "retryable"
+              ? "will_retry"
+              : "waiting";
+      const identity =
+        item.kind === "pdf"
+          ? `${aha?.date ?? "Saved AHA"} · PDF revision ${item.sourceRevision ?? "unknown"}`
+          : item.kind === "aha"
+            ? (aha?.date ?? "Saved AHA")
+            : (job?.name ?? "Saved job");
+      return {
+        key: item.key,
+        kind: item.kind,
+        title:
+          item.kind === "pdf"
+            ? "Official PDF"
+            : item.kind === "aha"
+              ? "AHA record"
+              : "Job setup",
+        identity,
+        state,
+        failureCode,
+        cause: failureCode
+          ? backupCauseCopy[failureCode]
+          : navigator.onLine
+            ? "Waiting for its turn to back up."
+            : "Waiting for an internet connection.",
+        lastAttemptAt: item.failedAt ?? null,
+        localCopyState:
+          failureCode === "invalid_local_data"
+            ? "preserved_needs_support"
+            : "safe",
+      };
+    }),
+  );
+}
+
+export async function retryBackupItem(key: string): Promise<boolean> {
+  const changed = await ahaDatabase.transaction(
+    "rw",
+    ahaDatabase.backupQueue,
+    async () => {
+      const current = await ahaDatabase.backupQueue.get(key);
+      if (!current) return false;
+      await ahaDatabase.backupQueue.put({
+        ...current,
+        nextAttemptAt: new Date().toISOString(),
+        lastFailure: null,
+        lastStatus: null,
+        failureCode: undefined,
+        failedAt: undefined,
+      });
+      return true;
+    },
+  );
+  if (changed) {
+    announce();
+    triggerBackupProcessing();
+  }
+  return changed;
 }
 
 const kindOrder: Record<BackupEntityKind, number> = {
@@ -369,6 +485,7 @@ async function retainFailure(
   captured: BackupQueueItem,
   failure: "retryable" | "rejected",
   status: number | null,
+  failureCode: BackupFailureCode,
 ): Promise<string | null> {
   let scheduledAt: string | null = null;
   await ahaDatabase.transaction("rw", ahaDatabase.backupQueue, async () => {
@@ -385,6 +502,8 @@ async function retainFailure(
       attempts,
       lastFailure: failure,
       lastStatus: status,
+      failureCode,
+      failedAt: new Date().toISOString(),
       nextAttemptAt: scheduledAt ?? current.nextAttemptAt,
     });
   });
@@ -424,12 +543,13 @@ async function run(): Promise<void> {
       try {
         const result = await upload(item);
         if (!result.accepted) {
-          await retainFailure(item, "rejected", 409);
+          await retainFailure(item, "rejected", 409, "remote_newer");
           continue;
         }
         await acknowledge(item, result.backedUpAt, result.pdfMetadata);
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) {
+          await retainFailure(item, "retryable", 401, "authorization");
           await ahaDatabase.settings.put({
             key: BACKUP_AUTH_PAUSED_SETTING,
             value: "true",
@@ -437,7 +557,12 @@ async function run(): Promise<void> {
           return;
         }
         const { failure, status } = classifyBackupError(error);
-        const scheduledAt = await retainFailure(item, failure, status);
+        const scheduledAt = await retainFailure(
+          item,
+          failure,
+          status,
+          classifyBackupFailureCode(error),
+        );
         if (failure === "retryable" && scheduledAt) {
           scheduleRetry(scheduledAt);
           return;

@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { ApiError } from "@workspace/api-client-react";
 
 import {
   applyPdfBackupAcknowledgment,
   calculateRetryDelay,
   classifyBackupError,
   classifyBackupFailure,
+  classifyBackupFailureCode,
   LocalBackupRecordError,
   selectNextBackupItem,
 } from "./backup-runtime";
@@ -45,6 +47,37 @@ test("only typed unreadable local records are rejected without an HTTP status", 
     failure: "retryable",
     status: null,
   });
+});
+
+test("backup diagnostics classify only sanitized operational failure codes", () => {
+  assert.equal(
+    classifyBackupFailureCode(
+      new LocalBackupRecordError("aha", new Error("private record contents")),
+    ),
+    "invalid_local_data",
+  );
+  assert.equal(
+    classifyBackupFailureCode(
+      new ApiError(new Response(null, { status: 409 }), null, {
+        method: "PUT",
+        url: "/api/ahas/aha-1/pdf",
+      }),
+    ),
+    "integrity_conflict",
+  );
+  assert.equal(
+    classifyBackupFailureCode(
+      new ApiError(new Response(null, { status: 503 }), null, {
+        method: "PUT",
+        url: "/api/ahas/aha-1",
+      }),
+    ),
+    "service_failure",
+  );
+  assert.equal(
+    classifyBackupFailureCode(new TypeError("offline")),
+    "unknown_failure",
+  );
 });
 
 function queueItem(

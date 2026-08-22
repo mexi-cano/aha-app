@@ -8,6 +8,7 @@ import {
 } from "@workspace/aha-domain";
 
 import type { DraftMetadata } from "./draft-metadata";
+import type { JobSetupDraft } from "../features/job-setup";
 
 export interface AppSetting {
   key: string;
@@ -42,6 +43,15 @@ export type BackupEntityKind = "job" | "aha" | "pdf";
 
 export type BackupFailureKind = "retryable" | "rejected" | null;
 
+export type BackupFailureCode =
+  | "remote_newer"
+  | "integrity_conflict"
+  | "invalid_local_data"
+  | "rejected_request"
+  | "authorization"
+  | "service_failure"
+  | "unknown_failure";
+
 export interface BackupQueueItem {
   key: string;
   kind: BackupEntityKind;
@@ -53,6 +63,17 @@ export interface BackupQueueItem {
   lastStatus: number | null;
   sourceRevision?: number;
   generatedAt?: string;
+  failureCode?: BackupFailureCode;
+  failedAt?: string;
+}
+
+export interface JobSetupDraftRecord {
+  key: string;
+  mode: "create" | "edit";
+  jobId: string | null;
+  draft: JobSetupDraft;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export function ahaPdfRevisionKey(
@@ -131,6 +152,8 @@ export function convertLegacyPdfQueueItem(
     attempts: queued.attempts,
     lastFailure: queued.lastFailure,
     lastStatus: queued.lastStatus,
+    failureCode: queued.failureCode,
+    failedAt: queued.failedAt,
   };
 }
 
@@ -156,6 +179,7 @@ class AhaDatabase extends Dexie {
   ahaPdfs!: EntityTable<AhaPdfRecord, "ahaId">;
   ahaPdfRevisions!: EntityTable<AhaPdfRevisionRecord, "key">;
   backupQueue!: EntityTable<BackupQueueItem, "key">;
+  jobSetupDrafts!: EntityTable<JobSetupDraftRecord, "key">;
 
   constructor() {
     super("its-aha");
@@ -275,6 +299,19 @@ class AhaDatabase extends Dexie {
           if (converted) await queue.put(converted);
         }
       });
+
+    this.version(5).stores({
+      jobs: "&id",
+      ahas: "&id, &[jobId+date], jobId, date, status, sync.savedLocallyAt",
+      settings: "&key",
+      draftMetadata: "&ahaId, sourceAhaId",
+      ahaPdfs: "&ahaId, sourceRevision, generatedAt",
+      ahaPdfRevisions:
+        "&key, ahaId, [ahaId+sourceRevision+generatedAt], sourceRevision, generatedAt, backedUpAt",
+      backupQueue:
+        "&key, kind, entityId, clientUpdatedAt, nextAttemptAt, lastFailure",
+      jobSetupDrafts: "&key, mode, jobId, updatedAt",
+    });
   }
 }
 

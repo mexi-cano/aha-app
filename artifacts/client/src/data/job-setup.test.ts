@@ -5,6 +5,7 @@ import {
   buildJobConfiguration,
   createEmptyJobSetupDraft,
   getVisibleJobSetupIssues,
+  parseJobSetupDraft,
   validateJobSetup,
 } from "../features/job-setup";
 
@@ -102,4 +103,28 @@ test("job setup preserves valid user-entered values exactly", () => {
   const job = buildJobConfiguration(draft);
   assert.equal(job.name, draft.name);
   assert.equal(job.defaults.location, draft.location);
+});
+
+test("saved setup drafts parse without rewriting user-entered values", () => {
+  const draft = {
+    ...requiredDraft(),
+    name: "  North Pump Station  ",
+    roster: [{ id: "worker-1", name: " Jordan Lee " }],
+  };
+  assert.deepEqual(parseJobSetupDraft(draft), draft);
+});
+
+test("malformed saved setup drafts are rejected without coercion", () => {
+  assert.throws(
+    () => parseJobSetupDraft({ ...requiredDraft(), roster: "Jordan Lee" }),
+    /Invalid saved job setup draft/,
+  );
+  assert.throws(
+    () =>
+      parseJobSetupDraft({
+        ...requiredDraft(),
+        personInChargeWorkerId: 42,
+      }),
+    /Invalid saved job setup draft/,
+  );
 });

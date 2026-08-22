@@ -69,6 +69,7 @@ export async function setActiveJob(jobId: string): Promise<void> {
 export async function createJob(
   input: Omit<Job, "id">,
   now = new Date(),
+  completedSetupDraftKey?: string,
 ): Promise<Job> {
   await assertRecoveryMutationAllowed();
   const job = jobSchema.parse({ ...input, id: createLocalId() });
@@ -78,6 +79,7 @@ export async function createJob(
     ahaDatabase.jobs,
     ahaDatabase.settings,
     ahaDatabase.backupQueue,
+    ahaDatabase.jobSetupDrafts,
     async () => {
       await assertRecoveryMutationAllowedInTransaction();
       await ahaDatabase.jobs.add(job);
@@ -89,6 +91,9 @@ export async function createJob(
       await ahaDatabase.backupQueue.put(
         createBackupQueueItem("job", job.id, changedAt),
       );
+      if (completedSetupDraftKey) {
+        await ahaDatabase.jobSetupDrafts.delete(completedSetupDraftKey);
+      }
     },
   );
   return job;
@@ -101,6 +106,7 @@ export async function updateJobConfiguration(
     "defaults" | "roster" | "defaultPersonInChargeWorkerId"
   >,
   now = new Date(),
+  completedSetupDraftKey?: string,
 ): Promise<Job> {
   await assertRecoveryMutationAllowed();
   const existingValue = await ahaDatabase.jobs.get(jobId);
@@ -115,6 +121,7 @@ export async function updateJobConfiguration(
     ahaDatabase.jobs,
     ahaDatabase.backupQueue,
     ahaDatabase.settings,
+    ahaDatabase.jobSetupDrafts,
     async () => {
       const queued = await ahaDatabase.backupQueue.get(
         backupQueueKey("job", updated.id),
@@ -128,6 +135,9 @@ export async function updateJobConfiguration(
       await ahaDatabase.backupQueue.put(
         createBackupQueueItem("job", updated.id, monotonicChangedAt),
       );
+      if (completedSetupDraftKey) {
+        await ahaDatabase.jobSetupDrafts.delete(completedSetupDraftKey);
+      }
     },
   );
   return updated;

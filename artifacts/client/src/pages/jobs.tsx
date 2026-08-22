@@ -6,6 +6,10 @@ import { useLocation, useNavigate } from "react-router";
 import { AppLogo } from "@/components/aha/app-logo";
 import { Button } from "@/components/ui/button";
 import { getJobListSnapshot, setActiveJob } from "@/data/job-repository";
+import {
+  getJobSetupDraftKeys,
+  jobSetupDraftKey,
+} from "@/data/job-setup-draft-repository";
 import { useRecoveryState } from "@/features/restore/restore-gate";
 
 interface JobsLocationState {
@@ -17,6 +21,7 @@ export default function Jobs() {
   const location = useLocation();
   const { isWriteBlocked } = useRecoveryState();
   const snapshot = useLiveQuery(getJobListSnapshot);
+  const setupDraftKeys = useLiveQuery(getJobSetupDraftKeys);
   const [activateError, setActivateError] = useState<string | null>(null);
   const [recoveryNotice] = useState(() => {
     const value = location.state as JobsLocationState | null;
@@ -28,7 +33,7 @@ export default function Jobs() {
     navigate(location.pathname, { replace: true, state: null });
   }, [location.pathname, location.state, navigate]);
 
-  if (!snapshot) {
+  if (!snapshot || setupDraftKeys === undefined) {
     return (
       <main className="min-h-screen bg-background px-5 py-12 text-center text-base font-semibold text-muted-foreground">
         Opening jobs…
@@ -113,6 +118,9 @@ export default function Jobs() {
           {snapshot.jobs.length ? (
             snapshot.jobs.map((job) => {
               const active = job.id === snapshot.activeJobId;
+              const hasSavedChanges = setupDraftKeys.includes(
+                jobSetupDraftKey(job.id),
+              );
               return (
                 <div
                   key={job.id}
@@ -145,10 +153,14 @@ export default function Jobs() {
                   <Button
                     variant="ghost"
                     className="min-h-12 shrink-0 text-base text-primary"
-                    disabled={isWriteBlocked}
+                    disabled={isWriteBlocked && !hasSavedChanges}
                     onClick={() => navigate(`/jobs/${job.id}/setup`)}
                   >
-                    Defaults{" "}
+                    {hasSavedChanges
+                      ? isWriteBlocked
+                        ? "View changes"
+                        : "Continue changes"
+                      : "Defaults"}{" "}
                     <ChevronRight className="size-5" aria-hidden="true" />
                   </Button>
                 </div>
@@ -164,10 +176,17 @@ export default function Jobs() {
         <Button
           variant="outline"
           className="min-h-14 border-dashed text-base text-primary"
-          disabled={isWriteBlocked}
+          disabled={
+            isWriteBlocked && !setupDraftKeys.includes(jobSetupDraftKey(null))
+          }
           onClick={() => navigate("/setup")}
         >
-          <Plus className="size-5" aria-hidden="true" /> Set up another job
+          <Plus className="size-5" aria-hidden="true" />
+          {setupDraftKeys.includes(jobSetupDraftKey(null))
+            ? isWriteBlocked
+              ? "View saved job setup"
+              : "Continue new job setup"
+            : "Set up another job"}
         </Button>
       </div>
     </main>

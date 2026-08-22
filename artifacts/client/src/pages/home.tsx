@@ -9,6 +9,10 @@ import { BackupStatus } from "@/components/aha/backup-status";
 import { HomeStateCard } from "@/components/aha/home-state-card";
 import { Button } from "@/components/ui/button";
 import { getHomeSnapshot, startToday } from "@/data/aha-repository";
+import {
+  getJobSetupDraftKeys,
+  jobSetupDraftKey,
+} from "@/data/job-setup-draft-repository";
 import { createPdfNavigationState } from "@/features/aha-editor/pdf-navigation";
 import { useRecoveryState } from "@/features/restore/restore-gate";
 import { useToday } from "@/hooks/use-today";
@@ -27,12 +31,14 @@ function EmptyJobState({
   onSetup,
   onChoose,
   onResumeRecovery,
+  hasSetupDraft,
 }: {
   hasJobs: boolean;
   isReadOnly: boolean;
   onSetup: () => void;
   onChoose: () => void;
   onResumeRecovery: () => void;
+  hasSetupDraft: boolean;
 }) {
   return (
     <main className="min-h-screen bg-background px-5 py-12">
@@ -41,41 +47,81 @@ function EmptyJobState({
           <AppLogo />
         </div>
         <h1 className="mt-8 text-2xl font-bold">
-          {isReadOnly && hasJobs
-            ? "Recovery paused"
-            : hasJobs
-              ? "Choose the restored job"
-              : "No job is set up yet"}
+          {isReadOnly && hasSetupDraft
+            ? "Saved job setup"
+            : isReadOnly && hasJobs
+              ? "Recovery paused"
+              : hasJobs
+                ? "Choose the restored job"
+                : hasSetupDraft
+                  ? "Continue setting up your job"
+                  : "No job is set up yet"}
         </h1>
         <p className="mt-3 text-base font-medium leading-relaxed text-muted-foreground">
-          {isReadOnly && hasJobs
-            ? "Choose a verified saved job to view its completed documents, or resume recovery from the banner above."
-            : hasJobs
-            ? "Recovery is complete. Choose the job to open; the app will not guess for you."
-            : "No job has been set up on this iPad. Your existing local data has not been changed."}
+          {isReadOnly && hasSetupDraft
+            ? "Your unfinished setup remains saved on this iPad. You can review it while recovery keeps changes read-only."
+            : isReadOnly && hasJobs
+              ? "Choose a verified saved job to view its completed documents, or resume recovery from the banner above."
+              : hasJobs
+                ? "Recovery is complete. Choose the job to open; the app will not guess for you."
+                : hasSetupDraft
+                  ? "Your unfinished setup is saved on this iPad. Continue where you left off."
+                  : "No job has been set up on this iPad. Your existing local data has not been changed."}
         </p>
         <Button
           className="mt-7 min-h-14 w-full text-base font-bold"
           onClick={
-            isReadOnly
-              ? hasJobs
-                ? onChoose
-                : onResumeRecovery
-              : hasJobs
-                ? onChoose
-                : onSetup
+            isReadOnly && hasSetupDraft
+              ? onSetup
+              : isReadOnly
+                ? hasJobs
+                  ? onChoose
+                  : onResumeRecovery
+                : hasJobs
+                  ? onChoose
+                  : onSetup
           }
         >
-          {isReadOnly && hasJobs
-            ? "CHOOSE SAVED JOB"
-            : isReadOnly
-              ? "RESUME RECOVERY"
-            : hasJobs
-              ? "CHOOSE A JOB"
-              : "SET UP A JOB"}
+          {isReadOnly && hasSetupDraft
+            ? "VIEW SAVED SETUP"
+            : isReadOnly && hasJobs
+              ? "CHOOSE SAVED JOB"
+              : isReadOnly
+                ? "RESUME RECOVERY"
+                : hasJobs
+                  ? "CHOOSE A JOB"
+                  : hasSetupDraft
+                    ? "CONTINUE JOB SETUP"
+                    : "SET UP A JOB"}
         </Button>
       </section>
     </main>
+  );
+}
+
+function SetupDraftNotice({
+  title,
+  description,
+  action,
+  onOpen,
+}: {
+  title: string;
+  description: string;
+  action: string;
+  onOpen: () => void;
+}) {
+  return (
+    <section className="rounded-xl border border-[#C6CDE8] bg-secondary px-4 py-4 text-secondary-foreground">
+      <p className="text-base font-bold">{title}</p>
+      <p className="mt-1 text-sm font-medium leading-relaxed">{description}</p>
+      <Button
+        variant="outline"
+        className="mt-3 min-h-12 bg-card text-base text-primary"
+        onClick={onOpen}
+      >
+        {action}
+      </Button>
+    </section>
   );
 }
 
@@ -84,10 +130,11 @@ export default function Home() {
   const { isPaused, isWriteBlocked, resumeRecovery } = useRecoveryState();
   const today = useToday();
   const snapshot = useLiveQuery(() => getHomeSnapshot(today), [today]);
+  const setupDraftKeys = useLiveQuery(getJobSetupDraftKeys);
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
 
-  if (!snapshot) {
+  if (!snapshot || setupDraftKeys === undefined) {
     return (
       <main className="min-h-screen bg-background px-5 py-12">
         <p className="text-center text-base font-semibold text-muted-foreground">
@@ -105,10 +152,13 @@ export default function Home() {
         onSetup={() => navigate("/setup")}
         onChoose={() => navigate("/jobs")}
         onResumeRecovery={resumeRecovery}
+        hasSetupDraft={setupDraftKeys.includes(jobSetupDraftKey(null))}
       />
     );
   }
   const job = snapshot.job;
+  const hasNewJobDraft = setupDraftKeys.includes(jobSetupDraftKey(null));
+  const hasActiveJobDraft = setupDraftKeys.includes(jobSetupDraftKey(job.id));
 
   const openEditor = (ahaId: string) => navigate(`/ahas/${ahaId}/details`);
   const handleStart = async () => {
@@ -139,6 +189,26 @@ export default function Home() {
             <BackupStatus className="justify-end" />
           </div>
         </header>
+
+        {hasActiveJobDraft ? (
+          <SetupDraftNotice
+            title={`Unfinished updates to ${job.name}`}
+            description="Your changes to this job's defaults and roster are saved on this iPad."
+            action={
+              isWriteBlocked ? "View saved changes" : "Continue job updates"
+            }
+            onOpen={() => navigate(`/jobs/${job.id}/setup`)}
+          />
+        ) : null}
+
+        {hasNewJobDraft ? (
+          <SetupDraftNotice
+            title="Unfinished new job setup"
+            description="Your entered details and workers are saved on this iPad."
+            action={isWriteBlocked ? "View saved setup" : "Continue job setup"}
+            onOpen={() => navigate("/setup")}
+          />
+        ) : null}
 
         <section className="rounded-[14px] border border-card-border bg-card px-5 py-6 sm:px-7">
           <p className="text-sm font-bold tracking-[0.1em] text-muted-foreground">

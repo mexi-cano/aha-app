@@ -70,23 +70,9 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/history" element={<History />} />
-        <Route
-          path="/setup"
-          element={
-            <RecoveryWriteRoute>
-              <JobSetup />
-            </RecoveryWriteRoute>
-          }
-        />
+        <Route path="/setup" element={<JobSetup />} />
         <Route path="/jobs" element={<Jobs />} />
-        <Route
-          path="/jobs/:jobId/setup"
-          element={
-            <RecoveryWriteRoute>
-              <JobSetup />
-            </RecoveryWriteRoute>
-          }
-        />
+        <Route path="/jobs/:jobId/setup" element={<JobSetup />} />
         {PdfTest ? (
           <Route
             path="/pdf-test"

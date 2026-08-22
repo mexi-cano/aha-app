@@ -20,6 +20,70 @@ export interface JobSetupDraft {
   customPersonInCharge: string;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+export function parseJobSetupDraft(value: unknown): JobSetupDraft {
+  if (!isRecord(value)) throw new Error("Invalid saved job setup draft.");
+
+  const stringFields = [
+    "name",
+    "cityLabel",
+    "location",
+    "closestEmergencyCentre",
+    "emergencyNumber",
+    "musterPoint",
+    "workOrderPermit",
+    "jhaProcedureNumbers",
+    "customPersonInCharge",
+  ] as const;
+  if (stringFields.some((field) => typeof value[field] !== "string")) {
+    throw new Error("Invalid saved job setup draft.");
+  }
+  if (
+    value.personInChargeMode !== "worker" &&
+    value.personInChargeMode !== "custom"
+  ) {
+    throw new Error("Invalid saved job setup draft.");
+  }
+  if (
+    value.personInChargeWorkerId !== null &&
+    typeof value.personInChargeWorkerId !== "string"
+  ) {
+    throw new Error("Invalid saved job setup draft.");
+  }
+  if (
+    !Array.isArray(value.roster) ||
+    value.roster.some(
+      (worker) =>
+        !isRecord(worker) ||
+        typeof worker.id !== "string" ||
+        typeof worker.name !== "string",
+    )
+  ) {
+    throw new Error("Invalid saved job setup draft.");
+  }
+
+  return {
+    name: value.name as string,
+    cityLabel: value.cityLabel as string,
+    location: value.location as string,
+    closestEmergencyCentre: value.closestEmergencyCentre as string,
+    emergencyNumber: value.emergencyNumber as string,
+    musterPoint: value.musterPoint as string,
+    workOrderPermit: value.workOrderPermit as string,
+    jhaProcedureNumbers: value.jhaProcedureNumbers as string,
+    roster: value.roster.map((worker) => ({
+      id: (worker as Record<string, unknown>).id as string,
+      name: (worker as Record<string, unknown>).name as string,
+    })),
+    personInChargeMode: value.personInChargeMode,
+    personInChargeWorkerId: value.personInChargeWorkerId,
+    customPersonInCharge: value.customPersonInCharge as string,
+  };
+}
+
 export type JobSetupField =
   | "name"
   | "cityLabel"

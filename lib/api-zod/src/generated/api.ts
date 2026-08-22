@@ -5,145 +5,147 @@
  * ITS AHA backup and recovery API
  * OpenAPI spec version: 0.2.0
  */
-import * as zod from 'zod';
-
+import * as zod from "zod";
 
 /**
  * @summary Application liveness
  */
 export const HealthCheckResponse = zod.object({
-  "status": zod.string()
-})
-
+  status: zod.string(),
+});
 
 /**
  * @summary Database connectivity
  */
 export const HealthCheckDbResponse = zod.object({
-  "status": zod.string(),
-  "database": zod.string()
-})
-
+  status: zod.string(),
+  database: zod.string(),
+});
 
 /**
  * @summary Exchange the shared crew access code for a device token
  */
 export const authenticateBodyAccessCodeMax = 128;
 
-
-
 export const AuthenticateBody = zod.object({
-  "accessCode": zod.string().min(1).max(authenticateBodyAccessCodeMax)
-})
+  accessCode: zod.string().min(1).max(authenticateBodyAccessCodeMax),
+});
 
 export const AuthenticateResponse = zod.object({
-  "token": zod.string(),
-  "expiresAt": zod.string().datetime({"offset":true})
-})
-
+  token: zod.string(),
+  expiresAt: zod.string().datetime({ offset: true }),
+});
 
 /**
  * @summary List backed-up jobs for empty-device restore
  */
 
-
 export const listJobsResponseOneJobRosterMax = 10;
 
-
-
-export const ListJobsResponseItem = zod.object({
-  "job": zod.object({
-  "id": zod.string().min(1),
-  "name": zod.string(),
-  "cityLabel": zod.string(),
-  "defaults": zod.object({
-  "location": zod.string(),
-  "personInCharge": zod.string(),
-  "closestEmergencyCentre": zod.string(),
-  "emergencyNumber": zod.string(),
-  "musterPoint": zod.string(),
-  "workOrderPermit": zod.string(),
-  "jhaProcedureNumbers": zod.string()
-}),
-  "roster": zod.array(zod.object({
-  "id": zod.string().min(1),
-  "name": zod.string()
-})).max(listJobsResponseOneJobRosterMax),
-  "defaultPersonInChargeWorkerId": zod.string().nullable()
-}),
-  "clientUpdatedAt": zod.string().datetime({"offset":true})
-}).and(zod.object({
-  "backedUpAt": zod.string().datetime({"offset":true})
-}))
-export const ListJobsResponse = zod.array(ListJobsResponseItem)
-
+export const ListJobsResponseItem = zod
+  .object({
+    job: zod.object({
+      id: zod.string().min(1),
+      name: zod.string(),
+      cityLabel: zod.string(),
+      defaults: zod.object({
+        location: zod.string(),
+        personInCharge: zod.string(),
+        closestEmergencyCentre: zod.string(),
+        emergencyNumber: zod.string(),
+        musterPoint: zod.string(),
+        workOrderPermit: zod.string(),
+        jhaProcedureNumbers: zod.string(),
+      }),
+      roster: zod
+        .array(
+          zod.object({
+            id: zod.string().min(1),
+            name: zod.string(),
+          }),
+        )
+        .max(listJobsResponseOneJobRosterMax),
+      defaultPersonInChargeWorkerId: zod.string().nullable(),
+    }),
+    clientUpdatedAt: zod.string().datetime({ offset: true }),
+  })
+  .and(
+    zod.object({
+      backedUpAt: zod.string().datetime({ offset: true }),
+    }),
+  );
+export const ListJobsResponse = zod.array(ListJobsResponseItem);
 
 /**
  * @summary Idempotently back up a job using timestamp last-write-wins
  */
 
-
 export const backupJobBodyJobRosterMax = 10;
 
-
-
 export const BackupJobBody = zod.object({
-  "job": zod.object({
-  "id": zod.string().min(1),
-  "name": zod.string(),
-  "cityLabel": zod.string(),
-  "defaults": zod.object({
-  "location": zod.string(),
-  "personInCharge": zod.string(),
-  "closestEmergencyCentre": zod.string(),
-  "emergencyNumber": zod.string(),
-  "musterPoint": zod.string(),
-  "workOrderPermit": zod.string(),
-  "jhaProcedureNumbers": zod.string()
-}),
-  "roster": zod.array(zod.object({
-  "id": zod.string().min(1),
-  "name": zod.string()
-})).max(backupJobBodyJobRosterMax),
-  "defaultPersonInChargeWorkerId": zod.string().nullable()
-}),
-  "clientUpdatedAt": zod.string().datetime({"offset":true})
-})
-
-
+  job: zod.object({
+    id: zod.string().min(1),
+    name: zod.string(),
+    cityLabel: zod.string(),
+    defaults: zod.object({
+      location: zod.string(),
+      personInCharge: zod.string(),
+      closestEmergencyCentre: zod.string(),
+      emergencyNumber: zod.string(),
+      musterPoint: zod.string(),
+      workOrderPermit: zod.string(),
+      jhaProcedureNumbers: zod.string(),
+    }),
+    roster: zod
+      .array(
+        zod.object({
+          id: zod.string().min(1),
+          name: zod.string(),
+        }),
+      )
+      .max(backupJobBodyJobRosterMax),
+    defaultPersonInChargeWorkerId: zod.string().nullable(),
+  }),
+  clientUpdatedAt: zod.string().datetime({ offset: true }),
+});
 
 export const backupJobResponseRecordOneJobRosterMax = 10;
 
-
-
 export const BackupJobResponse = zod.object({
-  "accepted": zod.boolean(),
-  "record": zod.object({
-  "job": zod.object({
-  "id": zod.string().min(1),
-  "name": zod.string(),
-  "cityLabel": zod.string(),
-  "defaults": zod.object({
-  "location": zod.string(),
-  "personInCharge": zod.string(),
-  "closestEmergencyCentre": zod.string(),
-  "emergencyNumber": zod.string(),
-  "musterPoint": zod.string(),
-  "workOrderPermit": zod.string(),
-  "jhaProcedureNumbers": zod.string()
-}),
-  "roster": zod.array(zod.object({
-  "id": zod.string().min(1),
-  "name": zod.string()
-})).max(backupJobResponseRecordOneJobRosterMax),
-  "defaultPersonInChargeWorkerId": zod.string().nullable()
-}),
-  "clientUpdatedAt": zod.string().datetime({"offset":true})
-}).and(zod.object({
-  "backedUpAt": zod.string().datetime({"offset":true})
-}))
-})
-
+  accepted: zod.boolean(),
+  record: zod
+    .object({
+      job: zod.object({
+        id: zod.string().min(1),
+        name: zod.string(),
+        cityLabel: zod.string(),
+        defaults: zod.object({
+          location: zod.string(),
+          personInCharge: zod.string(),
+          closestEmergencyCentre: zod.string(),
+          emergencyNumber: zod.string(),
+          musterPoint: zod.string(),
+          workOrderPermit: zod.string(),
+          jhaProcedureNumbers: zod.string(),
+        }),
+        roster: zod
+          .array(
+            zod.object({
+              id: zod.string().min(1),
+              name: zod.string(),
+            }),
+          )
+          .max(backupJobResponseRecordOneJobRosterMax),
+        defaultPersonInChargeWorkerId: zod.string().nullable(),
+      }),
+      clientUpdatedAt: zod.string().datetime({ offset: true }),
+    })
+    .and(
+      zod.object({
+        backedUpAt: zod.string().datetime({ offset: true }),
+      }),
+    ),
+});
 
 /**
  * @summary List AHA backups for empty-device restore
@@ -151,25 +153,23 @@ export const BackupJobResponse = zod.object({
 export const listAhasQueryLimitDefault = 25;
 export const listAhasQueryLimitMax = 50;
 
-
-
 export const ListAhasQueryParams = zod.object({
-  "cursor": zod.coerce.string().optional(),
-  "limit": zod.coerce.number().int().min(1).max(listAhasQueryLimitMax).default(listAhasQueryLimitDefault)
-})
-
-
-
+  cursor: zod.coerce.string().optional(),
+  limit: zod.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(listAhasQueryLimitMax)
+    .default(listAhasQueryLimitDefault),
+});
 
 export const listAhasResponseItemsItemTasksMax = 15;
 
 export const listAhasResponseItemsItemEnergySelectionsMax = 11;
 
-
 export const listAhasResponseItemsItemCrewMax = 10;
 
 export const listAhasResponseItemsItemDocumentRevisionMin = 0;
-
 
 export const listAhasResponseItemsItemDocumentEventsItemNoteMax = 250;
 
@@ -177,108 +177,234 @@ export const listAhasResponseItemsItemDocumentEventsItemFromDocumentRevisionMin 
 
 export const listAhasResponseItemsItemDocumentEventsItemToDocumentRevisionMin = 0;
 
-
+export const listAhasResponseItemsItemDocumentEventsItemRetainedSignaturesDefault =
+  [];
 export const listAhasResponseItemsItemDocumentEventsDefault = [];
 export const listAhasResponseItemsItemPendingCompletedUpdateOneBaselineDocumentRevisionMin = 0;
 
 export const listAhasResponseItemsItemPendingCompletedUpdateDefault = null;
+export const listAhasResponseItemsItemPendingSigningUpdateOneBaselineDocumentRevisionMin = 0;
+
+export const listAhasResponseItemsItemPendingSigningUpdateDefault = null;
 
 export const ListAhasResponse = zod.object({
-  "items": zod.array(zod.object({
-  "id": zod.string().min(1),
-  "jobId": zod.string().min(1),
-  "date": zod.string().date(),
-  "status": zod.enum(['draft', 'in_progress', 'completed']),
-  "header": zod.object({
-  "location": zod.string(),
-  "date": zod.string().date(),
-  "personInCharge": zod.string(),
-  "closestEmergencyCentre": zod.string(),
-  "emergencyNumber": zod.string(),
-  "musterPoint": zod.string(),
-  "workOrderPermit": zod.string(),
-  "jhaProcedureNumbers": zod.string(),
-  "rescuePlanRequired": zod.boolean().nullable()
-}),
-  "description": zod.string(),
-  "meetingNotes": zod.string(),
-  "notApplicable": zod.object({
-  "workOrderPermit": zod.boolean(),
-  "jhaProcedureNumbers": zod.boolean(),
-  "meetingNotes": zod.boolean()
-}),
-  "tasks": zod.array(zod.object({
-  "id": zod.string().min(1),
-  "task": zod.string(),
-  "hazards": zod.string(),
-  "controls": zod.string()
-})).max(listAhasResponseItemsItemTasksMax),
-  "energySelections": zod.array(zod.object({
-  "category": zod.enum(['Gravity', 'Motion', 'Mechanical', 'Electrical', 'Pressure', 'Sound', 'Radiation', 'Biological', 'Chemical', 'Temperature', 'Human factors']),
-  "examples": zod.array(zod.string())
-})).max(listAhasResponseItemsItemEnergySelectionsMax),
-  "safetyCheck": zod.union([zod.literal('yes'),zod.literal('no'),zod.literal(null)]).nullable(),
-  "crew": zod.array(zod.object({
-  "workerId": zod.string().min(1),
-  "name": zod.string(),
-  "signaturePng": zod.string().nullable(),
-  "signedAt": zod.string().datetime({"offset":true}).nullable()
-})).max(listAhasResponseItemsItemCrewMax),
-  "personInChargeWorkerId": zod.string().nullable(),
-  "documentRevision": zod.number().int().min(listAhasResponseItemsItemDocumentRevisionMin),
-  "completedAt": zod.string().datetime({"offset":true}).nullable(),
-  "updatedAfterCompletionAt": zod.array(zod.string().datetime({"offset":true})),
-  "documentEvents": zod.array(zod.object({
-  "id": zod.string().min(1),
-  "kind": zod.enum(['initial_completion', 'late_worker_added', 'signature_replaced', 'worker_removed', 'safety_update', 'administrative_update']),
-  "reason": zod.enum(['initial_completion', 'late_arrival', 'wrong_person_signed', 'signature_unclear', 'worker_not_on_site', 'duplicate_entry', 'added_by_mistake', 'work_conditions_changed', 'administrative_correction']),
-  "note": zod.string().max(listAhasResponseItemsItemDocumentEventsItemNoteMax).nullable(),
-  "occurredAt": zod.string().datetime({"offset":true}),
-  "fromDocumentRevision": zod.number().int().min(listAhasResponseItemsItemDocumentEventsItemFromDocumentRevisionMin).nullable(),
-  "toDocumentRevision": zod.number().int().min(listAhasResponseItemsItemDocumentEventsItemToDocumentRevisionMin),
-  "affectedWorkers": zod.array(zod.object({
-  "workerId": zod.string().min(1),
-  "name": zod.string()
-})),
-  "crewReviewConfirmation": zod.union([zod.object({
-  "confirmedAt": zod.string().datetime({"offset":true}),
-  "personInChargeName": zod.string()
-}),zod.null()])
-})).default(listAhasResponseItemsItemDocumentEventsDefault),
-  "pendingCompletedUpdate": zod.union([zod.object({
-  "id": zod.string().min(1),
-  "startedAt": zod.string().datetime({"offset":true}),
-  "baselineDocumentRevision": zod.number().int().min(listAhasResponseItemsItemPendingCompletedUpdateOneBaselineDocumentRevisionMin),
-  "kind": zod.enum(['safety', 'administrative']),
-  "crewReviewConfirmation": zod.union([zod.object({
-  "confirmedAt": zod.string().datetime({"offset":true}),
-  "personInChargeName": zod.string()
-}),zod.null()])
-}),zod.null()]).default(listAhasResponseItemsItemPendingCompletedUpdateDefault),
-  "sync": zod.object({
-  "savedLocallyAt": zod.string().datetime({"offset":true}),
-  "backedUpAt": zod.string().datetime({"offset":true}).nullable()
-})
-})),
-  "nextCursor": zod.string().nullable()
-})
-
+  items: zod.array(
+    zod.object({
+      id: zod.string().min(1),
+      jobId: zod.string().min(1),
+      date: zod.string().date(),
+      status: zod.enum(["draft", "in_progress", "completed"]),
+      header: zod.object({
+        location: zod.string(),
+        date: zod.string().date(),
+        personInCharge: zod.string(),
+        closestEmergencyCentre: zod.string(),
+        emergencyNumber: zod.string(),
+        musterPoint: zod.string(),
+        workOrderPermit: zod.string(),
+        jhaProcedureNumbers: zod.string(),
+        rescuePlanRequired: zod.boolean().nullable(),
+      }),
+      description: zod.string(),
+      meetingNotes: zod.string(),
+      notApplicable: zod.object({
+        workOrderPermit: zod.boolean(),
+        jhaProcedureNumbers: zod.boolean(),
+        meetingNotes: zod.boolean(),
+      }),
+      tasks: zod
+        .array(
+          zod.object({
+            id: zod.string().min(1),
+            task: zod.string(),
+            hazards: zod.string(),
+            controls: zod.string(),
+          }),
+        )
+        .max(listAhasResponseItemsItemTasksMax),
+      energySelections: zod
+        .array(
+          zod.object({
+            category: zod.enum([
+              "Gravity",
+              "Motion",
+              "Mechanical",
+              "Electrical",
+              "Pressure",
+              "Sound",
+              "Radiation",
+              "Biological",
+              "Chemical",
+              "Temperature",
+              "Human factors",
+            ]),
+            examples: zod.array(zod.string()),
+          }),
+        )
+        .max(listAhasResponseItemsItemEnergySelectionsMax),
+      safetyCheck: zod
+        .union([zod.literal("yes"), zod.literal("no"), zod.literal(null)])
+        .nullable(),
+      crew: zod
+        .array(
+          zod.object({
+            workerId: zod.string().min(1),
+            name: zod.string(),
+            signaturePng: zod.string().nullable(),
+            signedAt: zod.string().datetime({ offset: true }).nullable(),
+          }),
+        )
+        .max(listAhasResponseItemsItemCrewMax),
+      personInChargeWorkerId: zod.string().nullable(),
+      documentRevision: zod
+        .number()
+        .int()
+        .min(listAhasResponseItemsItemDocumentRevisionMin),
+      completedAt: zod.string().datetime({ offset: true }).nullable(),
+      updatedAfterCompletionAt: zod.array(
+        zod.string().datetime({ offset: true }),
+      ),
+      documentEvents: zod
+        .array(
+          zod.object({
+            id: zod.string().min(1),
+            kind: zod.enum([
+              "initial_completion",
+              "late_worker_added",
+              "signature_replaced",
+              "worker_removed",
+              "safety_update",
+              "administrative_update",
+            ]),
+            reason: zod.enum([
+              "initial_completion",
+              "late_arrival",
+              "wrong_person_signed",
+              "signature_unclear",
+              "worker_not_on_site",
+              "duplicate_entry",
+              "added_by_mistake",
+              "work_conditions_changed",
+              "administrative_correction",
+            ]),
+            note: zod
+              .string()
+              .max(listAhasResponseItemsItemDocumentEventsItemNoteMax)
+              .nullable(),
+            occurredAt: zod.string().datetime({ offset: true }),
+            fromDocumentRevision: zod
+              .number()
+              .int()
+              .min(
+                listAhasResponseItemsItemDocumentEventsItemFromDocumentRevisionMin,
+              )
+              .nullable(),
+            toDocumentRevision: zod
+              .number()
+              .int()
+              .min(
+                listAhasResponseItemsItemDocumentEventsItemToDocumentRevisionMin,
+              ),
+            affectedWorkers: zod.array(
+              zod.object({
+                workerId: zod.string().min(1),
+                name: zod.string(),
+              }),
+            ),
+            crewReviewConfirmation: zod.union([
+              zod.object({
+                confirmedAt: zod.string().datetime({ offset: true }),
+                personInChargeName: zod.string(),
+              }),
+              zod.null(),
+            ]),
+            retainedSignatures: zod
+              .array(
+                zod.object({
+                  workerId: zod.string().min(1),
+                  name: zod.string(),
+                  signedAt: zod.string().datetime({ offset: true }),
+                }),
+              )
+              .default(
+                listAhasResponseItemsItemDocumentEventsItemRetainedSignaturesDefault,
+              ),
+          }),
+        )
+        .default(listAhasResponseItemsItemDocumentEventsDefault),
+      pendingCompletedUpdate: zod
+        .union([
+          zod.object({
+            id: zod.string().min(1),
+            startedAt: zod.string().datetime({ offset: true }),
+            baselineDocumentRevision: zod
+              .number()
+              .int()
+              .min(
+                listAhasResponseItemsItemPendingCompletedUpdateOneBaselineDocumentRevisionMin,
+              ),
+            kind: zod.enum(["safety", "administrative"]),
+            crewReviewConfirmation: zod.union([
+              zod.object({
+                confirmedAt: zod.string().datetime({ offset: true }),
+                personInChargeName: zod.string(),
+              }),
+              zod.null(),
+            ]),
+          }),
+          zod.null(),
+        ])
+        .default(listAhasResponseItemsItemPendingCompletedUpdateDefault),
+      pendingSigningUpdate: zod
+        .union([
+          zod.object({
+            id: zod.string().min(1),
+            startedAt: zod.string().datetime({ offset: true }),
+            latestChangedAt: zod.string().datetime({ offset: true }),
+            baselineDocumentRevision: zod
+              .number()
+              .int()
+              .min(
+                listAhasResponseItemsItemPendingSigningUpdateOneBaselineDocumentRevisionMin,
+              ),
+            affectedWorkers: zod.array(
+              zod.object({
+                workerId: zod.string().min(1),
+                name: zod.string(),
+                signedAt: zod.string().datetime({ offset: true }),
+              }),
+            ),
+            crewReviewConfirmation: zod.union([
+              zod.object({
+                confirmedAt: zod.string().datetime({ offset: true }),
+                personInChargeName: zod.string(),
+              }),
+              zod.null(),
+            ]),
+          }),
+          zod.null(),
+        ])
+        .default(listAhasResponseItemsItemPendingSigningUpdateDefault),
+      sync: zod.object({
+        savedLocallyAt: zod.string().datetime({ offset: true }),
+        backedUpAt: zod.string().datetime({ offset: true }).nullable(),
+      }),
+    }),
+  ),
+  nextCursor: zod.string().nullable(),
+});
 
 /**
  * @summary Idempotently create or back up an AHA
  */
 
-
-
 export const backupAhaBodyTasksMax = 15;
 
 export const backupAhaBodyEnergySelectionsMax = 11;
 
-
 export const backupAhaBodyCrewMax = 10;
 
 export const backupAhaBodyDocumentRevisionMin = 0;
-
 
 export const backupAhaBodyDocumentEventsItemNoteMax = 250;
 
@@ -286,101 +412,211 @@ export const backupAhaBodyDocumentEventsItemFromDocumentRevisionMin = 0;
 
 export const backupAhaBodyDocumentEventsItemToDocumentRevisionMin = 0;
 
-
+export const backupAhaBodyDocumentEventsItemRetainedSignaturesDefault = [];
 export const backupAhaBodyDocumentEventsDefault = [];
 export const backupAhaBodyPendingCompletedUpdateOneBaselineDocumentRevisionMin = 0;
 
 export const backupAhaBodyPendingCompletedUpdateDefault = null;
+export const backupAhaBodyPendingSigningUpdateOneBaselineDocumentRevisionMin = 0;
+
+export const backupAhaBodyPendingSigningUpdateDefault = null;
 
 export const BackupAhaBody = zod.object({
-  "id": zod.string().min(1),
-  "jobId": zod.string().min(1),
-  "date": zod.string().date(),
-  "status": zod.enum(['draft', 'in_progress', 'completed']),
-  "header": zod.object({
-  "location": zod.string(),
-  "date": zod.string().date(),
-  "personInCharge": zod.string(),
-  "closestEmergencyCentre": zod.string(),
-  "emergencyNumber": zod.string(),
-  "musterPoint": zod.string(),
-  "workOrderPermit": zod.string(),
-  "jhaProcedureNumbers": zod.string(),
-  "rescuePlanRequired": zod.boolean().nullable()
-}),
-  "description": zod.string(),
-  "meetingNotes": zod.string(),
-  "notApplicable": zod.object({
-  "workOrderPermit": zod.boolean(),
-  "jhaProcedureNumbers": zod.boolean(),
-  "meetingNotes": zod.boolean()
-}),
-  "tasks": zod.array(zod.object({
-  "id": zod.string().min(1),
-  "task": zod.string(),
-  "hazards": zod.string(),
-  "controls": zod.string()
-})).max(backupAhaBodyTasksMax),
-  "energySelections": zod.array(zod.object({
-  "category": zod.enum(['Gravity', 'Motion', 'Mechanical', 'Electrical', 'Pressure', 'Sound', 'Radiation', 'Biological', 'Chemical', 'Temperature', 'Human factors']),
-  "examples": zod.array(zod.string())
-})).max(backupAhaBodyEnergySelectionsMax),
-  "safetyCheck": zod.union([zod.literal('yes'),zod.literal('no'),zod.literal(null)]).nullable(),
-  "crew": zod.array(zod.object({
-  "workerId": zod.string().min(1),
-  "name": zod.string(),
-  "signaturePng": zod.string().nullable(),
-  "signedAt": zod.string().datetime({"offset":true}).nullable()
-})).max(backupAhaBodyCrewMax),
-  "personInChargeWorkerId": zod.string().nullable(),
-  "documentRevision": zod.number().int().min(backupAhaBodyDocumentRevisionMin),
-  "completedAt": zod.string().datetime({"offset":true}).nullable(),
-  "updatedAfterCompletionAt": zod.array(zod.string().datetime({"offset":true})),
-  "documentEvents": zod.array(zod.object({
-  "id": zod.string().min(1),
-  "kind": zod.enum(['initial_completion', 'late_worker_added', 'signature_replaced', 'worker_removed', 'safety_update', 'administrative_update']),
-  "reason": zod.enum(['initial_completion', 'late_arrival', 'wrong_person_signed', 'signature_unclear', 'worker_not_on_site', 'duplicate_entry', 'added_by_mistake', 'work_conditions_changed', 'administrative_correction']),
-  "note": zod.string().max(backupAhaBodyDocumentEventsItemNoteMax).nullable(),
-  "occurredAt": zod.string().datetime({"offset":true}),
-  "fromDocumentRevision": zod.number().int().min(backupAhaBodyDocumentEventsItemFromDocumentRevisionMin).nullable(),
-  "toDocumentRevision": zod.number().int().min(backupAhaBodyDocumentEventsItemToDocumentRevisionMin),
-  "affectedWorkers": zod.array(zod.object({
-  "workerId": zod.string().min(1),
-  "name": zod.string()
-})),
-  "crewReviewConfirmation": zod.union([zod.object({
-  "confirmedAt": zod.string().datetime({"offset":true}),
-  "personInChargeName": zod.string()
-}),zod.null()])
-})).default(backupAhaBodyDocumentEventsDefault),
-  "pendingCompletedUpdate": zod.union([zod.object({
-  "id": zod.string().min(1),
-  "startedAt": zod.string().datetime({"offset":true}),
-  "baselineDocumentRevision": zod.number().int().min(backupAhaBodyPendingCompletedUpdateOneBaselineDocumentRevisionMin),
-  "kind": zod.enum(['safety', 'administrative']),
-  "crewReviewConfirmation": zod.union([zod.object({
-  "confirmedAt": zod.string().datetime({"offset":true}),
-  "personInChargeName": zod.string()
-}),zod.null()])
-}),zod.null()]).default(backupAhaBodyPendingCompletedUpdateDefault),
-  "sync": zod.object({
-  "savedLocallyAt": zod.string().datetime({"offset":true}),
-  "backedUpAt": zod.string().datetime({"offset":true}).nullable()
-})
-})
-
-
-
+  id: zod.string().min(1),
+  jobId: zod.string().min(1),
+  date: zod.string().date(),
+  status: zod.enum(["draft", "in_progress", "completed"]),
+  header: zod.object({
+    location: zod.string(),
+    date: zod.string().date(),
+    personInCharge: zod.string(),
+    closestEmergencyCentre: zod.string(),
+    emergencyNumber: zod.string(),
+    musterPoint: zod.string(),
+    workOrderPermit: zod.string(),
+    jhaProcedureNumbers: zod.string(),
+    rescuePlanRequired: zod.boolean().nullable(),
+  }),
+  description: zod.string(),
+  meetingNotes: zod.string(),
+  notApplicable: zod.object({
+    workOrderPermit: zod.boolean(),
+    jhaProcedureNumbers: zod.boolean(),
+    meetingNotes: zod.boolean(),
+  }),
+  tasks: zod
+    .array(
+      zod.object({
+        id: zod.string().min(1),
+        task: zod.string(),
+        hazards: zod.string(),
+        controls: zod.string(),
+      }),
+    )
+    .max(backupAhaBodyTasksMax),
+  energySelections: zod
+    .array(
+      zod.object({
+        category: zod.enum([
+          "Gravity",
+          "Motion",
+          "Mechanical",
+          "Electrical",
+          "Pressure",
+          "Sound",
+          "Radiation",
+          "Biological",
+          "Chemical",
+          "Temperature",
+          "Human factors",
+        ]),
+        examples: zod.array(zod.string()),
+      }),
+    )
+    .max(backupAhaBodyEnergySelectionsMax),
+  safetyCheck: zod
+    .union([zod.literal("yes"), zod.literal("no"), zod.literal(null)])
+    .nullable(),
+  crew: zod
+    .array(
+      zod.object({
+        workerId: zod.string().min(1),
+        name: zod.string(),
+        signaturePng: zod.string().nullable(),
+        signedAt: zod.string().datetime({ offset: true }).nullable(),
+      }),
+    )
+    .max(backupAhaBodyCrewMax),
+  personInChargeWorkerId: zod.string().nullable(),
+  documentRevision: zod.number().int().min(backupAhaBodyDocumentRevisionMin),
+  completedAt: zod.string().datetime({ offset: true }).nullable(),
+  updatedAfterCompletionAt: zod.array(zod.string().datetime({ offset: true })),
+  documentEvents: zod
+    .array(
+      zod.object({
+        id: zod.string().min(1),
+        kind: zod.enum([
+          "initial_completion",
+          "late_worker_added",
+          "signature_replaced",
+          "worker_removed",
+          "safety_update",
+          "administrative_update",
+        ]),
+        reason: zod.enum([
+          "initial_completion",
+          "late_arrival",
+          "wrong_person_signed",
+          "signature_unclear",
+          "worker_not_on_site",
+          "duplicate_entry",
+          "added_by_mistake",
+          "work_conditions_changed",
+          "administrative_correction",
+        ]),
+        note: zod
+          .string()
+          .max(backupAhaBodyDocumentEventsItemNoteMax)
+          .nullable(),
+        occurredAt: zod.string().datetime({ offset: true }),
+        fromDocumentRevision: zod
+          .number()
+          .int()
+          .min(backupAhaBodyDocumentEventsItemFromDocumentRevisionMin)
+          .nullable(),
+        toDocumentRevision: zod
+          .number()
+          .int()
+          .min(backupAhaBodyDocumentEventsItemToDocumentRevisionMin),
+        affectedWorkers: zod.array(
+          zod.object({
+            workerId: zod.string().min(1),
+            name: zod.string(),
+          }),
+        ),
+        crewReviewConfirmation: zod.union([
+          zod.object({
+            confirmedAt: zod.string().datetime({ offset: true }),
+            personInChargeName: zod.string(),
+          }),
+          zod.null(),
+        ]),
+        retainedSignatures: zod
+          .array(
+            zod.object({
+              workerId: zod.string().min(1),
+              name: zod.string(),
+              signedAt: zod.string().datetime({ offset: true }),
+            }),
+          )
+          .default(backupAhaBodyDocumentEventsItemRetainedSignaturesDefault),
+      }),
+    )
+    .default(backupAhaBodyDocumentEventsDefault),
+  pendingCompletedUpdate: zod
+    .union([
+      zod.object({
+        id: zod.string().min(1),
+        startedAt: zod.string().datetime({ offset: true }),
+        baselineDocumentRevision: zod
+          .number()
+          .int()
+          .min(
+            backupAhaBodyPendingCompletedUpdateOneBaselineDocumentRevisionMin,
+          ),
+        kind: zod.enum(["safety", "administrative"]),
+        crewReviewConfirmation: zod.union([
+          zod.object({
+            confirmedAt: zod.string().datetime({ offset: true }),
+            personInChargeName: zod.string(),
+          }),
+          zod.null(),
+        ]),
+      }),
+      zod.null(),
+    ])
+    .default(backupAhaBodyPendingCompletedUpdateDefault),
+  pendingSigningUpdate: zod
+    .union([
+      zod.object({
+        id: zod.string().min(1),
+        startedAt: zod.string().datetime({ offset: true }),
+        latestChangedAt: zod.string().datetime({ offset: true }),
+        baselineDocumentRevision: zod
+          .number()
+          .int()
+          .min(backupAhaBodyPendingSigningUpdateOneBaselineDocumentRevisionMin),
+        affectedWorkers: zod.array(
+          zod.object({
+            workerId: zod.string().min(1),
+            name: zod.string(),
+            signedAt: zod.string().datetime({ offset: true }),
+          }),
+        ),
+        crewReviewConfirmation: zod.union([
+          zod.object({
+            confirmedAt: zod.string().datetime({ offset: true }),
+            personInChargeName: zod.string(),
+          }),
+          zod.null(),
+        ]),
+      }),
+      zod.null(),
+    ])
+    .default(backupAhaBodyPendingSigningUpdateDefault),
+  sync: zod.object({
+    savedLocallyAt: zod.string().datetime({ offset: true }),
+    backedUpAt: zod.string().datetime({ offset: true }).nullable(),
+  }),
+});
 
 export const backupAhaResponseRecordTasksMax = 15;
 
 export const backupAhaResponseRecordEnergySelectionsMax = 11;
 
-
 export const backupAhaResponseRecordCrewMax = 10;
 
 export const backupAhaResponseRecordDocumentRevisionMin = 0;
-
 
 export const backupAhaResponseRecordDocumentEventsItemNoteMax = 250;
 
@@ -388,115 +624,236 @@ export const backupAhaResponseRecordDocumentEventsItemFromDocumentRevisionMin = 
 
 export const backupAhaResponseRecordDocumentEventsItemToDocumentRevisionMin = 0;
 
-
+export const backupAhaResponseRecordDocumentEventsItemRetainedSignaturesDefault =
+  [];
 export const backupAhaResponseRecordDocumentEventsDefault = [];
 export const backupAhaResponseRecordPendingCompletedUpdateOneBaselineDocumentRevisionMin = 0;
 
 export const backupAhaResponseRecordPendingCompletedUpdateDefault = null;
+export const backupAhaResponseRecordPendingSigningUpdateOneBaselineDocumentRevisionMin = 0;
+
+export const backupAhaResponseRecordPendingSigningUpdateDefault = null;
 
 export const BackupAhaResponse = zod.object({
-  "accepted": zod.boolean(),
-  "record": zod.object({
-  "id": zod.string().min(1),
-  "jobId": zod.string().min(1),
-  "date": zod.string().date(),
-  "status": zod.enum(['draft', 'in_progress', 'completed']),
-  "header": zod.object({
-  "location": zod.string(),
-  "date": zod.string().date(),
-  "personInCharge": zod.string(),
-  "closestEmergencyCentre": zod.string(),
-  "emergencyNumber": zod.string(),
-  "musterPoint": zod.string(),
-  "workOrderPermit": zod.string(),
-  "jhaProcedureNumbers": zod.string(),
-  "rescuePlanRequired": zod.boolean().nullable()
-}),
-  "description": zod.string(),
-  "meetingNotes": zod.string(),
-  "notApplicable": zod.object({
-  "workOrderPermit": zod.boolean(),
-  "jhaProcedureNumbers": zod.boolean(),
-  "meetingNotes": zod.boolean()
-}),
-  "tasks": zod.array(zod.object({
-  "id": zod.string().min(1),
-  "task": zod.string(),
-  "hazards": zod.string(),
-  "controls": zod.string()
-})).max(backupAhaResponseRecordTasksMax),
-  "energySelections": zod.array(zod.object({
-  "category": zod.enum(['Gravity', 'Motion', 'Mechanical', 'Electrical', 'Pressure', 'Sound', 'Radiation', 'Biological', 'Chemical', 'Temperature', 'Human factors']),
-  "examples": zod.array(zod.string())
-})).max(backupAhaResponseRecordEnergySelectionsMax),
-  "safetyCheck": zod.union([zod.literal('yes'),zod.literal('no'),zod.literal(null)]).nullable(),
-  "crew": zod.array(zod.object({
-  "workerId": zod.string().min(1),
-  "name": zod.string(),
-  "signaturePng": zod.string().nullable(),
-  "signedAt": zod.string().datetime({"offset":true}).nullable()
-})).max(backupAhaResponseRecordCrewMax),
-  "personInChargeWorkerId": zod.string().nullable(),
-  "documentRevision": zod.number().int().min(backupAhaResponseRecordDocumentRevisionMin),
-  "completedAt": zod.string().datetime({"offset":true}).nullable(),
-  "updatedAfterCompletionAt": zod.array(zod.string().datetime({"offset":true})),
-  "documentEvents": zod.array(zod.object({
-  "id": zod.string().min(1),
-  "kind": zod.enum(['initial_completion', 'late_worker_added', 'signature_replaced', 'worker_removed', 'safety_update', 'administrative_update']),
-  "reason": zod.enum(['initial_completion', 'late_arrival', 'wrong_person_signed', 'signature_unclear', 'worker_not_on_site', 'duplicate_entry', 'added_by_mistake', 'work_conditions_changed', 'administrative_correction']),
-  "note": zod.string().max(backupAhaResponseRecordDocumentEventsItemNoteMax).nullable(),
-  "occurredAt": zod.string().datetime({"offset":true}),
-  "fromDocumentRevision": zod.number().int().min(backupAhaResponseRecordDocumentEventsItemFromDocumentRevisionMin).nullable(),
-  "toDocumentRevision": zod.number().int().min(backupAhaResponseRecordDocumentEventsItemToDocumentRevisionMin),
-  "affectedWorkers": zod.array(zod.object({
-  "workerId": zod.string().min(1),
-  "name": zod.string()
-})),
-  "crewReviewConfirmation": zod.union([zod.object({
-  "confirmedAt": zod.string().datetime({"offset":true}),
-  "personInChargeName": zod.string()
-}),zod.null()])
-})).default(backupAhaResponseRecordDocumentEventsDefault),
-  "pendingCompletedUpdate": zod.union([zod.object({
-  "id": zod.string().min(1),
-  "startedAt": zod.string().datetime({"offset":true}),
-  "baselineDocumentRevision": zod.number().int().min(backupAhaResponseRecordPendingCompletedUpdateOneBaselineDocumentRevisionMin),
-  "kind": zod.enum(['safety', 'administrative']),
-  "crewReviewConfirmation": zod.union([zod.object({
-  "confirmedAt": zod.string().datetime({"offset":true}),
-  "personInChargeName": zod.string()
-}),zod.null()])
-}),zod.null()]).default(backupAhaResponseRecordPendingCompletedUpdateDefault),
-  "sync": zod.object({
-  "savedLocallyAt": zod.string().datetime({"offset":true}),
-  "backedUpAt": zod.string().datetime({"offset":true}).nullable()
-})
-})
-})
-
+  accepted: zod.boolean(),
+  record: zod.object({
+    id: zod.string().min(1),
+    jobId: zod.string().min(1),
+    date: zod.string().date(),
+    status: zod.enum(["draft", "in_progress", "completed"]),
+    header: zod.object({
+      location: zod.string(),
+      date: zod.string().date(),
+      personInCharge: zod.string(),
+      closestEmergencyCentre: zod.string(),
+      emergencyNumber: zod.string(),
+      musterPoint: zod.string(),
+      workOrderPermit: zod.string(),
+      jhaProcedureNumbers: zod.string(),
+      rescuePlanRequired: zod.boolean().nullable(),
+    }),
+    description: zod.string(),
+    meetingNotes: zod.string(),
+    notApplicable: zod.object({
+      workOrderPermit: zod.boolean(),
+      jhaProcedureNumbers: zod.boolean(),
+      meetingNotes: zod.boolean(),
+    }),
+    tasks: zod
+      .array(
+        zod.object({
+          id: zod.string().min(1),
+          task: zod.string(),
+          hazards: zod.string(),
+          controls: zod.string(),
+        }),
+      )
+      .max(backupAhaResponseRecordTasksMax),
+    energySelections: zod
+      .array(
+        zod.object({
+          category: zod.enum([
+            "Gravity",
+            "Motion",
+            "Mechanical",
+            "Electrical",
+            "Pressure",
+            "Sound",
+            "Radiation",
+            "Biological",
+            "Chemical",
+            "Temperature",
+            "Human factors",
+          ]),
+          examples: zod.array(zod.string()),
+        }),
+      )
+      .max(backupAhaResponseRecordEnergySelectionsMax),
+    safetyCheck: zod
+      .union([zod.literal("yes"), zod.literal("no"), zod.literal(null)])
+      .nullable(),
+    crew: zod
+      .array(
+        zod.object({
+          workerId: zod.string().min(1),
+          name: zod.string(),
+          signaturePng: zod.string().nullable(),
+          signedAt: zod.string().datetime({ offset: true }).nullable(),
+        }),
+      )
+      .max(backupAhaResponseRecordCrewMax),
+    personInChargeWorkerId: zod.string().nullable(),
+    documentRevision: zod
+      .number()
+      .int()
+      .min(backupAhaResponseRecordDocumentRevisionMin),
+    completedAt: zod.string().datetime({ offset: true }).nullable(),
+    updatedAfterCompletionAt: zod.array(
+      zod.string().datetime({ offset: true }),
+    ),
+    documentEvents: zod
+      .array(
+        zod.object({
+          id: zod.string().min(1),
+          kind: zod.enum([
+            "initial_completion",
+            "late_worker_added",
+            "signature_replaced",
+            "worker_removed",
+            "safety_update",
+            "administrative_update",
+          ]),
+          reason: zod.enum([
+            "initial_completion",
+            "late_arrival",
+            "wrong_person_signed",
+            "signature_unclear",
+            "worker_not_on_site",
+            "duplicate_entry",
+            "added_by_mistake",
+            "work_conditions_changed",
+            "administrative_correction",
+          ]),
+          note: zod
+            .string()
+            .max(backupAhaResponseRecordDocumentEventsItemNoteMax)
+            .nullable(),
+          occurredAt: zod.string().datetime({ offset: true }),
+          fromDocumentRevision: zod
+            .number()
+            .int()
+            .min(
+              backupAhaResponseRecordDocumentEventsItemFromDocumentRevisionMin,
+            )
+            .nullable(),
+          toDocumentRevision: zod
+            .number()
+            .int()
+            .min(
+              backupAhaResponseRecordDocumentEventsItemToDocumentRevisionMin,
+            ),
+          affectedWorkers: zod.array(
+            zod.object({
+              workerId: zod.string().min(1),
+              name: zod.string(),
+            }),
+          ),
+          crewReviewConfirmation: zod.union([
+            zod.object({
+              confirmedAt: zod.string().datetime({ offset: true }),
+              personInChargeName: zod.string(),
+            }),
+            zod.null(),
+          ]),
+          retainedSignatures: zod
+            .array(
+              zod.object({
+                workerId: zod.string().min(1),
+                name: zod.string(),
+                signedAt: zod.string().datetime({ offset: true }),
+              }),
+            )
+            .default(
+              backupAhaResponseRecordDocumentEventsItemRetainedSignaturesDefault,
+            ),
+        }),
+      )
+      .default(backupAhaResponseRecordDocumentEventsDefault),
+    pendingCompletedUpdate: zod
+      .union([
+        zod.object({
+          id: zod.string().min(1),
+          startedAt: zod.string().datetime({ offset: true }),
+          baselineDocumentRevision: zod
+            .number()
+            .int()
+            .min(
+              backupAhaResponseRecordPendingCompletedUpdateOneBaselineDocumentRevisionMin,
+            ),
+          kind: zod.enum(["safety", "administrative"]),
+          crewReviewConfirmation: zod.union([
+            zod.object({
+              confirmedAt: zod.string().datetime({ offset: true }),
+              personInChargeName: zod.string(),
+            }),
+            zod.null(),
+          ]),
+        }),
+        zod.null(),
+      ])
+      .default(backupAhaResponseRecordPendingCompletedUpdateDefault),
+    pendingSigningUpdate: zod
+      .union([
+        zod.object({
+          id: zod.string().min(1),
+          startedAt: zod.string().datetime({ offset: true }),
+          latestChangedAt: zod.string().datetime({ offset: true }),
+          baselineDocumentRevision: zod
+            .number()
+            .int()
+            .min(
+              backupAhaResponseRecordPendingSigningUpdateOneBaselineDocumentRevisionMin,
+            ),
+          affectedWorkers: zod.array(
+            zod.object({
+              workerId: zod.string().min(1),
+              name: zod.string(),
+              signedAt: zod.string().datetime({ offset: true }),
+            }),
+          ),
+          crewReviewConfirmation: zod.union([
+            zod.object({
+              confirmedAt: zod.string().datetime({ offset: true }),
+              personInChargeName: zod.string(),
+            }),
+            zod.null(),
+          ]),
+        }),
+        zod.null(),
+      ])
+      .default(backupAhaResponseRecordPendingSigningUpdateDefault),
+    sync: zod.object({
+      savedLocallyAt: zod.string().datetime({ offset: true }),
+      backedUpAt: zod.string().datetime({ offset: true }).nullable(),
+    }),
+  }),
+});
 
 /**
  * @summary Idempotently update an AHA backup
  */
 
-
-
 export const UpdateAhaBackupParams = zod.object({
-  "ahaId": zod.coerce.string().min(1)
-})
-
-
-
+  ahaId: zod.coerce.string().min(1),
+});
 
 export const updateAhaBackupBodyTasksMax = 15;
 
 export const updateAhaBackupBodyEnergySelectionsMax = 11;
 
-
 export const updateAhaBackupBodyCrewMax = 10;
 
 export const updateAhaBackupBodyDocumentRevisionMin = 0;
-
 
 export const updateAhaBackupBodyDocumentEventsItemNoteMax = 250;
 
@@ -504,101 +861,219 @@ export const updateAhaBackupBodyDocumentEventsItemFromDocumentRevisionMin = 0;
 
 export const updateAhaBackupBodyDocumentEventsItemToDocumentRevisionMin = 0;
 
-
+export const updateAhaBackupBodyDocumentEventsItemRetainedSignaturesDefault =
+  [];
 export const updateAhaBackupBodyDocumentEventsDefault = [];
 export const updateAhaBackupBodyPendingCompletedUpdateOneBaselineDocumentRevisionMin = 0;
 
 export const updateAhaBackupBodyPendingCompletedUpdateDefault = null;
+export const updateAhaBackupBodyPendingSigningUpdateOneBaselineDocumentRevisionMin = 0;
+
+export const updateAhaBackupBodyPendingSigningUpdateDefault = null;
 
 export const UpdateAhaBackupBody = zod.object({
-  "id": zod.string().min(1),
-  "jobId": zod.string().min(1),
-  "date": zod.string().date(),
-  "status": zod.enum(['draft', 'in_progress', 'completed']),
-  "header": zod.object({
-  "location": zod.string(),
-  "date": zod.string().date(),
-  "personInCharge": zod.string(),
-  "closestEmergencyCentre": zod.string(),
-  "emergencyNumber": zod.string(),
-  "musterPoint": zod.string(),
-  "workOrderPermit": zod.string(),
-  "jhaProcedureNumbers": zod.string(),
-  "rescuePlanRequired": zod.boolean().nullable()
-}),
-  "description": zod.string(),
-  "meetingNotes": zod.string(),
-  "notApplicable": zod.object({
-  "workOrderPermit": zod.boolean(),
-  "jhaProcedureNumbers": zod.boolean(),
-  "meetingNotes": zod.boolean()
-}),
-  "tasks": zod.array(zod.object({
-  "id": zod.string().min(1),
-  "task": zod.string(),
-  "hazards": zod.string(),
-  "controls": zod.string()
-})).max(updateAhaBackupBodyTasksMax),
-  "energySelections": zod.array(zod.object({
-  "category": zod.enum(['Gravity', 'Motion', 'Mechanical', 'Electrical', 'Pressure', 'Sound', 'Radiation', 'Biological', 'Chemical', 'Temperature', 'Human factors']),
-  "examples": zod.array(zod.string())
-})).max(updateAhaBackupBodyEnergySelectionsMax),
-  "safetyCheck": zod.union([zod.literal('yes'),zod.literal('no'),zod.literal(null)]).nullable(),
-  "crew": zod.array(zod.object({
-  "workerId": zod.string().min(1),
-  "name": zod.string(),
-  "signaturePng": zod.string().nullable(),
-  "signedAt": zod.string().datetime({"offset":true}).nullable()
-})).max(updateAhaBackupBodyCrewMax),
-  "personInChargeWorkerId": zod.string().nullable(),
-  "documentRevision": zod.number().int().min(updateAhaBackupBodyDocumentRevisionMin),
-  "completedAt": zod.string().datetime({"offset":true}).nullable(),
-  "updatedAfterCompletionAt": zod.array(zod.string().datetime({"offset":true})),
-  "documentEvents": zod.array(zod.object({
-  "id": zod.string().min(1),
-  "kind": zod.enum(['initial_completion', 'late_worker_added', 'signature_replaced', 'worker_removed', 'safety_update', 'administrative_update']),
-  "reason": zod.enum(['initial_completion', 'late_arrival', 'wrong_person_signed', 'signature_unclear', 'worker_not_on_site', 'duplicate_entry', 'added_by_mistake', 'work_conditions_changed', 'administrative_correction']),
-  "note": zod.string().max(updateAhaBackupBodyDocumentEventsItemNoteMax).nullable(),
-  "occurredAt": zod.string().datetime({"offset":true}),
-  "fromDocumentRevision": zod.number().int().min(updateAhaBackupBodyDocumentEventsItemFromDocumentRevisionMin).nullable(),
-  "toDocumentRevision": zod.number().int().min(updateAhaBackupBodyDocumentEventsItemToDocumentRevisionMin),
-  "affectedWorkers": zod.array(zod.object({
-  "workerId": zod.string().min(1),
-  "name": zod.string()
-})),
-  "crewReviewConfirmation": zod.union([zod.object({
-  "confirmedAt": zod.string().datetime({"offset":true}),
-  "personInChargeName": zod.string()
-}),zod.null()])
-})).default(updateAhaBackupBodyDocumentEventsDefault),
-  "pendingCompletedUpdate": zod.union([zod.object({
-  "id": zod.string().min(1),
-  "startedAt": zod.string().datetime({"offset":true}),
-  "baselineDocumentRevision": zod.number().int().min(updateAhaBackupBodyPendingCompletedUpdateOneBaselineDocumentRevisionMin),
-  "kind": zod.enum(['safety', 'administrative']),
-  "crewReviewConfirmation": zod.union([zod.object({
-  "confirmedAt": zod.string().datetime({"offset":true}),
-  "personInChargeName": zod.string()
-}),zod.null()])
-}),zod.null()]).default(updateAhaBackupBodyPendingCompletedUpdateDefault),
-  "sync": zod.object({
-  "savedLocallyAt": zod.string().datetime({"offset":true}),
-  "backedUpAt": zod.string().datetime({"offset":true}).nullable()
-})
-})
-
-
-
+  id: zod.string().min(1),
+  jobId: zod.string().min(1),
+  date: zod.string().date(),
+  status: zod.enum(["draft", "in_progress", "completed"]),
+  header: zod.object({
+    location: zod.string(),
+    date: zod.string().date(),
+    personInCharge: zod.string(),
+    closestEmergencyCentre: zod.string(),
+    emergencyNumber: zod.string(),
+    musterPoint: zod.string(),
+    workOrderPermit: zod.string(),
+    jhaProcedureNumbers: zod.string(),
+    rescuePlanRequired: zod.boolean().nullable(),
+  }),
+  description: zod.string(),
+  meetingNotes: zod.string(),
+  notApplicable: zod.object({
+    workOrderPermit: zod.boolean(),
+    jhaProcedureNumbers: zod.boolean(),
+    meetingNotes: zod.boolean(),
+  }),
+  tasks: zod
+    .array(
+      zod.object({
+        id: zod.string().min(1),
+        task: zod.string(),
+        hazards: zod.string(),
+        controls: zod.string(),
+      }),
+    )
+    .max(updateAhaBackupBodyTasksMax),
+  energySelections: zod
+    .array(
+      zod.object({
+        category: zod.enum([
+          "Gravity",
+          "Motion",
+          "Mechanical",
+          "Electrical",
+          "Pressure",
+          "Sound",
+          "Radiation",
+          "Biological",
+          "Chemical",
+          "Temperature",
+          "Human factors",
+        ]),
+        examples: zod.array(zod.string()),
+      }),
+    )
+    .max(updateAhaBackupBodyEnergySelectionsMax),
+  safetyCheck: zod
+    .union([zod.literal("yes"), zod.literal("no"), zod.literal(null)])
+    .nullable(),
+  crew: zod
+    .array(
+      zod.object({
+        workerId: zod.string().min(1),
+        name: zod.string(),
+        signaturePng: zod.string().nullable(),
+        signedAt: zod.string().datetime({ offset: true }).nullable(),
+      }),
+    )
+    .max(updateAhaBackupBodyCrewMax),
+  personInChargeWorkerId: zod.string().nullable(),
+  documentRevision: zod
+    .number()
+    .int()
+    .min(updateAhaBackupBodyDocumentRevisionMin),
+  completedAt: zod.string().datetime({ offset: true }).nullable(),
+  updatedAfterCompletionAt: zod.array(zod.string().datetime({ offset: true })),
+  documentEvents: zod
+    .array(
+      zod.object({
+        id: zod.string().min(1),
+        kind: zod.enum([
+          "initial_completion",
+          "late_worker_added",
+          "signature_replaced",
+          "worker_removed",
+          "safety_update",
+          "administrative_update",
+        ]),
+        reason: zod.enum([
+          "initial_completion",
+          "late_arrival",
+          "wrong_person_signed",
+          "signature_unclear",
+          "worker_not_on_site",
+          "duplicate_entry",
+          "added_by_mistake",
+          "work_conditions_changed",
+          "administrative_correction",
+        ]),
+        note: zod
+          .string()
+          .max(updateAhaBackupBodyDocumentEventsItemNoteMax)
+          .nullable(),
+        occurredAt: zod.string().datetime({ offset: true }),
+        fromDocumentRevision: zod
+          .number()
+          .int()
+          .min(updateAhaBackupBodyDocumentEventsItemFromDocumentRevisionMin)
+          .nullable(),
+        toDocumentRevision: zod
+          .number()
+          .int()
+          .min(updateAhaBackupBodyDocumentEventsItemToDocumentRevisionMin),
+        affectedWorkers: zod.array(
+          zod.object({
+            workerId: zod.string().min(1),
+            name: zod.string(),
+          }),
+        ),
+        crewReviewConfirmation: zod.union([
+          zod.object({
+            confirmedAt: zod.string().datetime({ offset: true }),
+            personInChargeName: zod.string(),
+          }),
+          zod.null(),
+        ]),
+        retainedSignatures: zod
+          .array(
+            zod.object({
+              workerId: zod.string().min(1),
+              name: zod.string(),
+              signedAt: zod.string().datetime({ offset: true }),
+            }),
+          )
+          .default(
+            updateAhaBackupBodyDocumentEventsItemRetainedSignaturesDefault,
+          ),
+      }),
+    )
+    .default(updateAhaBackupBodyDocumentEventsDefault),
+  pendingCompletedUpdate: zod
+    .union([
+      zod.object({
+        id: zod.string().min(1),
+        startedAt: zod.string().datetime({ offset: true }),
+        baselineDocumentRevision: zod
+          .number()
+          .int()
+          .min(
+            updateAhaBackupBodyPendingCompletedUpdateOneBaselineDocumentRevisionMin,
+          ),
+        kind: zod.enum(["safety", "administrative"]),
+        crewReviewConfirmation: zod.union([
+          zod.object({
+            confirmedAt: zod.string().datetime({ offset: true }),
+            personInChargeName: zod.string(),
+          }),
+          zod.null(),
+        ]),
+      }),
+      zod.null(),
+    ])
+    .default(updateAhaBackupBodyPendingCompletedUpdateDefault),
+  pendingSigningUpdate: zod
+    .union([
+      zod.object({
+        id: zod.string().min(1),
+        startedAt: zod.string().datetime({ offset: true }),
+        latestChangedAt: zod.string().datetime({ offset: true }),
+        baselineDocumentRevision: zod
+          .number()
+          .int()
+          .min(
+            updateAhaBackupBodyPendingSigningUpdateOneBaselineDocumentRevisionMin,
+          ),
+        affectedWorkers: zod.array(
+          zod.object({
+            workerId: zod.string().min(1),
+            name: zod.string(),
+            signedAt: zod.string().datetime({ offset: true }),
+          }),
+        ),
+        crewReviewConfirmation: zod.union([
+          zod.object({
+            confirmedAt: zod.string().datetime({ offset: true }),
+            personInChargeName: zod.string(),
+          }),
+          zod.null(),
+        ]),
+      }),
+      zod.null(),
+    ])
+    .default(updateAhaBackupBodyPendingSigningUpdateDefault),
+  sync: zod.object({
+    savedLocallyAt: zod.string().datetime({ offset: true }),
+    backedUpAt: zod.string().datetime({ offset: true }).nullable(),
+  }),
+});
 
 export const updateAhaBackupResponseRecordTasksMax = 15;
 
 export const updateAhaBackupResponseRecordEnergySelectionsMax = 11;
 
-
 export const updateAhaBackupResponseRecordCrewMax = 10;
 
 export const updateAhaBackupResponseRecordDocumentRevisionMin = 0;
-
 
 export const updateAhaBackupResponseRecordDocumentEventsItemNoteMax = 250;
 
@@ -606,177 +1081,326 @@ export const updateAhaBackupResponseRecordDocumentEventsItemFromDocumentRevision
 
 export const updateAhaBackupResponseRecordDocumentEventsItemToDocumentRevisionMin = 0;
 
-
+export const updateAhaBackupResponseRecordDocumentEventsItemRetainedSignaturesDefault =
+  [];
 export const updateAhaBackupResponseRecordDocumentEventsDefault = [];
 export const updateAhaBackupResponseRecordPendingCompletedUpdateOneBaselineDocumentRevisionMin = 0;
 
 export const updateAhaBackupResponseRecordPendingCompletedUpdateDefault = null;
+export const updateAhaBackupResponseRecordPendingSigningUpdateOneBaselineDocumentRevisionMin = 0;
+
+export const updateAhaBackupResponseRecordPendingSigningUpdateDefault = null;
 
 export const UpdateAhaBackupResponse = zod.object({
-  "accepted": zod.boolean(),
-  "record": zod.object({
-  "id": zod.string().min(1),
-  "jobId": zod.string().min(1),
-  "date": zod.string().date(),
-  "status": zod.enum(['draft', 'in_progress', 'completed']),
-  "header": zod.object({
-  "location": zod.string(),
-  "date": zod.string().date(),
-  "personInCharge": zod.string(),
-  "closestEmergencyCentre": zod.string(),
-  "emergencyNumber": zod.string(),
-  "musterPoint": zod.string(),
-  "workOrderPermit": zod.string(),
-  "jhaProcedureNumbers": zod.string(),
-  "rescuePlanRequired": zod.boolean().nullable()
-}),
-  "description": zod.string(),
-  "meetingNotes": zod.string(),
-  "notApplicable": zod.object({
-  "workOrderPermit": zod.boolean(),
-  "jhaProcedureNumbers": zod.boolean(),
-  "meetingNotes": zod.boolean()
-}),
-  "tasks": zod.array(zod.object({
-  "id": zod.string().min(1),
-  "task": zod.string(),
-  "hazards": zod.string(),
-  "controls": zod.string()
-})).max(updateAhaBackupResponseRecordTasksMax),
-  "energySelections": zod.array(zod.object({
-  "category": zod.enum(['Gravity', 'Motion', 'Mechanical', 'Electrical', 'Pressure', 'Sound', 'Radiation', 'Biological', 'Chemical', 'Temperature', 'Human factors']),
-  "examples": zod.array(zod.string())
-})).max(updateAhaBackupResponseRecordEnergySelectionsMax),
-  "safetyCheck": zod.union([zod.literal('yes'),zod.literal('no'),zod.literal(null)]).nullable(),
-  "crew": zod.array(zod.object({
-  "workerId": zod.string().min(1),
-  "name": zod.string(),
-  "signaturePng": zod.string().nullable(),
-  "signedAt": zod.string().datetime({"offset":true}).nullable()
-})).max(updateAhaBackupResponseRecordCrewMax),
-  "personInChargeWorkerId": zod.string().nullable(),
-  "documentRevision": zod.number().int().min(updateAhaBackupResponseRecordDocumentRevisionMin),
-  "completedAt": zod.string().datetime({"offset":true}).nullable(),
-  "updatedAfterCompletionAt": zod.array(zod.string().datetime({"offset":true})),
-  "documentEvents": zod.array(zod.object({
-  "id": zod.string().min(1),
-  "kind": zod.enum(['initial_completion', 'late_worker_added', 'signature_replaced', 'worker_removed', 'safety_update', 'administrative_update']),
-  "reason": zod.enum(['initial_completion', 'late_arrival', 'wrong_person_signed', 'signature_unclear', 'worker_not_on_site', 'duplicate_entry', 'added_by_mistake', 'work_conditions_changed', 'administrative_correction']),
-  "note": zod.string().max(updateAhaBackupResponseRecordDocumentEventsItemNoteMax).nullable(),
-  "occurredAt": zod.string().datetime({"offset":true}),
-  "fromDocumentRevision": zod.number().int().min(updateAhaBackupResponseRecordDocumentEventsItemFromDocumentRevisionMin).nullable(),
-  "toDocumentRevision": zod.number().int().min(updateAhaBackupResponseRecordDocumentEventsItemToDocumentRevisionMin),
-  "affectedWorkers": zod.array(zod.object({
-  "workerId": zod.string().min(1),
-  "name": zod.string()
-})),
-  "crewReviewConfirmation": zod.union([zod.object({
-  "confirmedAt": zod.string().datetime({"offset":true}),
-  "personInChargeName": zod.string()
-}),zod.null()])
-})).default(updateAhaBackupResponseRecordDocumentEventsDefault),
-  "pendingCompletedUpdate": zod.union([zod.object({
-  "id": zod.string().min(1),
-  "startedAt": zod.string().datetime({"offset":true}),
-  "baselineDocumentRevision": zod.number().int().min(updateAhaBackupResponseRecordPendingCompletedUpdateOneBaselineDocumentRevisionMin),
-  "kind": zod.enum(['safety', 'administrative']),
-  "crewReviewConfirmation": zod.union([zod.object({
-  "confirmedAt": zod.string().datetime({"offset":true}),
-  "personInChargeName": zod.string()
-}),zod.null()])
-}),zod.null()]).default(updateAhaBackupResponseRecordPendingCompletedUpdateDefault),
-  "sync": zod.object({
-  "savedLocallyAt": zod.string().datetime({"offset":true}),
-  "backedUpAt": zod.string().datetime({"offset":true}).nullable()
-})
-})
-})
-
+  accepted: zod.boolean(),
+  record: zod.object({
+    id: zod.string().min(1),
+    jobId: zod.string().min(1),
+    date: zod.string().date(),
+    status: zod.enum(["draft", "in_progress", "completed"]),
+    header: zod.object({
+      location: zod.string(),
+      date: zod.string().date(),
+      personInCharge: zod.string(),
+      closestEmergencyCentre: zod.string(),
+      emergencyNumber: zod.string(),
+      musterPoint: zod.string(),
+      workOrderPermit: zod.string(),
+      jhaProcedureNumbers: zod.string(),
+      rescuePlanRequired: zod.boolean().nullable(),
+    }),
+    description: zod.string(),
+    meetingNotes: zod.string(),
+    notApplicable: zod.object({
+      workOrderPermit: zod.boolean(),
+      jhaProcedureNumbers: zod.boolean(),
+      meetingNotes: zod.boolean(),
+    }),
+    tasks: zod
+      .array(
+        zod.object({
+          id: zod.string().min(1),
+          task: zod.string(),
+          hazards: zod.string(),
+          controls: zod.string(),
+        }),
+      )
+      .max(updateAhaBackupResponseRecordTasksMax),
+    energySelections: zod
+      .array(
+        zod.object({
+          category: zod.enum([
+            "Gravity",
+            "Motion",
+            "Mechanical",
+            "Electrical",
+            "Pressure",
+            "Sound",
+            "Radiation",
+            "Biological",
+            "Chemical",
+            "Temperature",
+            "Human factors",
+          ]),
+          examples: zod.array(zod.string()),
+        }),
+      )
+      .max(updateAhaBackupResponseRecordEnergySelectionsMax),
+    safetyCheck: zod
+      .union([zod.literal("yes"), zod.literal("no"), zod.literal(null)])
+      .nullable(),
+    crew: zod
+      .array(
+        zod.object({
+          workerId: zod.string().min(1),
+          name: zod.string(),
+          signaturePng: zod.string().nullable(),
+          signedAt: zod.string().datetime({ offset: true }).nullable(),
+        }),
+      )
+      .max(updateAhaBackupResponseRecordCrewMax),
+    personInChargeWorkerId: zod.string().nullable(),
+    documentRevision: zod
+      .number()
+      .int()
+      .min(updateAhaBackupResponseRecordDocumentRevisionMin),
+    completedAt: zod.string().datetime({ offset: true }).nullable(),
+    updatedAfterCompletionAt: zod.array(
+      zod.string().datetime({ offset: true }),
+    ),
+    documentEvents: zod
+      .array(
+        zod.object({
+          id: zod.string().min(1),
+          kind: zod.enum([
+            "initial_completion",
+            "late_worker_added",
+            "signature_replaced",
+            "worker_removed",
+            "safety_update",
+            "administrative_update",
+          ]),
+          reason: zod.enum([
+            "initial_completion",
+            "late_arrival",
+            "wrong_person_signed",
+            "signature_unclear",
+            "worker_not_on_site",
+            "duplicate_entry",
+            "added_by_mistake",
+            "work_conditions_changed",
+            "administrative_correction",
+          ]),
+          note: zod
+            .string()
+            .max(updateAhaBackupResponseRecordDocumentEventsItemNoteMax)
+            .nullable(),
+          occurredAt: zod.string().datetime({ offset: true }),
+          fromDocumentRevision: zod
+            .number()
+            .int()
+            .min(
+              updateAhaBackupResponseRecordDocumentEventsItemFromDocumentRevisionMin,
+            )
+            .nullable(),
+          toDocumentRevision: zod
+            .number()
+            .int()
+            .min(
+              updateAhaBackupResponseRecordDocumentEventsItemToDocumentRevisionMin,
+            ),
+          affectedWorkers: zod.array(
+            zod.object({
+              workerId: zod.string().min(1),
+              name: zod.string(),
+            }),
+          ),
+          crewReviewConfirmation: zod.union([
+            zod.object({
+              confirmedAt: zod.string().datetime({ offset: true }),
+              personInChargeName: zod.string(),
+            }),
+            zod.null(),
+          ]),
+          retainedSignatures: zod
+            .array(
+              zod.object({
+                workerId: zod.string().min(1),
+                name: zod.string(),
+                signedAt: zod.string().datetime({ offset: true }),
+              }),
+            )
+            .default(
+              updateAhaBackupResponseRecordDocumentEventsItemRetainedSignaturesDefault,
+            ),
+        }),
+      )
+      .default(updateAhaBackupResponseRecordDocumentEventsDefault),
+    pendingCompletedUpdate: zod
+      .union([
+        zod.object({
+          id: zod.string().min(1),
+          startedAt: zod.string().datetime({ offset: true }),
+          baselineDocumentRevision: zod
+            .number()
+            .int()
+            .min(
+              updateAhaBackupResponseRecordPendingCompletedUpdateOneBaselineDocumentRevisionMin,
+            ),
+          kind: zod.enum(["safety", "administrative"]),
+          crewReviewConfirmation: zod.union([
+            zod.object({
+              confirmedAt: zod.string().datetime({ offset: true }),
+              personInChargeName: zod.string(),
+            }),
+            zod.null(),
+          ]),
+        }),
+        zod.null(),
+      ])
+      .default(updateAhaBackupResponseRecordPendingCompletedUpdateDefault),
+    pendingSigningUpdate: zod
+      .union([
+        zod.object({
+          id: zod.string().min(1),
+          startedAt: zod.string().datetime({ offset: true }),
+          latestChangedAt: zod.string().datetime({ offset: true }),
+          baselineDocumentRevision: zod
+            .number()
+            .int()
+            .min(
+              updateAhaBackupResponseRecordPendingSigningUpdateOneBaselineDocumentRevisionMin,
+            ),
+          affectedWorkers: zod.array(
+            zod.object({
+              workerId: zod.string().min(1),
+              name: zod.string(),
+              signedAt: zod.string().datetime({ offset: true }),
+            }),
+          ),
+          crewReviewConfirmation: zod.union([
+            zod.object({
+              confirmedAt: zod.string().datetime({ offset: true }),
+              personInChargeName: zod.string(),
+            }),
+            zod.null(),
+          ]),
+        }),
+        zod.null(),
+      ])
+      .default(updateAhaBackupResponseRecordPendingSigningUpdateDefault),
+    sync: zod.object({
+      savedLocallyAt: zod.string().datetime({ offset: true }),
+      backedUpAt: zod.string().datetime({ offset: true }).nullable(),
+    }),
+  }),
+});
 
 /**
  * @summary Download a finished PDF for empty-device restore
  */
 
-
-
 export const GetAhaPdfBackupParams = zod.object({
-  "ahaId": zod.coerce.string().min(1)
-})
+  ahaId: zod.coerce.string().min(1),
+});
 
-export const GetAhaPdfBackupResponse = zod.unknown()
-
+export const GetAhaPdfBackupResponse = zod.unknown();
 
 /**
  * @summary Idempotently back up a finished PDF
  */
 
-
-
 export const BackupAhaPdfParams = zod.object({
-  "ahaId": zod.coerce.string().min(1)
-})
+  ahaId: zod.coerce.string().min(1),
+});
 
 export const backupAhaPdfQueryFilenameMax = 240;
 
 export const backupAhaPdfQuerySourceRevisionMin = 0;
 
-
-
 export const BackupAhaPdfQueryParams = zod.object({
-  "filename": zod.coerce.string().min(1).max(backupAhaPdfQueryFilenameMax),
-  "sourceRevision": zod.coerce.number().int().min(backupAhaPdfQuerySourceRevisionMin),
-  "generatedAt": zod.coerce.string().datetime({"offset":true}).describe('PDF generation instant; legacy parseable PostgreSQL timestamps are accepted and normalized to UTC.')
-})
+  filename: zod.coerce.string().min(1).max(backupAhaPdfQueryFilenameMax),
+  sourceRevision: zod.coerce
+    .number()
+    .int()
+    .min(backupAhaPdfQuerySourceRevisionMin),
+  generatedAt: zod.coerce
+    .string()
+    .datetime({ offset: true })
+    .describe(
+      "PDF generation instant; legacy parseable PostgreSQL timestamps are accepted and normalized to UTC.",
+    ),
+});
 
 export const backupAhaPdfResponseRecordSourceRevisionMin = 0;
 
-
-
-
 export const BackupAhaPdfResponse = zod.object({
-  "accepted": zod.boolean().describe('True when the artifact was safely retained as either the current PDF or a historical version.'),
-  "isCurrent": zod.boolean().describe('True when this artifact won version comparison and is now the current PDF.'),
-  "record": zod.object({
-  "ahaId": zod.string(),
-  "filename": zod.string(),
-  "sourceRevision": zod.number().int().min(backupAhaPdfResponseRecordSourceRevisionMin),
-  "generatedAt": zod.string().datetime({"offset":true}).describe('Canonical UTC ISO 8601 timestamp used in PDF version identity.'),
-  "byteLength": zod.number().int().min(1),
-  "sha256": zod.string(),
-  "backedUpAt": zod.string().datetime({"offset":true})
-})
-})
-
+  accepted: zod
+    .boolean()
+    .describe(
+      "True when the artifact was safely retained as either the current PDF or a historical version.",
+    ),
+  isCurrent: zod
+    .boolean()
+    .describe(
+      "True when this artifact won version comparison and is now the current PDF.",
+    ),
+  record: zod.object({
+    ahaId: zod.string(),
+    filename: zod.string(),
+    sourceRevision: zod
+      .number()
+      .int()
+      .min(backupAhaPdfResponseRecordSourceRevisionMin),
+    generatedAt: zod
+      .string()
+      .datetime({ offset: true })
+      .describe(
+        "Canonical UTC ISO 8601 timestamp used in PDF version identity.",
+      ),
+    byteLength: zod.number().int().min(1),
+    sha256: zod.string(),
+    backedUpAt: zod.string().datetime({ offset: true }),
+  }),
+});
 
 /**
  * @summary List current and superseded PDF metadata
  */
 
-
-
 export const ListAhaPdfVersionsParams = zod.object({
-  "ahaId": zod.coerce.string().min(1)
-})
+  ahaId: zod.coerce.string().min(1),
+});
 
 export const listAhaPdfVersionsResponseOneSourceRevisionMin = 0;
 
-
-
-
-export const ListAhaPdfVersionsResponseItem = zod.object({
-  "ahaId": zod.string(),
-  "filename": zod.string(),
-  "sourceRevision": zod.number().int().min(listAhaPdfVersionsResponseOneSourceRevisionMin),
-  "generatedAt": zod.string().datetime({"offset":true}).describe('Canonical UTC ISO 8601 timestamp used in PDF version identity.'),
-  "byteLength": zod.number().int().min(1),
-  "sha256": zod.string(),
-  "backedUpAt": zod.string().datetime({"offset":true})
-}).and(zod.object({
-  "supersededAt": zod.string().datetime({"offset":true}).nullable(),
-  "isCurrent": zod.boolean()
-}))
-export const ListAhaPdfVersionsResponse = zod.array(ListAhaPdfVersionsResponseItem)
-
+export const ListAhaPdfVersionsResponseItem = zod
+  .object({
+    ahaId: zod.string(),
+    filename: zod.string(),
+    sourceRevision: zod
+      .number()
+      .int()
+      .min(listAhaPdfVersionsResponseOneSourceRevisionMin),
+    generatedAt: zod
+      .string()
+      .datetime({ offset: true })
+      .describe(
+        "Canonical UTC ISO 8601 timestamp used in PDF version identity.",
+      ),
+    byteLength: zod.number().int().min(1),
+    sha256: zod.string(),
+    backedUpAt: zod.string().datetime({ offset: true }),
+  })
+  .and(
+    zod.object({
+      supersededAt: zod.string().datetime({ offset: true }).nullable(),
+      isCurrent: zod.boolean(),
+    }),
+  );
+export const ListAhaPdfVersionsResponse = zod.array(
+  ListAhaPdfVersionsResponseItem,
+);
 
 /**
  * @summary Download one exact PDF version
@@ -784,17 +1408,21 @@ export const ListAhaPdfVersionsResponse = zod.array(ListAhaPdfVersionsResponseIt
 
 export const getAhaPdfVersionPathSourceRevisionMin = 0;
 
-
-
 export const GetAhaPdfVersionParams = zod.object({
-  "ahaId": zod.coerce.string().min(1),
-  "sourceRevision": zod.coerce.number().int().min(getAhaPdfVersionPathSourceRevisionMin)
-})
+  ahaId: zod.coerce.string().min(1),
+  sourceRevision: zod.coerce
+    .number()
+    .int()
+    .min(getAhaPdfVersionPathSourceRevisionMin),
+});
 
 export const GetAhaPdfVersionQueryParams = zod.object({
-  "generatedAt": zod.coerce.string().datetime({"offset":true}).describe('Exact generation instant; responses always use canonical UTC ISO 8601.')
-})
+  generatedAt: zod.coerce
+    .string()
+    .datetime({ offset: true })
+    .describe(
+      "Exact generation instant; responses always use canonical UTC ISO 8601.",
+    ),
+});
 
-export const GetAhaPdfVersionResponse = zod.unknown()
-
-
+export const GetAhaPdfVersionResponse = zod.unknown();

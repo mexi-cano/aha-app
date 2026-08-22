@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   MAX_CREW_MEMBERS,
+  CREW_REVIEW_CONFIRMATION,
   addSignedCrewMember,
   canFinishAha,
   canStartSigning,
+  confirmSigningCrewReview,
   completeAha,
   countSignedCrew,
   recordSignature,
@@ -34,13 +36,17 @@ import {
 import { createLocalId } from "@/data/aha-repository";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import {
+  describePdfFitIssue,
+  pdfFitIssueEditorPath,
+} from "@/features/aha-editor/pdf-fit-navigation";
+import { runAhaPdfFitPreflight } from "@/features/aha-editor/pdf-fit-preflight";
+import {
   getWorkerReviewCopy,
   type WorkerReviewErrorKey,
   type WorkerReviewLanguage,
 } from "@/features/aha-editor/worker-review-copy";
 import { formatEditorDate, formatTime } from "@/lib/date-format";
 import {
-  analyzeAhaPdfFit,
   navigateAfterPersistedPdfOperation,
   saveAhaAndGeneratePdf,
   type PdfFitIssue,
@@ -64,8 +70,9 @@ export default function AhaSigning() {
   const [hasInk, setHasInk] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
   const [operationError, setOperationError] = useState<string | null>(null);
-  const [workerError, setWorkerError] =
-    useState<WorkerReviewErrorKey | null>(null);
+  const [workerError, setWorkerError] = useState<WorkerReviewErrorKey | null>(
+    null,
+  );
   const [workerLanguage, setWorkerLanguage] =
     useState<WorkerReviewLanguage>("en");
   const [savedNotice, setSavedNotice] = useState<"signature" | "ready" | null>(
@@ -75,6 +82,11 @@ export default function AhaSigning() {
   const [discardAsk, setDiscardAsk] = useState(false);
   const [limitMessage, setLimitMessage] = useState(false);
   const [fitIssues, setFitIssues] = useState<PdfFitIssue[]>([]);
+  const [fitState, setFitState] = useState<"checking" | "ready" | "error">(
+    "checking",
+  );
+  const [fitRevision, setFitRevision] = useState<number | null>(null);
+  const [fitAttempt, setFitAttempt] = useState(0);
   const finishSectionRef = useRef<HTMLDivElement>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const finishInFlightRef = useRef(false);
@@ -100,6 +112,14 @@ export default function AhaSigning() {
   const foremanWorkerId = resolvePersonInChargeWorkerId(aha);
   const workerCopy = getWorkerReviewCopy(workerLanguage);
   const isWorkerView = view.kind === "member" || view.kind === "add";
+  const canCollectSignatures =
+    fitState === "ready" &&
+    fitRevision === aha.documentRevision &&
+    fitIssues.length === 0;
+  const affectedWorkerIds = new Set(
+    aha.pendingSigningUpdate?.affectedWorkers.map(({ workerId }) => workerId) ??
+      [],
+  );
   const headerTitle =
     view.kind === "member"
       ? (signingMember?.name ?? "Crew member")
@@ -118,6 +138,28 @@ export default function AhaSigning() {
       void navigateSafely(`/ahas/${aha.id}/review`);
     }
   }, [aha, navigateSafely]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setFitState("checking");
+    setFitRevision(null);
+    setFitIssues([]);
+    void runAhaPdfFitPreflight(aha, job)
+      .then((fit) => {
+        if (cancelled) return;
+        setFitIssues(fit.issues);
+        setFitRevision(fit.documentRevision);
+        setFitState("ready");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setFitRevision(null);
+        setFitState("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [aha.documentRevision, aha.id, fitAttempt, job]);
 
   useEffect(() => {
     if (view.kind === "member" && !signingMember) {
@@ -165,12 +207,14 @@ export default function AhaSigning() {
   };
 
   const openMember = (workerId: string) => {
+    if (!canCollectSignatures) return;
     resetSigningDraft();
     setWorkerLanguage("en");
     setView({ kind: "member", workerId });
   };
 
   const openAddWorker = () => {
+    if (!canCollectSignatures) return;
     if (aha.crew.length >= MAX_CREW_MEMBERS) {
       setLimitMessage(true);
       return;
@@ -193,6 +237,7 @@ export default function AhaSigning() {
       return;
     }
     if (view.kind !== "add" && view.kind !== "member") return;
+    if (!canCollectSignatures) return;
 
     const signedWorkerId = view.kind === "add" ? addWorkerId : view.workerId;
     signatureInFlightRef.current = true;
@@ -200,6 +245,27 @@ export default function AhaSigning() {
     setOperationError(null);
     setWorkerError(null);
     try {
+      if (view.kind === "add") {
+        try {
+          const candidate = addSignedCrewMember(
+            aha,
+            { id: addWorkerId, name: addName },
+            signaturePng,
+            new Date(),
+          );
+          const candidateFit = await runAhaPdfFitPreflight(candidate, job);
+          if (candidateFit.issues.length > 0) {
+            setFitIssues(candidateFit.issues);
+            setFitRevision(candidateFit.documentRevision);
+            setFitState("ready");
+            setWorkerError("save_signature");
+            return;
+          }
+        } catch {
+          setWorkerError("save_signature");
+          return;
+        }
+      }
       const saved = await commitAha((current) =>
         view.kind === "add"
           ? addSignedCrewMember(
@@ -249,7 +315,7 @@ export default function AhaSigning() {
     try {
       let fit;
       try {
-        fit = await analyzeAhaPdfFit(aha, job);
+        fit = await runAhaPdfFitPreflight(aha, job);
       } catch {
         setOperationError(
           "We couldn't check the official PDF. Your AHA and signatures are still saved. Try again.",
@@ -260,10 +326,16 @@ export default function AhaSigning() {
         setFitIssues(fit.issues);
         return;
       }
+      const analyzedRevision = fit.documentRevision;
 
       const result = await saveAhaAndGeneratePdf({
         commitAha,
-        update: (current) => completeAha(current, new Date()),
+        update: (current) => {
+          if (current.documentRevision !== analyzedRevision) {
+            throw new Error("The AHA changed after PDF preflight");
+          }
+          return completeAha(current, new Date());
+        },
         job,
       });
       if (result.status === "save_failed") {
@@ -358,6 +430,109 @@ export default function AhaSigning() {
               View today's AHA
             </Button>
 
+            {fitState === "checking" ? (
+              <p
+                className="rounded-xl border border-[#C6CDE8] bg-secondary px-4 py-3 text-center text-base font-semibold text-secondary-foreground"
+                role="status"
+              >
+                Checking the official sheet before signing…
+              </p>
+            ) : fitState === "error" ? (
+              <div
+                className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-base font-semibold text-warning-foreground"
+                role="alert"
+              >
+                <p>
+                  We couldn&apos;t check the official PDF. No additional
+                  signatures can be collected until the check succeeds.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-3 min-h-12 text-base text-primary"
+                  onClick={() => setFitAttempt((current) => current + 1)}
+                >
+                  Try fit check again
+                </Button>
+              </div>
+            ) : fitIssues.length > 0 ? (
+              <div
+                className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-4 text-warning-foreground"
+                role="alert"
+              >
+                <p className="font-bold">
+                  The official PDF must fit before anyone else signs.
+                </p>
+                <ul className="mt-3 space-y-3">
+                  {fitIssues.map((issue) => (
+                    <li
+                      key={`${issue.fieldPath}-${issue.code}`}
+                      className="rounded-lg bg-card/70 p-3 text-sm font-semibold"
+                    >
+                      <p>{describePdfFitIssue(issue, aha)}</p>
+                      <Button
+                        variant="outline"
+                        className="mt-2 min-h-12 text-base text-primary"
+                        onClick={() =>
+                          void navigateSafely(
+                            pdfFitIssueEditorPath(aha.id, issue),
+                          )
+                        }
+                      >
+                        Fix {issue.label.toLowerCase()}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {aha.pendingSigningUpdate ? (
+              <section className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-4">
+                <p className="text-base font-bold text-warning-foreground">
+                  Signed workers need to review the latest updates
+                </p>
+                <p className="mt-1 text-sm font-medium text-muted-foreground">
+                  Ask the affected workers to choose Review updates and sign
+                  again, or have{" "}
+                  {aha.header.personInCharge || "the Person in charge"} confirm
+                  the changes were reviewed with today&apos;s crew. The app
+                  records the configured name and time, not who physically
+                  tapped this button.
+                </p>
+                <ul className="mt-2 text-sm font-semibold">
+                  {aha.pendingSigningUpdate.affectedWorkers.map(
+                    ({ workerId, name }) => (
+                      <li key={workerId}>{name}</li>
+                    ),
+                  )}
+                </ul>
+                <Button
+                  type="button"
+                  variant={
+                    aha.pendingSigningUpdate.crewReviewConfirmation
+                      ? "secondary"
+                      : "outline"
+                  }
+                  className="mt-3 min-h-14 w-full whitespace-normal text-base font-bold"
+                  disabled={
+                    isCommitting ||
+                    aha.safetyCheck !== "yes" ||
+                    Boolean(aha.pendingSigningUpdate.crewReviewConfirmation)
+                  }
+                  onClick={() =>
+                    void commitAha((current) =>
+                      confirmSigningCrewReview(current, new Date()),
+                    )
+                  }
+                >
+                  {aha.pendingSigningUpdate.crewReviewConfirmation
+                    ? "✓ Reviewed with today's crew"
+                    : CREW_REVIEW_CONFIRMATION}
+                </Button>
+              </section>
+            ) : null}
+
             <div className="flex flex-col gap-2.5 pt-1">
               {aha.crew.map((member) => {
                 const signed = Boolean(member.signaturePng && member.signedAt);
@@ -375,11 +550,13 @@ export default function AhaSigning() {
                         ? "border border-card-border"
                         : "border-[1.5px] border-[#C6CDE8]"
                     }`}
-                    disabled={isCommitting}
+                    disabled={isCommitting || !canCollectSignatures}
                     onClick={() =>
-                      signed
-                        ? setResignWorkerId(member.workerId)
-                        : openMember(member.workerId)
+                      signed && affectedWorkerIds.has(member.workerId)
+                        ? openMember(member.workerId)
+                        : signed
+                          ? setResignWorkerId(member.workerId)
+                          : openMember(member.workerId)
                     }
                   >
                     <span className="min-w-0 flex-1 text-lg font-semibold">
@@ -388,7 +565,11 @@ export default function AhaSigning() {
                         <ForemanBadge className="ml-2 align-middle" />
                       ) : null}
                     </span>
-                    {signed && member.signedAt ? (
+                    {signed && affectedWorkerIds.has(member.workerId) ? (
+                      <span className="shrink-0 text-sm font-semibold text-warning-foreground">
+                        Review updates ›
+                      </span>
+                    ) : signed && member.signedAt ? (
                       <span className="shrink-0 text-base font-semibold text-success">
                         Signed {formatTime(member.signedAt)} ✓
                       </span>
@@ -404,7 +585,7 @@ export default function AhaSigning() {
                 type="button"
                 variant="outline"
                 className="min-h-14 w-full border-[1.5px] border-dashed border-[#C6CDE8] text-[17px] font-bold text-primary"
-                disabled={isCommitting}
+                disabled={isCommitting || !canCollectSignatures}
                 onClick={openAddWorker}
               >
                 + Add Worker
@@ -428,28 +609,10 @@ export default function AhaSigning() {
                 {operationError}
               </p>
             ) : null}
-            {fitIssues.length > 0 ? (
-              <div
-                className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-warning-foreground"
-                role="alert"
-              >
-                <p className="font-bold">
-                  The official PDF needs shorter content before completion:
-                </p>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm font-semibold">
-                  {fitIssues.map((issue) => (
-                    <li key={`${issue.fieldPath}-${issue.code}`}>
-                      {issue.message}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-
             <div ref={finishSectionRef} className="flex flex-col gap-2.5 pt-2">
               <Button
                 className="min-h-[72px] w-full rounded-[14px] text-xl font-bold tracking-wide"
-                disabled={!finishReady || isCommitting}
+                disabled={!finishReady || isCommitting || !canCollectSignatures}
                 onClick={() => void finish()}
               >
                 {isCommitting ? "FINISHING…" : "FINISH TODAY'S AHA"}
@@ -481,8 +644,10 @@ export default function AhaSigning() {
                   }
                 : undefined
             }
-            disabled={isCommitting}
-            confirmDisabled={view.kind === "add" && !addName.trim()}
+            disabled={isCommitting || !canCollectSignatures}
+            confirmDisabled={
+              !canCollectSignatures || (view.kind === "add" && !addName.trim())
+            }
             confirmLabel={
               isCommitting ? workerCopy.saving : workerCopy.confirmSignature
             }

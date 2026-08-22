@@ -205,6 +205,16 @@ export type CompletedCrewReviewConfirmation = z.infer<
   typeof completedCrewReviewConfirmationSchema
 >;
 
+export const retainedSignatureSnapshotSchema = z.object({
+  workerId: z.string().min(1),
+  name: z.string(),
+  signedAt: z.string().datetime(),
+});
+
+export type RetainedSignatureSnapshot = z.infer<
+  typeof retainedSignatureSnapshotSchema
+>;
+
 export const ahaDocumentEventSchema = z.object({
   id: z.string().min(1),
   kind: ahaDocumentEventKindSchema,
@@ -220,6 +230,7 @@ export const ahaDocumentEventSchema = z.object({
     }),
   ),
   crewReviewConfirmation: completedCrewReviewConfirmationSchema.nullable(),
+  retainedSignatures: z.array(retainedSignatureSnapshotSchema).default([]),
 });
 
 export type AhaDocumentEvent = z.infer<typeof ahaDocumentEventSchema>;
@@ -235,6 +246,17 @@ export const pendingCompletedUpdateSchema = z.object({
 export type PendingCompletedUpdate = z.infer<
   typeof pendingCompletedUpdateSchema
 >;
+
+export const pendingSigningUpdateSchema = z.object({
+  id: z.string().min(1),
+  startedAt: z.string().datetime(),
+  latestChangedAt: z.string().datetime(),
+  baselineDocumentRevision: z.number().int().nonnegative(),
+  affectedWorkers: z.array(retainedSignatureSnapshotSchema),
+  crewReviewConfirmation: completedCrewReviewConfirmationSchema.nullable(),
+});
+
+export type PendingSigningUpdate = z.infer<typeof pendingSigningUpdateSchema>;
 
 export const ahaSchema = z
   .object({
@@ -264,6 +286,7 @@ export const ahaSchema = z
     pendingCompletedUpdate: pendingCompletedUpdateSchema
       .nullable()
       .default(null),
+    pendingSigningUpdate: pendingSigningUpdateSchema.nullable().default(null),
     sync: z.object({
       savedLocallyAt: z.string().datetime(),
       backedUpAt: z.string().datetime().nullable(),

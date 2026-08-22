@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import {
+  ENERGY_CATEGORIES,
   MAX_TASKS,
   canAddTask,
   createEmptyTask,
   getReviewReport,
+  toggleEnergyCategory,
 } from "@workspace/aha-domain";
 
 import {
@@ -19,22 +21,40 @@ import {
 } from "@/components/ui/alert-dialog";
 import { EditorContinue } from "@/components/aha/editor-continue";
 import { EditorShell } from "@/components/aha/editor-shell";
-import { TextAreaField, TextField } from "@/components/aha/form-field";
+import { EnergyCategoryToggle } from "@/components/aha/energy-category-toggle";
+import { TextAreaField } from "@/components/aha/form-field";
 import { PrefillBanner } from "@/components/aha/prefill-banner";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { createLocalId } from "@/data/aha-repository";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import { shouldShowPrefillBanner } from "@/features/aha-editor/completed-update-grouping";
 import { scrollToAndFocus } from "@/features/aha-editor/editor-navigation";
 import { taskNeedsDetails } from "@/features/aha-editor/review-presentation";
+import { runAhaPdfFitPreflight } from "@/features/aha-editor/pdf-fit-preflight";
+import type { PdfFitIssue } from "@/pdf";
 
 export default function AhaWork() {
-  const { aha, updateAha, navigateSafely, editorBasePath, editorMode } =
+  const { aha, job, updateAha, navigateSafely, editorBasePath, editorMode } =
     useAhaEditor();
   const [searchParams] = useSearchParams();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [limitMessage, setLimitMessage] = useState(false);
+  const [energyDialogOpen, setEnergyDialogOpen] = useState(false);
+  const [taskFitIssues, setTaskFitIssues] = useState<
+    Record<string, PdfFitIssue[]>
+  >({});
+  const [fitCheckFailedTaskId, setFitCheckFailedTaskId] = useState<
+    string | null
+  >(null);
 
   const taskToDelete = useMemo(
     () => aha.tasks.find(({ id }) => id === deleteId) ?? null,
@@ -104,6 +124,20 @@ export default function AhaWork() {
     setLimitMessage(false);
   };
 
+  const finishEditingTask = async (taskId: string) => {
+    setEditingId(null);
+    setFitCheckFailedTaskId(null);
+    try {
+      const fit = await runAhaPdfFitPreflight(aha, job);
+      setTaskFitIssues((current) => ({
+        ...current,
+        [taskId]: fit.issues.filter((issue) => issue.taskId === taskId),
+      }));
+    } catch {
+      setFitCheckFailedTaskId(taskId);
+    }
+  };
+
   return (
     <EditorShell>
       <div className="flex flex-col gap-5">
@@ -118,6 +152,7 @@ export default function AhaWork() {
         {aha.tasks.map((task) => {
           const isEditing = editingId === task.id;
           const needsDetails = taskNeedsDetails(reviewReport, task.id);
+          const officialSheetIssues = taskFitIssues[task.id] ?? [];
           if (!isEditing) {
             return (
               <article
@@ -134,6 +169,18 @@ export default function AhaWork() {
                     </span>
                   ) : null}
                 </div>
+                {officialSheetIssues.length > 0 ? (
+                  <p className="mt-3 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-sm font-semibold text-warning-foreground">
+                    Won&apos;t fit official sheet. Shorten this task or split
+                    the work before signing.
+                  </p>
+                ) : null}
+                {fitCheckFailedTaskId === task.id ? (
+                  <p className="mt-3 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-sm font-semibold text-warning-foreground">
+                    Official-sheet fit could not be checked. Review will try
+                    again before signing.
+                  </p>
+                ) : null}
                 <p className="mt-1 text-base font-medium text-muted-foreground">
                   {task.hazards.trim() ? task.hazards : "Hazards not entered"}
                 </p>
@@ -176,16 +223,38 @@ export default function AhaWork() {
               className="rounded-[14px] border border-primary bg-card p-5 shadow-[inset_0_0_0_1px_#374B96] sm:p-6"
             >
               <div className="flex flex-col gap-5">
-                <TextField
+                <TextAreaField
                   id={`task-${task.id}`}
                   label="Task"
                   hint="What are you doing?"
                   requirement="required"
+                  rows={2}
+                  autoGrow
+                  description={
+                    <>
+                      Describe the work only. Select Energy Wheel categories
+                      separately. Example: Cut asphalt.
+                    </>
+                  }
                   value={task.task}
                   onChange={(event) =>
                     updateTask(task.id, "task", event.target.value)
                   }
                 />
+                <div className="rounded-xl border border-[#C6CDE8] bg-secondary/60 p-4">
+                  <p className="text-sm font-semibold text-secondary-foreground">
+                    Energy selections apply to today&apos;s entire AHA, not only
+                    this task.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-3 min-h-12 w-full border-[#C6CDE8] bg-card text-base font-bold text-primary sm:w-auto"
+                    onClick={() => setEnergyDialogOpen(true)}
+                  >
+                    Mark today&apos;s energy
+                  </Button>
+                </div>
                 <TextAreaField
                   id={`hazards-${task.id}`}
                   label="Hazards"
@@ -220,7 +289,7 @@ export default function AhaWork() {
                   <Button
                     type="button"
                     className="min-h-12 flex-1 text-base font-bold"
-                    onClick={() => setEditingId(null)}
+                    onClick={() => void finishEditingTask(task.id)}
                   >
                     Done
                   </Button>
@@ -302,6 +371,60 @@ export default function AhaWork() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={energyDialogOpen} onOpenChange={setEnergyDialogOpen}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto rounded-2xl bg-card">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">
+              Mark today&apos;s energy
+            </DialogTitle>
+            <DialogDescription className="text-base font-medium leading-relaxed">
+              These categories apply to today&apos;s entire AHA. Step 3 still
+              asks you to review the full wheel, choose examples, and answer the
+              safety check.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm font-semibold text-muted-foreground">
+            {aha.energySelections.length} of {ENERGY_CATEGORIES.length} selected
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {ENERGY_CATEGORIES.map(({ category }) => {
+              const selected = aha.energySelections.some(
+                (selection) => selection.category === category,
+              );
+              return (
+                <div
+                  key={category}
+                  className={`rounded-xl border-2 ${
+                    selected
+                      ? "border-primary bg-secondary"
+                      : "border-border bg-card"
+                  }`}
+                >
+                  <EnergyCategoryToggle
+                    category={category}
+                    selected={selected}
+                    onToggle={() =>
+                      updateAha((current) =>
+                        toggleEnergyCategory(current, category),
+                      )
+                    }
+                  />
+                </div>
+              );
+            })}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              className="min-h-12 w-full text-base font-bold sm:w-auto"
+              onClick={() => setEnergyDialogOpen(false)}
+            >
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </EditorShell>
   );
 }

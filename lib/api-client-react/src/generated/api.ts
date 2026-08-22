@@ -5,10 +5,7 @@
  * ITS AHA backup and recovery API
  * OpenAPI spec version: 0.2.0
  */
-import {
-  useMutation,
-  useQuery
-} from '@tanstack/react-query';
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   MutationFunction,
   QueryFunction,
@@ -16,8 +13,8 @@ import type {
   UseMutationOptions,
   UseMutationResult,
   UseQueryOptions,
-  UseQueryResult
-} from '@tanstack/react-query';
+  UseQueryResult,
+} from "@tanstack/react-query";
 
 import type {
   Aha,
@@ -35,27 +32,27 @@ import type {
   ListAhasParams,
   PdfVersionMetadata,
   PdfWriteResult,
-  ProblemResponse
-} from './api.schemas';
+  ProblemResponse,
+} from "./api.schemas";
 
-import { customFetch } from '../custom-fetch';
-import type { ErrorType , BodyType } from '../custom-fetch';
+import { customFetch } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
-      type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
-
+type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
-
-
-const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKey: K } => {
+const withQueryKey = <T extends object, K>(
+  query: T,
+  queryKey: K,
+): T & { queryKey: K } => {
   const result = { queryKey } as T & { queryKey: K };
   for (const key of Object.keys(query)) {
     // The explicit queryKey always wins, matching the previous
     // `{ ...query, queryKey }` spread where it was set last.
-    if (key === 'queryKey') continue;
+    if (key === "queryKey") continue;
     Object.defineProperty(result, key, {
       enumerable: true,
       configurable: true,
@@ -66,897 +63,1069 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 export const getHealthCheckUrl = () => {
-
-
-
-
-  return `/api/healthz`
-}
+  return `/api/healthz`;
+};
 
 /**
  * @summary Application liveness
  */
-export const healthCheck = async ( options?: Parameters<typeof customFetch>[1]): Promise<HealthStatus> => {
-
-  return customFetch<HealthStatus>(getHealthCheckUrl(),
-  {
+export const healthCheck = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<HealthStatus> => {
+  return customFetch<HealthStatus>(getHealthCheckUrl(), {
     ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
+    method: "GET",
+  });
+};
 
 export const getHealthCheckQueryKey = () => {
-    return [
-    `/api/healthz`
-    ] as const;
-    }
+  return [`/api/healthz`] as const;
+};
 
+export const getHealthCheckQueryOptions = <
+  TData = Awaited<ReturnType<typeof healthCheck>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof healthCheck>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-export const getHealthCheckQueryOptions = <TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
+  const queryKey = queryOptions?.queryKey ?? getHealthCheckQueryKey();
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof healthCheck>>> = ({
+    signal,
+  }) => healthCheck({ signal, ...requestOptions });
 
-  const queryKey =  queryOptions?.queryKey ?? getHealthCheckQueryKey();
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof healthCheck>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
 
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof healthCheck>>> = ({ signal }) => healthCheck({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type HealthCheckQueryResult = NonNullable<Awaited<ReturnType<typeof healthCheck>>>
-export type HealthCheckQueryError = ErrorType<unknown>
-
+export type HealthCheckQueryResult = NonNullable<
+  Awaited<ReturnType<typeof healthCheck>>
+>;
+export type HealthCheckQueryError = ErrorType<unknown>;
 
 /**
  * @summary Application liveness
  */
 
-export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useHealthCheck<
+  TData = Awaited<ReturnType<typeof healthCheck>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof healthCheck>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getHealthCheckQueryOptions(options);
 
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getHealthCheckQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
 export const getHealthCheckDbUrl = () => {
-
-
-
-
-  return `/api/health`
-}
+  return `/api/health`;
+};
 
 /**
  * @summary Database connectivity
  */
-export const healthCheckDb = async ( options?: Parameters<typeof customFetch>[1]): Promise<DbHealthStatus> => {
-
-  return customFetch<DbHealthStatus>(getHealthCheckDbUrl(),
-  {
+export const healthCheckDb = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<DbHealthStatus> => {
+  return customFetch<DbHealthStatus>(getHealthCheckDbUrl(), {
     ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
+    method: "GET",
+  });
+};
 
 export const getHealthCheckDbQueryKey = () => {
-    return [
-    `/api/health`
-    ] as const;
-    }
+  return [`/api/health`] as const;
+};
 
+export const getHealthCheckDbQueryOptions = <
+  TData = Awaited<ReturnType<typeof healthCheckDb>>,
+  TError = ErrorType<DbHealthStatus>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof healthCheckDb>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-export const getHealthCheckDbQueryOptions = <TData = Awaited<ReturnType<typeof healthCheckDb>>, TError = ErrorType<DbHealthStatus>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheckDb>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
+  const queryKey = queryOptions?.queryKey ?? getHealthCheckDbQueryKey();
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof healthCheckDb>>> = ({
+    signal,
+  }) => healthCheckDb({ signal, ...requestOptions });
 
-  const queryKey =  queryOptions?.queryKey ?? getHealthCheckDbQueryKey();
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof healthCheckDb>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
 
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof healthCheckDb>>> = ({ signal }) => healthCheckDb({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof healthCheckDb>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type HealthCheckDbQueryResult = NonNullable<Awaited<ReturnType<typeof healthCheckDb>>>
-export type HealthCheckDbQueryError = ErrorType<DbHealthStatus>
-
+export type HealthCheckDbQueryResult = NonNullable<
+  Awaited<ReturnType<typeof healthCheckDb>>
+>;
+export type HealthCheckDbQueryError = ErrorType<DbHealthStatus>;
 
 /**
  * @summary Database connectivity
  */
 
-export function useHealthCheckDb<TData = Awaited<ReturnType<typeof healthCheckDb>>, TError = ErrorType<DbHealthStatus>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheckDb>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useHealthCheckDb<
+  TData = Awaited<ReturnType<typeof healthCheckDb>>,
+  TError = ErrorType<DbHealthStatus>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof healthCheckDb>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getHealthCheckDbQueryOptions(options);
 
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getHealthCheckDbQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
 
 export const getAuthenticateUrl = () => {
-
-
-
-
-  return `/api/auth`
-}
+  return `/api/auth`;
+};
 
 /**
  * @summary Exchange the shared crew access code for a device token
  */
-export const authenticate = async (authRequest: AuthRequest, options?: Parameters<typeof customFetch>[1]): Promise<AuthResponse> => {
-
-  return customFetch<AuthResponse>(getAuthenticateUrl(),
-  {
+export const authenticate = async (
+  authRequest: AuthRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<AuthResponse> => {
+  return customFetch<AuthResponse>(getAuthenticateUrl(), {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(authRequest)
-  }
-);}
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(authRequest),
+  });
+};
 
+export const getAuthenticateMutationOptions = <
+  TError = ErrorType<ProblemResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof authenticate>>,
+    TError,
+    { data: BodyType<AuthRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof authenticate>>,
+  TError,
+  { data: BodyType<AuthRequest> },
+  TContext
+> => {
+  const mutationKey = ["authenticate"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
 
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof authenticate>>,
+    { data: BodyType<AuthRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
 
+    return authenticate(data, requestOptions);
+  };
 
+  return { mutationFn, ...mutationOptions };
+};
 
-export const getAuthenticateMutationOptions = <TError = ErrorType<ProblemResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authenticate>>, TError,{data: BodyType<AuthRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof authenticate>>, TError,{data: BodyType<AuthRequest>}, TContext> => {
+export type AuthenticateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof authenticate>>
+>;
+export type AuthenticateMutationBody = BodyType<AuthRequest>;
+export type AuthenticateMutationError = ErrorType<ProblemResponse>;
 
-const mutationKey = ['authenticate'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authenticate>>, {data: BodyType<AuthRequest>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  authenticate(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type AuthenticateMutationResult = NonNullable<Awaited<ReturnType<typeof authenticate>>>
-    export type AuthenticateMutationBody = BodyType<AuthRequest>
-    export type AuthenticateMutationError = ErrorType<ProblemResponse>
-
-    /**
+/**
  * @summary Exchange the shared crew access code for a device token
  */
-export const useAuthenticate = <TError = ErrorType<ProblemResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authenticate>>, TError,{data: BodyType<AuthRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof authenticate>>,
-        TError,
-        {data: BodyType<AuthRequest>},
-        TContext
-      > => {
-      return useMutation(getAuthenticateMutationOptions(options));
-    }
+export const useAuthenticate = <
+  TError = ErrorType<ProblemResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof authenticate>>,
+    TError,
+    { data: BodyType<AuthRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof authenticate>>,
+  TError,
+  { data: BodyType<AuthRequest> },
+  TContext
+> => {
+  return useMutation(getAuthenticateMutationOptions(options));
+};
 
 export const getListJobsUrl = () => {
-
-
-
-
-  return `/api/jobs`
-}
+  return `/api/jobs`;
+};
 
 /**
  * @summary List backed-up jobs for empty-device restore
  */
-export const listJobs = async ( options?: Parameters<typeof customFetch>[1]): Promise<JobBackupRecord[]> => {
-
-  return customFetch<JobBackupRecord[]>(getListJobsUrl(),
-  {
+export const listJobs = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<JobBackupRecord[]> => {
+  return customFetch<JobBackupRecord[]>(getListJobsUrl(), {
     ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
+    method: "GET",
+  });
+};
 
 export const getListJobsQueryKey = () => {
-    return [
-    `/api/jobs`
-    ] as const;
-    }
+  return [`/api/jobs`] as const;
+};
 
+export const getListJobsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listJobs>>,
+  TError = ErrorType<ProblemResponse>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof listJobs>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-export const getListJobsQueryOptions = <TData = Awaited<ReturnType<typeof listJobs>>, TError = ErrorType<ProblemResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listJobs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
+  const queryKey = queryOptions?.queryKey ?? getListJobsQueryKey();
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listJobs>>> = ({
+    signal,
+  }) => listJobs({ signal, ...requestOptions });
 
-  const queryKey =  queryOptions?.queryKey ?? getListJobsQueryKey();
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listJobs>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
 
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listJobs>>> = ({ signal }) => listJobs({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listJobs>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type ListJobsQueryResult = NonNullable<Awaited<ReturnType<typeof listJobs>>>
-export type ListJobsQueryError = ErrorType<ProblemResponse>
-
+export type ListJobsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listJobs>>
+>;
+export type ListJobsQueryError = ErrorType<ProblemResponse>;
 
 /**
  * @summary List backed-up jobs for empty-device restore
  */
 
-export function useListJobs<TData = Awaited<ReturnType<typeof listJobs>>, TError = ErrorType<ProblemResponse>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listJobs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useListJobs<
+  TData = Awaited<ReturnType<typeof listJobs>>,
+  TError = ErrorType<ProblemResponse>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof listJobs>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListJobsQueryOptions(options);
 
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getListJobsQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
 export const getBackupJobUrl = () => {
-
-
-
-
-  return `/api/jobs`
-}
+  return `/api/jobs`;
+};
 
 /**
  * @summary Idempotently back up a job using timestamp last-write-wins
  */
-export const backupJob = async (jobBackupRequest: JobBackupRequest, options?: Parameters<typeof customFetch>[1]): Promise<JobWriteResult> => {
-
-  return customFetch<JobWriteResult>(getBackupJobUrl(),
-  {
+export const backupJob = async (
+  jobBackupRequest: JobBackupRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<JobWriteResult> => {
+  return customFetch<JobWriteResult>(getBackupJobUrl(), {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(jobBackupRequest)
-  }
-);}
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(jobBackupRequest),
+  });
+};
 
+export const getBackupJobMutationOptions = <
+  TError = ErrorType<ProblemResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof backupJob>>,
+    TError,
+    { data: BodyType<JobBackupRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof backupJob>>,
+  TError,
+  { data: BodyType<JobBackupRequest> },
+  TContext
+> => {
+  const mutationKey = ["backupJob"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
 
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof backupJob>>,
+    { data: BodyType<JobBackupRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
 
+    return backupJob(data, requestOptions);
+  };
 
+  return { mutationFn, ...mutationOptions };
+};
 
-export const getBackupJobMutationOptions = <TError = ErrorType<ProblemResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof backupJob>>, TError,{data: BodyType<JobBackupRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof backupJob>>, TError,{data: BodyType<JobBackupRequest>}, TContext> => {
+export type BackupJobMutationResult = NonNullable<
+  Awaited<ReturnType<typeof backupJob>>
+>;
+export type BackupJobMutationBody = BodyType<JobBackupRequest>;
+export type BackupJobMutationError = ErrorType<ProblemResponse>;
 
-const mutationKey = ['backupJob'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof backupJob>>, {data: BodyType<JobBackupRequest>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  backupJob(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type BackupJobMutationResult = NonNullable<Awaited<ReturnType<typeof backupJob>>>
-    export type BackupJobMutationBody = BodyType<JobBackupRequest>
-    export type BackupJobMutationError = ErrorType<ProblemResponse>
-
-    /**
+/**
  * @summary Idempotently back up a job using timestamp last-write-wins
  */
-export const useBackupJob = <TError = ErrorType<ProblemResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof backupJob>>, TError,{data: BodyType<JobBackupRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof backupJob>>,
-        TError,
-        {data: BodyType<JobBackupRequest>},
-        TContext
-      > => {
-      return useMutation(getBackupJobMutationOptions(options));
-    }
+export const useBackupJob = <
+  TError = ErrorType<ProblemResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof backupJob>>,
+    TError,
+    { data: BodyType<JobBackupRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof backupJob>>,
+  TError,
+  { data: BodyType<JobBackupRequest> },
+  TContext
+> => {
+  return useMutation(getBackupJobMutationOptions(options));
+};
 
-export const getListAhasUrl = (params?: ListAhasParams,) => {
+export const getListAhasUrl = (params?: ListAhasParams) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
-
     if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
+      normalizedParams.append(key, value === null ? "null" : String(value));
     }
   });
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/ahas?${stringifiedParams}` : `/api/ahas`
-}
+  return stringifiedParams.length > 0
+    ? `/api/ahas?${stringifiedParams}`
+    : `/api/ahas`;
+};
 
 /**
  * @summary List AHA backups for empty-device restore
  */
-export const listAhas = async (params?: ListAhasParams, options?: Parameters<typeof customFetch>[1]): Promise<AhaPage> => {
-
-  return customFetch<AhaPage>(getListAhasUrl(params),
-  {
+export const listAhas = async (
+  params?: ListAhasParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<AhaPage> => {
+  return customFetch<AhaPage>(getListAhasUrl(params), {
     ...options,
-    method: 'GET'
+    method: "GET",
+  });
+};
 
+export const getListAhasQueryKey = (params?: ListAhasParams) => {
+  return [`/api/ahas`, ...(params ? [params] : [])] as const;
+};
 
-  }
-);}
-
-
-
-
-
-export const getListAhasQueryKey = (params?: ListAhasParams,) => {
-    return [
-    `/api/ahas`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getListAhasQueryOptions = <TData = Awaited<ReturnType<typeof listAhas>>, TError = ErrorType<ProblemResponse>>(params?: ListAhasParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAhas>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListAhasQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAhas>>,
+  TError = ErrorType<ProblemResponse>,
+>(
+  params?: ListAhasParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAhas>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
 ) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryKey = queryOptions?.queryKey ?? getListAhasQueryKey(params);
 
-  const queryKey =  queryOptions?.queryKey ?? getListAhasQueryKey(params);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAhas>>> = ({
+    signal,
+  }) => listAhas(params, { signal, ...requestOptions });
 
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAhas>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
 
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAhas>>> = ({ signal }) => listAhas(params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAhas>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type ListAhasQueryResult = NonNullable<Awaited<ReturnType<typeof listAhas>>>
-export type ListAhasQueryError = ErrorType<ProblemResponse>
-
+export type ListAhasQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAhas>>
+>;
+export type ListAhasQueryError = ErrorType<ProblemResponse>;
 
 /**
  * @summary List AHA backups for empty-device restore
  */
 
-export function useListAhas<TData = Awaited<ReturnType<typeof listAhas>>, TError = ErrorType<ProblemResponse>>(
- params?: ListAhasParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAhas>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useListAhas<
+  TData = Awaited<ReturnType<typeof listAhas>>,
+  TError = ErrorType<ProblemResponse>,
+>(
+  params?: ListAhasParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAhas>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAhasQueryOptions(params, options);
 
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getListAhasQueryOptions(params,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
 export const getBackupAhaUrl = () => {
-
-
-
-
-  return `/api/ahas`
-}
+  return `/api/ahas`;
+};
 
 /**
  * @summary Idempotently create or back up an AHA
  */
-export const backupAha = async (aha: Aha, options?: Parameters<typeof customFetch>[1]): Promise<AhaWriteResult> => {
-
-  return customFetch<AhaWriteResult>(getBackupAhaUrl(),
-  {
+export const backupAha = async (
+  aha: Aha,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<AhaWriteResult> => {
+  return customFetch<AhaWriteResult>(getBackupAhaUrl(), {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(aha)
-  }
-);}
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(aha),
+  });
+};
 
+export const getBackupAhaMutationOptions = <
+  TError = ErrorType<ProblemResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof backupAha>>,
+    TError,
+    { data: BodyType<Aha> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof backupAha>>,
+  TError,
+  { data: BodyType<Aha> },
+  TContext
+> => {
+  const mutationKey = ["backupAha"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
 
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof backupAha>>,
+    { data: BodyType<Aha> }
+  > = (props) => {
+    const { data } = props ?? {};
 
+    return backupAha(data, requestOptions);
+  };
 
+  return { mutationFn, ...mutationOptions };
+};
 
-export const getBackupAhaMutationOptions = <TError = ErrorType<ProblemResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof backupAha>>, TError,{data: BodyType<Aha>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof backupAha>>, TError,{data: BodyType<Aha>}, TContext> => {
+export type BackupAhaMutationResult = NonNullable<
+  Awaited<ReturnType<typeof backupAha>>
+>;
+export type BackupAhaMutationBody = BodyType<Aha>;
+export type BackupAhaMutationError = ErrorType<ProblemResponse>;
 
-const mutationKey = ['backupAha'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof backupAha>>, {data: BodyType<Aha>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  backupAha(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type BackupAhaMutationResult = NonNullable<Awaited<ReturnType<typeof backupAha>>>
-    export type BackupAhaMutationBody = BodyType<Aha>
-    export type BackupAhaMutationError = ErrorType<ProblemResponse>
-
-    /**
+/**
  * @summary Idempotently create or back up an AHA
  */
-export const useBackupAha = <TError = ErrorType<ProblemResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof backupAha>>, TError,{data: BodyType<Aha>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof backupAha>>,
-        TError,
-        {data: BodyType<Aha>},
-        TContext
-      > => {
-      return useMutation(getBackupAhaMutationOptions(options));
-    }
+export const useBackupAha = <
+  TError = ErrorType<ProblemResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof backupAha>>,
+    TError,
+    { data: BodyType<Aha> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof backupAha>>,
+  TError,
+  { data: BodyType<Aha> },
+  TContext
+> => {
+  return useMutation(getBackupAhaMutationOptions(options));
+};
 
-export const getUpdateAhaBackupUrl = (ahaId: string,) => {
-
-
-
-
-  return `/api/ahas/${ahaId}`
-}
+export const getUpdateAhaBackupUrl = (ahaId: string) => {
+  return `/api/ahas/${ahaId}`;
+};
 
 /**
  * @summary Idempotently update an AHA backup
  */
-export const updateAhaBackup = async (ahaId: string,
-    aha: Aha, options?: Parameters<typeof customFetch>[1]): Promise<AhaWriteResult> => {
-
-  return customFetch<AhaWriteResult>(getUpdateAhaBackupUrl(ahaId),
-  {
+export const updateAhaBackup = async (
+  ahaId: string,
+  aha: Aha,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<AhaWriteResult> => {
+  return customFetch<AhaWriteResult>(getUpdateAhaBackupUrl(ahaId), {
     ...options,
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(aha)
-  }
-);}
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(aha),
+  });
+};
 
+export const getUpdateAhaBackupMutationOptions = <
+  TError = ErrorType<ProblemResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAhaBackup>>,
+    TError,
+    { ahaId: string; data: BodyType<Aha> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAhaBackup>>,
+  TError,
+  { ahaId: string; data: BodyType<Aha> },
+  TContext
+> => {
+  const mutationKey = ["updateAhaBackup"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
 
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAhaBackup>>,
+    { ahaId: string; data: BodyType<Aha> }
+  > = (props) => {
+    const { ahaId, data } = props ?? {};
 
+    return updateAhaBackup(ahaId, data, requestOptions);
+  };
 
+  return { mutationFn, ...mutationOptions };
+};
 
-export const getUpdateAhaBackupMutationOptions = <TError = ErrorType<ProblemResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAhaBackup>>, TError,{ahaId: string;data: BodyType<Aha>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateAhaBackup>>, TError,{ahaId: string;data: BodyType<Aha>}, TContext> => {
+export type UpdateAhaBackupMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateAhaBackup>>
+>;
+export type UpdateAhaBackupMutationBody = BodyType<Aha>;
+export type UpdateAhaBackupMutationError = ErrorType<ProblemResponse>;
 
-const mutationKey = ['updateAhaBackup'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAhaBackup>>, {ahaId: string;data: BodyType<Aha>}> = (props) => {
-          const {ahaId,data} = props ?? {};
-
-          return  updateAhaBackup(ahaId,data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type UpdateAhaBackupMutationResult = NonNullable<Awaited<ReturnType<typeof updateAhaBackup>>>
-    export type UpdateAhaBackupMutationBody = BodyType<Aha>
-    export type UpdateAhaBackupMutationError = ErrorType<ProblemResponse>
-
-    /**
+/**
  * @summary Idempotently update an AHA backup
  */
-export const useUpdateAhaBackup = <TError = ErrorType<ProblemResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAhaBackup>>, TError,{ahaId: string;data: BodyType<Aha>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof updateAhaBackup>>,
-        TError,
-        {ahaId: string;data: BodyType<Aha>},
-        TContext
-      > => {
-      return useMutation(getUpdateAhaBackupMutationOptions(options));
-    }
+export const useUpdateAhaBackup = <
+  TError = ErrorType<ProblemResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAhaBackup>>,
+    TError,
+    { ahaId: string; data: BodyType<Aha> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateAhaBackup>>,
+  TError,
+  { ahaId: string; data: BodyType<Aha> },
+  TContext
+> => {
+  return useMutation(getUpdateAhaBackupMutationOptions(options));
+};
 
-export const getGetAhaPdfBackupUrl = (ahaId: string,) => {
-
-
-
-
-  return `/api/ahas/${ahaId}/pdf`
-}
+export const getGetAhaPdfBackupUrl = (ahaId: string) => {
+  return `/api/ahas/${ahaId}/pdf`;
+};
 
 /**
  * @summary Download a finished PDF for empty-device restore
  */
-export const getAhaPdfBackup = async (ahaId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
-
-  return customFetch<Blob>(getGetAhaPdfBackupUrl(ahaId),
-  {
+export const getAhaPdfBackup = async (
+  ahaId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<Blob> => {
+  return customFetch<Blob>(getGetAhaPdfBackupUrl(ahaId), {
     ...options,
-    method: 'GET'
+    method: "GET",
+  });
+};
 
+export const getGetAhaPdfBackupQueryKey = (ahaId: string) => {
+  return [`/api/ahas/${ahaId}/pdf`] as const;
+};
 
-  }
-);}
-
-
-
-
-
-export const getGetAhaPdfBackupQueryKey = (ahaId: string,) => {
-    return [
-    `/api/ahas/${ahaId}/pdf`
-    ] as const;
-    }
-
-
-export const getGetAhaPdfBackupQueryOptions = <TData = Awaited<ReturnType<typeof getAhaPdfBackup>>, TError = ErrorType<ProblemResponse>>(ahaId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAhaPdfBackup>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetAhaPdfBackupQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAhaPdfBackup>>,
+  TError = ErrorType<ProblemResponse>,
+>(
+  ahaId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAhaPdfBackup>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
 ) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryKey = queryOptions?.queryKey ?? getGetAhaPdfBackupQueryKey(ahaId);
 
-  const queryKey =  queryOptions?.queryKey ?? getGetAhaPdfBackupQueryKey(ahaId);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAhaPdfBackup>>> = ({
+    signal,
+  }) => getAhaPdfBackup(ahaId, { signal, ...requestOptions });
 
+  return {
+    queryKey,
+    queryFn,
+    enabled: ahaId !== null && ahaId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAhaPdfBackup>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
 
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAhaPdfBackup>>> = ({ signal }) => getAhaPdfBackup(ahaId, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: ahaId !== null && ahaId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAhaPdfBackup>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetAhaPdfBackupQueryResult = NonNullable<Awaited<ReturnType<typeof getAhaPdfBackup>>>
-export type GetAhaPdfBackupQueryError = ErrorType<ProblemResponse>
-
+export type GetAhaPdfBackupQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAhaPdfBackup>>
+>;
+export type GetAhaPdfBackupQueryError = ErrorType<ProblemResponse>;
 
 /**
  * @summary Download a finished PDF for empty-device restore
  */
 
-export function useGetAhaPdfBackup<TData = Awaited<ReturnType<typeof getAhaPdfBackup>>, TError = ErrorType<ProblemResponse>>(
- ahaId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAhaPdfBackup>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useGetAhaPdfBackup<
+  TData = Awaited<ReturnType<typeof getAhaPdfBackup>>,
+  TError = ErrorType<ProblemResponse>,
+>(
+  ahaId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAhaPdfBackup>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAhaPdfBackupQueryOptions(ahaId, options);
 
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetAhaPdfBackupQueryOptions(ahaId,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
 
-
-
-
-
-
-
-export const getBackupAhaPdfUrl = (ahaId: string,
-    params: BackupAhaPdfParams,) => {
+export const getBackupAhaPdfUrl = (
+  ahaId: string,
+  params: BackupAhaPdfParams,
+) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
-
     if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
+      normalizedParams.append(key, value === null ? "null" : String(value));
     }
   });
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/ahas/${ahaId}/pdf?${stringifiedParams}` : `/api/ahas/${ahaId}/pdf`
-}
+  return stringifiedParams.length > 0
+    ? `/api/ahas/${ahaId}/pdf?${stringifiedParams}`
+    : `/api/ahas/${ahaId}/pdf`;
+};
 
 /**
  * @summary Idempotently back up a finished PDF
  */
-export const backupAhaPdf = async (ahaId: string,
-    backupAhaPdfBody: Blob,
-    params: BackupAhaPdfParams, options?: Parameters<typeof customFetch>[1]): Promise<PdfWriteResult> => {
-
-  return customFetch<PdfWriteResult>(getBackupAhaPdfUrl(ahaId,params),
-  {
+export const backupAhaPdf = async (
+  ahaId: string,
+  backupAhaPdfBody: Blob,
+  params: BackupAhaPdfParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<PdfWriteResult> => {
+  return customFetch<PdfWriteResult>(getBackupAhaPdfUrl(ahaId, params), {
     ...options,
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/pdf', ...options?.headers },
-    body: backupAhaPdfBody
-  }
-);}
+    method: "PUT",
+    headers: { "Content-Type": "application/pdf", ...options?.headers },
+    body: backupAhaPdfBody,
+  });
+};
 
+export const getBackupAhaPdfMutationOptions = <
+  TError = ErrorType<ProblemResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof backupAhaPdf>>,
+    TError,
+    { ahaId: string; data: BodyType<Blob>; params: BackupAhaPdfParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof backupAhaPdf>>,
+  TError,
+  { ahaId: string; data: BodyType<Blob>; params: BackupAhaPdfParams },
+  TContext
+> => {
+  const mutationKey = ["backupAhaPdf"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
 
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof backupAhaPdf>>,
+    { ahaId: string; data: BodyType<Blob>; params: BackupAhaPdfParams }
+  > = (props) => {
+    const { ahaId, data, params } = props ?? {};
 
+    return backupAhaPdf(ahaId, data, params, requestOptions);
+  };
 
+  return { mutationFn, ...mutationOptions };
+};
 
-export const getBackupAhaPdfMutationOptions = <TError = ErrorType<ProblemResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof backupAhaPdf>>, TError,{ahaId: string;data: BodyType<Blob>;params: BackupAhaPdfParams}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof backupAhaPdf>>, TError,{ahaId: string;data: BodyType<Blob>;params: BackupAhaPdfParams}, TContext> => {
+export type BackupAhaPdfMutationResult = NonNullable<
+  Awaited<ReturnType<typeof backupAhaPdf>>
+>;
+export type BackupAhaPdfMutationBody = BodyType<Blob>;
+export type BackupAhaPdfMutationError = ErrorType<ProblemResponse>;
 
-const mutationKey = ['backupAhaPdf'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof backupAhaPdf>>, {ahaId: string;data: BodyType<Blob>;params: BackupAhaPdfParams}> = (props) => {
-          const {ahaId,data,params} = props ?? {};
-
-          return  backupAhaPdf(ahaId,data,params,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type BackupAhaPdfMutationResult = NonNullable<Awaited<ReturnType<typeof backupAhaPdf>>>
-    export type BackupAhaPdfMutationBody = BodyType<Blob>
-    export type BackupAhaPdfMutationError = ErrorType<ProblemResponse>
-
-    /**
+/**
  * @summary Idempotently back up a finished PDF
  */
-export const useBackupAhaPdf = <TError = ErrorType<ProblemResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof backupAhaPdf>>, TError,{ahaId: string;data: BodyType<Blob>;params: BackupAhaPdfParams}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof backupAhaPdf>>,
-        TError,
-        {ahaId: string;data: BodyType<Blob>;params: BackupAhaPdfParams},
-        TContext
-      > => {
-      return useMutation(getBackupAhaPdfMutationOptions(options));
-    }
+export const useBackupAhaPdf = <
+  TError = ErrorType<ProblemResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof backupAhaPdf>>,
+    TError,
+    { ahaId: string; data: BodyType<Blob>; params: BackupAhaPdfParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof backupAhaPdf>>,
+  TError,
+  { ahaId: string; data: BodyType<Blob>; params: BackupAhaPdfParams },
+  TContext
+> => {
+  return useMutation(getBackupAhaPdfMutationOptions(options));
+};
 
-export const getListAhaPdfVersionsUrl = (ahaId: string,) => {
-
-
-
-
-  return `/api/ahas/${ahaId}/pdf/versions`
-}
+export const getListAhaPdfVersionsUrl = (ahaId: string) => {
+  return `/api/ahas/${ahaId}/pdf/versions`;
+};
 
 /**
  * @summary List current and superseded PDF metadata
  */
-export const listAhaPdfVersions = async (ahaId: string, options?: Parameters<typeof customFetch>[1]): Promise<PdfVersionMetadata[]> => {
-
-  return customFetch<PdfVersionMetadata[]>(getListAhaPdfVersionsUrl(ahaId),
-  {
+export const listAhaPdfVersions = async (
+  ahaId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<PdfVersionMetadata[]> => {
+  return customFetch<PdfVersionMetadata[]>(getListAhaPdfVersionsUrl(ahaId), {
     ...options,
-    method: 'GET'
+    method: "GET",
+  });
+};
 
+export const getListAhaPdfVersionsQueryKey = (ahaId: string) => {
+  return [`/api/ahas/${ahaId}/pdf/versions`] as const;
+};
 
-  }
-);}
-
-
-
-
-
-export const getListAhaPdfVersionsQueryKey = (ahaId: string,) => {
-    return [
-    `/api/ahas/${ahaId}/pdf/versions`
-    ] as const;
-    }
-
-
-export const getListAhaPdfVersionsQueryOptions = <TData = Awaited<ReturnType<typeof listAhaPdfVersions>>, TError = ErrorType<ProblemResponse>>(ahaId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAhaPdfVersions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListAhaPdfVersionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAhaPdfVersions>>,
+  TError = ErrorType<ProblemResponse>,
+>(
+  ahaId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAhaPdfVersions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
 ) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryKey =
+    queryOptions?.queryKey ?? getListAhaPdfVersionsQueryKey(ahaId);
 
-  const queryKey =  queryOptions?.queryKey ?? getListAhaPdfVersionsQueryKey(ahaId);
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listAhaPdfVersions>>
+  > = ({ signal }) => listAhaPdfVersions(ahaId, { signal, ...requestOptions });
 
+  return {
+    queryKey,
+    queryFn,
+    enabled: ahaId !== null && ahaId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAhaPdfVersions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
 
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAhaPdfVersions>>> = ({ signal }) => listAhaPdfVersions(ahaId, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: ahaId !== null && ahaId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAhaPdfVersions>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type ListAhaPdfVersionsQueryResult = NonNullable<Awaited<ReturnType<typeof listAhaPdfVersions>>>
-export type ListAhaPdfVersionsQueryError = ErrorType<ProblemResponse>
-
+export type ListAhaPdfVersionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAhaPdfVersions>>
+>;
+export type ListAhaPdfVersionsQueryError = ErrorType<ProblemResponse>;
 
 /**
  * @summary List current and superseded PDF metadata
  */
 
-export function useListAhaPdfVersions<TData = Awaited<ReturnType<typeof listAhaPdfVersions>>, TError = ErrorType<ProblemResponse>>(
- ahaId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAhaPdfVersions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useListAhaPdfVersions<
+  TData = Awaited<ReturnType<typeof listAhaPdfVersions>>,
+  TError = ErrorType<ProblemResponse>,
+>(
+  ahaId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAhaPdfVersions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAhaPdfVersionsQueryOptions(ahaId, options);
 
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getListAhaPdfVersionsQueryOptions(ahaId,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
 
-
-
-
-
-
-
-export const getGetAhaPdfVersionUrl = (ahaId: string,
-    sourceRevision: number,
-    params: GetAhaPdfVersionParams,) => {
+export const getGetAhaPdfVersionUrl = (
+  ahaId: string,
+  sourceRevision: number,
+  params: GetAhaPdfVersionParams,
+) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
-
     if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
+      normalizedParams.append(key, value === null ? "null" : String(value));
     }
   });
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/ahas/${ahaId}/pdf/versions/${sourceRevision}?${stringifiedParams}` : `/api/ahas/${ahaId}/pdf/versions/${sourceRevision}`
-}
+  return stringifiedParams.length > 0
+    ? `/api/ahas/${ahaId}/pdf/versions/${sourceRevision}?${stringifiedParams}`
+    : `/api/ahas/${ahaId}/pdf/versions/${sourceRevision}`;
+};
 
 /**
  * @summary Download one exact PDF version
  */
-export const getAhaPdfVersion = async (ahaId: string,
-    sourceRevision: number,
-    params: GetAhaPdfVersionParams, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+export const getAhaPdfVersion = async (
+  ahaId: string,
+  sourceRevision: number,
+  params: GetAhaPdfVersionParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<Blob> => {
+  return customFetch<Blob>(
+    getGetAhaPdfVersionUrl(ahaId, sourceRevision, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
 
-  return customFetch<Blob>(getGetAhaPdfVersionUrl(ahaId,sourceRevision,params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetAhaPdfVersionQueryKey = (ahaId: string,
-    sourceRevision: number,
-    params?: GetAhaPdfVersionParams,) => {
-    return [
-    `/api/ahas/${ahaId}/pdf/versions/${sourceRevision}`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getGetAhaPdfVersionQueryOptions = <TData = Awaited<ReturnType<typeof getAhaPdfVersion>>, TError = ErrorType<ProblemResponse>>(ahaId: string,
-    sourceRevision: number,
-    params: GetAhaPdfVersionParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAhaPdfVersion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetAhaPdfVersionQueryKey = (
+  ahaId: string,
+  sourceRevision: number,
+  params?: GetAhaPdfVersionParams,
 ) => {
+  return [
+    `/api/ahas/${ahaId}/pdf/versions/${sourceRevision}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+export const getGetAhaPdfVersionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAhaPdfVersion>>,
+  TError = ErrorType<ProblemResponse>,
+>(
+  ahaId: string,
+  sourceRevision: number,
+  params: GetAhaPdfVersionParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAhaPdfVersion>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetAhaPdfVersionQueryKey(ahaId,sourceRevision,params);
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetAhaPdfVersionQueryKey(ahaId, sourceRevision, params);
 
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAhaPdfVersion>>
+  > = ({ signal }) =>
+    getAhaPdfVersion(ahaId, sourceRevision, params, {
+      signal,
+      ...requestOptions,
+    });
 
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      ahaId !== null &&
+      ahaId !== undefined &&
+      sourceRevision !== null &&
+      sourceRevision !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAhaPdfVersion>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAhaPdfVersion>>> = ({ signal }) => getAhaPdfVersion(ahaId,sourceRevision,params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: ahaId !== null && ahaId !== undefined && sourceRevision !== null && sourceRevision !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAhaPdfVersion>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetAhaPdfVersionQueryResult = NonNullable<Awaited<ReturnType<typeof getAhaPdfVersion>>>
-export type GetAhaPdfVersionQueryError = ErrorType<ProblemResponse>
-
+export type GetAhaPdfVersionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAhaPdfVersion>>
+>;
+export type GetAhaPdfVersionQueryError = ErrorType<ProblemResponse>;
 
 /**
  * @summary Download one exact PDF version
  */
 
-export function useGetAhaPdfVersion<TData = Awaited<ReturnType<typeof getAhaPdfVersion>>, TError = ErrorType<ProblemResponse>>(
- ahaId: string,
-    sourceRevision: number,
-    params: GetAhaPdfVersionParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAhaPdfVersion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useGetAhaPdfVersion<
+  TData = Awaited<ReturnType<typeof getAhaPdfVersion>>,
+  TError = ErrorType<ProblemResponse>,
+>(
+  ahaId: string,
+  sourceRevision: number,
+  params: GetAhaPdfVersionParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAhaPdfVersion>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAhaPdfVersionQueryOptions(
+    ahaId,
+    sourceRevision,
+    params,
+    options,
+  );
 
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetAhaPdfVersionQueryOptions(ahaId,sourceRevision,params,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
 
   return withQueryKey(query, queryOptions.queryKey);
 }

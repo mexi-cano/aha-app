@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronRight } from "lucide-react";
 import {
   enterCustomPersonInCharge,
+  findUniqueWorkerIdByName,
   resolvePersonInChargeWorkerId,
   selectPersonInChargeWorker,
   type Aha,
@@ -110,11 +111,22 @@ export function PersonInChargeField({
 
   const saveCustomName = () => {
     if (!customName.trim()) return;
-    updateAha((current) => enterCustomPersonInCharge(current, customName.trim()));
+    updateAha((current) =>
+      enterCustomPersonInCharge(current, customName.trim()),
+    );
     setCrewDialogOpen(false);
   };
 
   const currentName = aha.header.personInCharge.trim();
+  const matchingWorkerId = selectedWorkerId
+    ? null
+    : findUniqueWorkerIdByName(
+        aha.crew.map(({ workerId, name }) => ({ id: workerId, name })),
+        currentName,
+      );
+  const matchingWorker = aha.crew.find(
+    ({ workerId }) => workerId === matchingWorkerId,
+  );
   const stateDescription = selectedWorker
     ? "FOREMAN · Today’s crew"
     : currentName
@@ -158,6 +170,16 @@ export function PersonInChargeField({
         This person is responsible for today’s work and will be labeled FOREMAN.
         They do not have to be the person entering this AHA.
       </p>
+      {matchingWorker ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="min-h-12 w-full border-[#C6CDE8] text-left text-sm font-bold text-primary sm:w-auto"
+          onClick={() => selectWorker(matchingWorker.workerId)}
+        >
+          Connect to {matchingWorker.name} in today&apos;s crew
+        </Button>
+      ) : null}
 
       <Dialog open={crewDialogOpen} onOpenChange={setCrewDialogOpen}>
         <DialogContent className="max-w-md rounded-2xl bg-card">

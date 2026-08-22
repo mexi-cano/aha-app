@@ -14,6 +14,7 @@ import {
   canStartSigning,
   completeAha,
   confirmCompletedCrewReview,
+  confirmSigningCrewReview,
   createBlankAha,
   enterCustomPersonInCharge,
   finalizeCompletedUpdate,
@@ -320,6 +321,131 @@ test("mid-signing safety-sensitive edits clear only the safety answer", () => {
     toggleEnergyCategory(signed, ENERGY_CATEGORIES[0].category),
   );
   assert.equal(changedEnergy.safetyCheck, null);
+});
+
+test("signed safety edits track affected workers until re-sign or attestation", () => {
+  const signed = recordSignature(
+    beginSigning(reviewReadyAha()),
+    "worker-1",
+    png,
+    new Date("2026-08-18T12:30:00.000Z"),
+  );
+  const changedAt = new Date("2026-08-18T12:35:00.000Z");
+  const changed = applyAhaMutationRules(
+    signed,
+    { ...signed, description: "Changed work after signing" },
+    { recordSigningUpdateAt: changedAt },
+  );
+
+  assert.equal(changed.safetyCheck, null);
+  assert.equal(
+    changed.pendingSigningUpdate?.startedAt,
+    changedAt.toISOString(),
+  );
+  assert.deepEqual(changed.pendingSigningUpdate?.affectedWorkers, [
+    {
+      workerId: "worker-1",
+      name: "Crew lead",
+      signedAt: "2026-08-18T12:30:00.000Z",
+    },
+  ]);
+  assert.equal(canFinishAha(changed), false);
+
+  const answered = applyAhaMutationRules(changed, {
+    ...changed,
+    safetyCheck: "yes",
+  });
+  const confirmed = confirmSigningCrewReview(
+    answered,
+    new Date("2026-08-18T12:40:00.000Z"),
+  );
+  const allSigned = recordSignature(
+    confirmed,
+    "worker-2",
+    png,
+    new Date("2026-08-18T12:41:00.000Z"),
+  );
+  assert.equal(canFinishAha(allSigned), true);
+  const completed = completeAha(
+    allSigned,
+    new Date("2026-08-18T12:42:00.000Z"),
+  );
+  const event = completed.documentEvents.at(-1);
+  assert.deepEqual(event?.retainedSignatures, [
+    {
+      workerId: "worker-1",
+      name: "Crew lead",
+      signedAt: "2026-08-18T12:30:00.000Z",
+    },
+  ]);
+  assert.equal(event?.crewReviewConfirmation?.personInChargeName, "Crew lead");
+  assert.equal(completed.pendingSigningUpdate, null);
+});
+
+test("affected workers can re-sign individually and removal prunes pending state", () => {
+  let signed = beginSigning(reviewReadyAha());
+  signed = recordSignature(
+    signed,
+    "worker-1",
+    png,
+    new Date("2026-08-18T12:30:00.000Z"),
+  );
+  signed = recordSignature(
+    signed,
+    "worker-2",
+    png,
+    new Date("2026-08-18T12:31:00.000Z"),
+  );
+  const changed = applyAhaMutationRules(
+    signed,
+    { ...signed, meetingNotes: "New safety discussion" },
+    { recordSigningUpdateAt: new Date("2026-08-18T12:35:00.000Z") },
+  );
+  assert.deepEqual(
+    changed.pendingSigningUpdate?.affectedWorkers.map(
+      ({ workerId }) => workerId,
+    ),
+    ["worker-1", "worker-2"],
+  );
+
+  const answered = applyAhaMutationRules(changed, {
+    ...changed,
+    safetyCheck: "yes",
+  });
+  const resigned = recordSignature(
+    answered,
+    "worker-1",
+    replacementPng,
+    new Date("2026-08-18T12:40:00.000Z"),
+  );
+  assert.deepEqual(
+    resigned.pendingSigningUpdate?.affectedWorkers.map(
+      ({ workerId }) => workerId,
+    ),
+    ["worker-2"],
+  );
+  const removed = removeCrewMember(resigned, "worker-2");
+  assert.equal(removed.pendingSigningUpdate, null);
+  assert.equal(canFinishAha(removed), true);
+});
+
+test("administrative edits during signing do not create a signed-content update", () => {
+  const signed = recordSignature(
+    beginSigning(reviewReadyAha()),
+    "worker-1",
+    png,
+    new Date("2026-08-18T12:30:00.000Z"),
+  );
+  const changed = applyAhaMutationRules(
+    signed,
+    {
+      ...signed,
+      header: { ...signed.header, workOrderPermit: "WO-42" },
+    },
+    { recordSigningUpdateAt: new Date("2026-08-18T12:35:00.000Z") },
+  );
+  assert.equal(changed.safetyCheck, "yes");
+  assert.equal(changed.pendingSigningUpdate, null);
 });
 
 test("document revision changes only with PDF-visible source data", () => {

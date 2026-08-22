@@ -13,6 +13,7 @@ import {
 
 import { EditorContinue } from "@/components/aha/editor-continue";
 import { EditorShell } from "@/components/aha/editor-shell";
+import { EnergyCategoryToggle } from "@/components/aha/energy-category-toggle";
 import { EnergyWheel } from "@/components/aha/energy-wheel";
 import { FieldRequirementBadge } from "@/components/aha/form-field";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
@@ -42,6 +43,10 @@ export default function AhaEnergy() {
           <p className="mt-1 text-base font-medium text-muted-foreground sm:text-[17px]">
             Mark every energy type in today's work
           </p>
+          <p className="mt-2 text-sm font-medium text-muted-foreground">
+            Choose only the energy sources and examples present in today&apos;s
+            work.
+          </p>
         </header>
 
         <div className="grid items-start gap-4 md:grid-cols-[minmax(0,1fr)_244px]">
@@ -70,41 +75,16 @@ export default function AhaEnergy() {
                       "sm:col-span-2",
                   )}
                 >
-                  <button
-                    type="button"
-                    className="flex min-h-[76px] w-full items-center gap-3.5 rounded-xl px-[18px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    aria-pressed={isSelected}
-                    onClick={() =>
+                  <EnergyCategoryToggle
+                    category={category}
+                    selected={isSelected}
+                    markedCount={!isExpanded ? markedCount : undefined}
+                    onToggle={() =>
                       updateAha((current) =>
                         toggleEnergyCategory(current, category),
                       )
                     }
-                  >
-                    <span
-                      className={cn(
-                        "flex size-[26px] shrink-0 items-center justify-center rounded-[7px] border-2 text-base font-bold",
-                        isSelected
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-[#8A93AC] bg-card text-transparent",
-                      )}
-                      aria-hidden="true"
-                    >
-                      ✓
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-lg font-bold">
-                        {category}
-                      </span>
-                      {!isExpanded && markedCount > 0 ? (
-                        <span className="mt-0.5 block text-sm font-semibold text-primary">
-                          {markedCount}{" "}
-                          {markedCount === 1
-                            ? "example marked"
-                            : "examples marked"}
-                        </span>
-                      ) : null}
-                    </span>
-                  </button>
+                  />
 
                   <div
                     className={cn(

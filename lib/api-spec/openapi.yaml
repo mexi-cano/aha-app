@@ -458,6 +458,14 @@ components:
       properties:
         confirmedAt: { type: string, format: date-time }
         personInChargeName: { type: string }
+    RetainedSignatureSnapshot:
+      type: object
+      additionalProperties: false
+      required: [workerId, name, signedAt]
+      properties:
+        workerId: { type: string, minLength: 1 }
+        name: { type: string }
+        signedAt: { type: string, format: date-time }
     AhaDocumentEvent:
       type: object
       additionalProperties: false
@@ -517,6 +525,10 @@ components:
           oneOf:
             - $ref: "#/components/schemas/CompletedCrewReviewConfirmation"
             - type: "null"
+        retainedSignatures:
+          type: array
+          default: []
+          items: { $ref: "#/components/schemas/RetainedSignatureSnapshot" }
     PendingCompletedUpdate:
       type: object
       additionalProperties: false
@@ -527,6 +539,30 @@ components:
         startedAt: { type: string, format: date-time }
         baselineDocumentRevision: { type: integer, minimum: 0 }
         kind: { type: string, enum: [safety, administrative] }
+        crewReviewConfirmation:
+          oneOf:
+            - $ref: "#/components/schemas/CompletedCrewReviewConfirmation"
+            - type: "null"
+    PendingSigningUpdate:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          startedAt,
+          latestChangedAt,
+          baselineDocumentRevision,
+          affectedWorkers,
+          crewReviewConfirmation,
+        ]
+      properties:
+        id: { type: string, minLength: 1 }
+        startedAt: { type: string, format: date-time }
+        latestChangedAt: { type: string, format: date-time }
+        baselineDocumentRevision: { type: integer, minimum: 0 }
+        affectedWorkers:
+          type: array
+          items: { $ref: "#/components/schemas/RetainedSignatureSnapshot" }
         crewReviewConfirmation:
           oneOf:
             - $ref: "#/components/schemas/CompletedCrewReviewConfirmation"
@@ -600,6 +636,11 @@ components:
         pendingCompletedUpdate:
           oneOf:
             - $ref: "#/components/schemas/PendingCompletedUpdate"
+            - type: "null"
+          default: null
+        pendingSigningUpdate:
+          oneOf:
+            - $ref: "#/components/schemas/PendingSigningUpdate"
             - type: "null"
           default: null
         sync:

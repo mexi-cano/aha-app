@@ -47,8 +47,18 @@ test("duplicate crew names receive non-printing chooser qualifiers", () => {
   const html = renderToStaticMarkup(
     createElement(PersonInChargeCrewChoices, {
       crew: [
-        { workerId: "worker-1", name: "Alex Lee", signaturePng: null, signedAt: null },
-        { workerId: "worker-2", name: "Alex Lee", signaturePng: null, signedAt: null },
+        {
+          workerId: "worker-1",
+          name: "Alex Lee",
+          signaturePng: null,
+          signedAt: null,
+        },
+        {
+          workerId: "worker-2",
+          name: "Alex Lee",
+          signaturePng: null,
+          signedAt: null,
+        },
       ],
       selectedWorkerId: null,
       onSelect: () => undefined,
@@ -98,4 +108,44 @@ test("person-in-charge card has associated, custom, and empty states", () => {
       "Choose person in charge",
     ),
   );
+  assert.ok(
+    render(
+      enterCustomPersonInCharge(associated, "  MIGUEL RODRIGUEZ  "),
+    ).includes("Connect to Miguel Rodriguez in today&#x27;s crew"),
+  );
+});
+
+test("person-in-charge connection is not offered for duplicate name matches", () => {
+  const job = jobSchema.parse({
+    id: "job-duplicates",
+    name: "Job",
+    cityLabel: "Raleigh, NC",
+    defaults: {
+      location: "Site",
+      personInCharge: "Alex Lee",
+      closestEmergencyCentre: "Hospital",
+      emergencyNumber: "911",
+      musterPoint: "Gate",
+      workOrderPermit: "",
+      jhaProcedureNumbers: "",
+    },
+    roster: [
+      { id: "worker-1", name: "Alex Lee" },
+      { id: "worker-2", name: "Alex Lee" },
+    ],
+  });
+  const aha = enterCustomPersonInCharge(
+    createBlankAha(job, "2026-08-19", {
+      createId: () => "aha-duplicates",
+      now: () => new Date("2026-08-19T12:00:00.000Z"),
+    }),
+    "Alex Lee",
+  );
+  const html = renderToStaticMarkup(
+    createElement(PersonInChargeField, {
+      aha,
+      updateAha: () => undefined,
+    }),
+  );
+  assert.ok(!html.includes("Connect to Alex Lee"));
 });

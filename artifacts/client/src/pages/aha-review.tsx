@@ -1,7 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import {
   beginSigning,
+  CREW_REVIEW_CONFIRMATION,
+  confirmSigningCrewReview,
   confirmCompletedCrewReview,
   finalizeCompletedUpdate,
   getReviewReport,
@@ -16,6 +18,11 @@ import { EditorShell } from "@/components/aha/editor-shell";
 import { Button } from "@/components/ui/button";
 import { useAhaEditor } from "@/features/aha-editor/editor-context";
 import { reviewTargetPath } from "@/features/aha-editor/editor-navigation";
+import {
+  describePdfFitIssue,
+  pdfFitIssueEditorPath,
+} from "@/features/aha-editor/pdf-fit-navigation";
+import { runAhaPdfFitPreflight } from "@/features/aha-editor/pdf-fit-preflight";
 import { saveAhaAndGeneratePdf, type PdfFitIssue } from "@/pdf";
 
 export default function AhaReview() {
@@ -27,11 +34,17 @@ export default function AhaReview() {
     navigateSafely,
     editorMode,
     editorBasePath,
+    flushSaves,
   } = useAhaEditor();
   const [searchParams] = useSearchParams();
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [fitIssues, setFitIssues] = useState<PdfFitIssue[]>([]);
+  const [fitState, setFitState] = useState<
+    "idle" | "checking" | "ready" | "error"
+  >(editorMode === "initial" ? "checking" : "idle");
+  const [fitRevision, setFitRevision] = useState<number | null>(null);
+  const [fitAttempt, setFitAttempt] = useState(0);
   const report = useMemo(() => getReviewReport(aha), [aha]);
   const focusCrew = searchParams.get("focus") === "crew";
   const foremanWorkerId = resolvePersonInChargeWorkerId(aha);
@@ -44,6 +57,33 @@ export default function AhaReview() {
     pendingSafetyUpdate?.crewReviewConfirmation,
   );
   const hasPendingCompletedUpdate = Boolean(aha.pendingCompletedUpdate);
+  const pendingSigningUpdate =
+    editorMode === "initial" ? aha.pendingSigningUpdate : null;
+  const signingCrewReviewConfirmed = Boolean(
+    pendingSigningUpdate?.crewReviewConfirmation,
+  );
+
+  useEffect(() => {
+    if (editorMode !== "initial") return;
+    let cancelled = false;
+    setFitState("checking");
+    setFitIssues([]);
+    void runAhaPdfFitPreflight(aha, job)
+      .then((fit) => {
+        if (cancelled) return;
+        setFitIssues(fit.issues);
+        setFitRevision(fit.documentRevision);
+        setFitState("ready");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setFitState("error");
+        setFitRevision(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [aha.documentRevision, aha.id, editorMode, fitAttempt, job]);
 
   const fixIssue = (issue: ReviewIssue) => {
     const initialPath = reviewTargetPath(aha.id, issue.target);
@@ -103,7 +143,36 @@ export default function AhaReview() {
       }
       return;
     }
-    const saved = await commitAha((current) => beginSigning(current));
+    if (!(await flushSaves())) {
+      setIsStarting(false);
+      setStartError("We couldn't confirm the latest saved AHA. Try again.");
+      return;
+    }
+    let preflight;
+    try {
+      preflight = await runAhaPdfFitPreflight(aha, job);
+    } catch {
+      setFitState("error");
+      setIsStarting(false);
+      setStartError(
+        "We couldn't check the official PDF. Your AHA is still saved. Try again.",
+      );
+      return;
+    }
+    setFitIssues(preflight.issues);
+    setFitRevision(preflight.documentRevision);
+    setFitState("ready");
+    if (preflight.issues.length > 0) {
+      setIsStarting(false);
+      return;
+    }
+    const analyzedRevision = preflight.documentRevision;
+    const saved = await commitAha((current) => {
+      if (current.documentRevision !== analyzedRevision) {
+        throw new Error("The AHA changed after PDF preflight");
+      }
+      return beginSigning(current);
+    });
     setIsStarting(false);
     if (saved) {
       await navigateSafely(`/ahas/${aha.id}/sign`);
@@ -205,16 +274,108 @@ export default function AhaReview() {
               role="alert"
             >
               <p className="font-bold">
-                The updated PDF needs shorter content:
+                {editorMode === "initial"
+                  ? "The official PDF needs shorter content before signing:"
+                  : "The official PDF needs shorter content before it can be regenerated:"}
               </p>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm font-semibold">
+              <ul className="mt-3 space-y-3 text-sm font-semibold">
                 {fitIssues.map((issue) => (
-                  <li key={`${issue.fieldPath}-${issue.code}`}>
-                    {issue.message}
+                  <li
+                    key={`${issue.fieldPath}-${issue.code}`}
+                    className="rounded-lg bg-card/70 p-3"
+                  >
+                    <p>{describePdfFitIssue(issue, aha)}</p>
+                    <Button
+                      variant="outline"
+                      className="mt-2 min-h-12 text-base text-primary"
+                      onClick={() => {
+                        const initialPath = pdfFitIssueEditorPath(
+                          aha.id,
+                          issue,
+                        );
+                        void navigateSafely(
+                          editorMode === "completed_update"
+                            ? initialPath.replace(
+                                `/ahas/${aha.id}`,
+                                editorBasePath,
+                              )
+                            : initialPath,
+                        );
+                      }}
+                    >
+                      Fix {issue.label.toLowerCase()}
+                    </Button>
                   </li>
                 ))}
               </ul>
             </div>
+          ) : null}
+          {editorMode === "initial" && fitState === "checking" ? (
+            <p
+              className="text-center text-sm font-semibold text-muted-foreground"
+              role="status"
+            >
+              Checking the official sheet…
+            </p>
+          ) : null}
+          {editorMode === "initial" && fitState === "error" ? (
+            <div
+              className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-base font-semibold text-warning-foreground"
+              role="alert"
+            >
+              <p>
+                We couldn&apos;t check the official PDF. Your AHA is still
+                saved.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-3 min-h-12 text-base text-primary"
+                onClick={() => setFitAttempt((current) => current + 1)}
+              >
+                Try fit check again
+              </Button>
+            </div>
+          ) : null}
+          {pendingSigningUpdate ? (
+            <section className="rounded-2xl border border-warning/30 bg-warning/10 p-5 text-left">
+              <p className="text-sm font-bold tracking-[0.08em] text-warning-foreground">
+                SIGNED CONTENT WAS UPDATED
+              </p>
+              <p className="mt-2 text-base font-semibold">
+                {pendingSigningUpdate.affectedWorkers.length} signed{" "}
+                {pendingSigningUpdate.affectedWorkers.length === 1
+                  ? "worker needs"
+                  : "workers need"}{" "}
+                to review the latest changes again.
+              </p>
+              <p className="mt-2 text-sm font-medium text-muted-foreground">
+                They may sign again individually. If their existing signatures
+                remain, {aha.header.personInCharge || "the Person in charge"}{" "}
+                should confirm the update was reviewed with today&apos;s crew.
+                The app records the configured name and time, not who physically
+                tapped this button.
+              </p>
+              <Button
+                type="button"
+                variant={signingCrewReviewConfirmed ? "secondary" : "outline"}
+                className="mt-4 min-h-14 w-full whitespace-normal px-4 text-base font-bold"
+                disabled={
+                  isStarting ||
+                  aha.safetyCheck !== "yes" ||
+                  signingCrewReviewConfirmed
+                }
+                onClick={() =>
+                  updateAha((current) =>
+                    confirmSigningCrewReview(current, new Date()),
+                  )
+                }
+              >
+                {signingCrewReviewConfirmed
+                  ? "✓ Reviewed with today's crew"
+                  : CREW_REVIEW_CONFIRMATION}
+              </Button>
+            </section>
           ) : null}
           {pendingSafetyUpdate ? (
             <section className="rounded-2xl border border-[#C6CDE8] bg-card p-5 text-left shadow-sm">
@@ -241,7 +402,7 @@ export default function AhaReview() {
               >
                 {crewReviewConfirmed
                   ? "✓ Reviewed with today's crew"
-                  : "I reviewed these updates with today's crew"}
+                  : CREW_REVIEW_CONFIRMATION}
               </Button>
               {aha.safetyCheck !== "yes" ? (
                 <p className="mt-2 text-sm font-semibold text-warning-foreground">
@@ -261,6 +422,10 @@ export default function AhaReview() {
             disabled={
               !report.canStartSigning ||
               isStarting ||
+              (editorMode === "initial" &&
+                (fitState !== "ready" ||
+                  fitRevision !== aha.documentRevision ||
+                  fitIssues.length > 0)) ||
               Boolean(pendingSafetyUpdate && !crewReviewConfirmed) ||
               (editorMode === "completed_update" && !hasPendingCompletedUpdate)
             }

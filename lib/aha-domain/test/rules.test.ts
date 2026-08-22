@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  CREW_REVIEW_CONFIRMATION,
   ENERGY_CATEGORIES,
   MAX_CREW_MEMBERS,
   MAX_TASKS,
@@ -121,6 +122,10 @@ test("canonical form strings remain exact and ordered", () => {
   assert.equal(
     SAFETY_GATE_INSTRUCTION,
     'Do not proceed until you can answer "yes"',
+  );
+  assert.equal(
+    CREW_REVIEW_CONFIRMATION,
+    "I reviewed these updates with today's crew.",
   );
 });
 
@@ -333,6 +338,37 @@ test("stored AHA person-in-charge associations migrate without guessing duplicat
     }).personInChargeWorkerId,
     null,
   );
+});
+
+test("legacy AHAs default signed-update state and retained audit snapshots", () => {
+  const current = previousAha();
+  const {
+    pendingSigningUpdate: _pendingSigningUpdate,
+    documentEvents: currentEvents,
+    ...withoutPendingSigningUpdate
+  } = current;
+  const legacy = {
+    ...withoutPendingSigningUpdate,
+    documentEvents: [
+      ...currentEvents.map(
+        ({ retainedSignatures: _retainedSignatures, ...event }) => event,
+      ),
+      {
+        id: "legacy-completion",
+        kind: "initial_completion",
+        reason: "initial_completion",
+        note: null,
+        occurredAt: "2026-08-17T13:00:00.000Z",
+        fromDocumentRevision: null,
+        toDocumentRevision: current.documentRevision,
+        affectedWorkers: [],
+        crewReviewConfirmation: null,
+      },
+    ],
+  };
+  const parsed = parseStoredAha(legacy);
+  assert.equal(parsed.pendingSigningUpdate, null);
+  assert.deepEqual(parsed.documentEvents.at(-1)?.retainedSignatures, []);
 });
 
 test("legacy jobs infer only an unambiguous default Person in charge", () => {

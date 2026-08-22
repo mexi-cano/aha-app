@@ -20,6 +20,7 @@ export function applyEditorMutationRules(
     : loadedPdfState;
 
   return applyAhaMutationRules(current, next, {
+    recordSigningUpdateAt: now,
     recordCompletedUpdateAt:
       editorMode === "completed_update" && !current.pendingCompletedUpdate
         ? now

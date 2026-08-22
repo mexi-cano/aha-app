@@ -24,9 +24,9 @@ export interface Problem {
 
 export interface AuthRequest {
   /**
-     * @minLength 1
-     * @maxLength 128
-     */
+   * @minLength 1
+   * @maxLength 128
+   */
   accessCode: string;
 }
 
@@ -98,21 +98,21 @@ export interface AhaTask {
   controls: string;
 }
 
-export type EnergySelectionCategory = typeof EnergySelectionCategory[keyof typeof EnergySelectionCategory];
-
+export type EnergySelectionCategory =
+  (typeof EnergySelectionCategory)[keyof typeof EnergySelectionCategory];
 
 export const EnergySelectionCategory = {
-  Gravity: 'Gravity',
-  Motion: 'Motion',
-  Mechanical: 'Mechanical',
-  Electrical: 'Electrical',
-  Pressure: 'Pressure',
-  Sound: 'Sound',
-  Radiation: 'Radiation',
-  Biological: 'Biological',
-  Chemical: 'Chemical',
-  Temperature: 'Temperature',
-  Human_factors: 'Human factors',
+  Gravity: "Gravity",
+  Motion: "Motion",
+  Mechanical: "Mechanical",
+  Electrical: "Electrical",
+  Pressure: "Pressure",
+  Sound: "Sound",
+  Radiation: "Radiation",
+  Biological: "Biological",
+  Chemical: "Chemical",
+  Temperature: "Temperature",
+  Human_factors: "Human factors",
 } as const;
 
 export interface EnergySelection {
@@ -135,31 +135,38 @@ export interface CompletedCrewReviewConfirmation {
   personInChargeName: string;
 }
 
-export type AhaDocumentEventKind = typeof AhaDocumentEventKind[keyof typeof AhaDocumentEventKind];
+export interface RetainedSignatureSnapshot {
+  /** @minLength 1 */
+  workerId: string;
+  name: string;
+  signedAt: string;
+}
 
+export type AhaDocumentEventKind =
+  (typeof AhaDocumentEventKind)[keyof typeof AhaDocumentEventKind];
 
 export const AhaDocumentEventKind = {
-  initial_completion: 'initial_completion',
-  late_worker_added: 'late_worker_added',
-  signature_replaced: 'signature_replaced',
-  worker_removed: 'worker_removed',
-  safety_update: 'safety_update',
-  administrative_update: 'administrative_update',
+  initial_completion: "initial_completion",
+  late_worker_added: "late_worker_added",
+  signature_replaced: "signature_replaced",
+  worker_removed: "worker_removed",
+  safety_update: "safety_update",
+  administrative_update: "administrative_update",
 } as const;
 
-export type AhaDocumentEventReason = typeof AhaDocumentEventReason[keyof typeof AhaDocumentEventReason];
-
+export type AhaDocumentEventReason =
+  (typeof AhaDocumentEventReason)[keyof typeof AhaDocumentEventReason];
 
 export const AhaDocumentEventReason = {
-  initial_completion: 'initial_completion',
-  late_arrival: 'late_arrival',
-  wrong_person_signed: 'wrong_person_signed',
-  signature_unclear: 'signature_unclear',
-  worker_not_on_site: 'worker_not_on_site',
-  duplicate_entry: 'duplicate_entry',
-  added_by_mistake: 'added_by_mistake',
-  work_conditions_changed: 'work_conditions_changed',
-  administrative_correction: 'administrative_correction',
+  initial_completion: "initial_completion",
+  late_arrival: "late_arrival",
+  wrong_person_signed: "wrong_person_signed",
+  signature_unclear: "signature_unclear",
+  worker_not_on_site: "worker_not_on_site",
+  duplicate_entry: "duplicate_entry",
+  added_by_mistake: "added_by_mistake",
+  work_conditions_changed: "work_conditions_changed",
+  administrative_correction: "administrative_correction",
 } as const;
 
 export type AhaDocumentEventAffectedWorkersItem = {
@@ -174,28 +181,29 @@ export interface AhaDocumentEvent {
   kind: AhaDocumentEventKind;
   reason: AhaDocumentEventReason;
   /**
-     * @maxLength 250
-     * @nullable
-     */
+   * @maxLength 250
+   * @nullable
+   */
   note: string | null;
   occurredAt: string;
   /**
-     * @minimum 0
-     * @nullable
-     */
+   * @minimum 0
+   * @nullable
+   */
   fromDocumentRevision: number | null;
   /** @minimum 0 */
   toDocumentRevision: number;
   affectedWorkers: AhaDocumentEventAffectedWorkersItem[];
   crewReviewConfirmation: CompletedCrewReviewConfirmation | null;
+  retainedSignatures?: RetainedSignatureSnapshot[];
 }
 
-export type PendingCompletedUpdateKind = typeof PendingCompletedUpdateKind[keyof typeof PendingCompletedUpdateKind];
-
+export type PendingCompletedUpdateKind =
+  (typeof PendingCompletedUpdateKind)[keyof typeof PendingCompletedUpdateKind];
 
 export const PendingCompletedUpdateKind = {
-  safety: 'safety',
-  administrative: 'administrative',
+  safety: "safety",
+  administrative: "administrative",
 } as const;
 
 export interface PendingCompletedUpdate {
@@ -208,13 +216,23 @@ export interface PendingCompletedUpdate {
   crewReviewConfirmation: CompletedCrewReviewConfirmation | null;
 }
 
-export type AhaStatus = typeof AhaStatus[keyof typeof AhaStatus];
+export interface PendingSigningUpdate {
+  /** @minLength 1 */
+  id: string;
+  startedAt: string;
+  latestChangedAt: string;
+  /** @minimum 0 */
+  baselineDocumentRevision: number;
+  affectedWorkers: RetainedSignatureSnapshot[];
+  crewReviewConfirmation: CompletedCrewReviewConfirmation | null;
+}
 
+export type AhaStatus = (typeof AhaStatus)[keyof typeof AhaStatus];
 
 export const AhaStatus = {
-  draft: 'draft',
-  in_progress: 'in_progress',
-  completed: 'completed',
+  draft: "draft",
+  in_progress: "in_progress",
+  completed: "completed",
 } as const;
 
 export type AhaNotApplicable = {
@@ -226,12 +244,12 @@ export type AhaNotApplicable = {
 /**
  * @nullable
  */
-export type AhaSafetyCheck = typeof AhaSafetyCheck[keyof typeof AhaSafetyCheck] | null;
-
+export type AhaSafetyCheck =
+  (typeof AhaSafetyCheck)[keyof typeof AhaSafetyCheck] | null;
 
 export const AhaSafetyCheck = {
-  yes: 'yes',
-  no: 'no',
+  yes: "yes",
+  no: "no",
 } as const;
 
 export type AhaSync = {
@@ -268,6 +286,7 @@ export interface Aha {
   updatedAfterCompletionAt: string[];
   documentEvents?: AhaDocumentEvent[];
   pendingCompletedUpdate?: PendingCompletedUpdate | null;
+  pendingSigningUpdate?: PendingSigningUpdate | null;
   sync: AhaSync;
 }
 
@@ -303,11 +322,11 @@ export interface PdfWriteResult {
   record: PdfBackupMetadata;
 }
 
-export type PdfVersionMetadata = PdfBackupMetadata & ({
+export type PdfVersionMetadata = PdfBackupMetadata & {
   /** @nullable */
   supersededAt: string | null;
   isCurrent: boolean;
-});
+};
 
 /**
  * Request failed
@@ -315,34 +334,33 @@ export type PdfVersionMetadata = PdfBackupMetadata & ({
 export type ProblemResponse = Problem;
 
 export type ListAhasParams = {
-cursor?: string;
-/**
- * @minimum 1
- * @maximum 50
- */
-limit?: number;
+  cursor?: string;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  limit?: number;
 };
 
 export type BackupAhaPdfParams = {
-/**
- * @minLength 1
- * @maxLength 240
- */
-filename: string;
-/**
- * @minimum 0
- */
-sourceRevision: number;
-/**
- * PDF generation instant; legacy parseable PostgreSQL timestamps are accepted and normalized to UTC.
- */
-generatedAt: string;
+  /**
+   * @minLength 1
+   * @maxLength 240
+   */
+  filename: string;
+  /**
+   * @minimum 0
+   */
+  sourceRevision: number;
+  /**
+   * PDF generation instant; legacy parseable PostgreSQL timestamps are accepted and normalized to UTC.
+   */
+  generatedAt: string;
 };
 
 export type GetAhaPdfVersionParams = {
-/**
- * Exact generation instant; responses always use canonical UTC ISO 8601.
- */
-generatedAt: string;
+  /**
+   * Exact generation instant; responses always use canonical UTC ISO 8601.
+   */
+  generatedAt: string;
 };
-

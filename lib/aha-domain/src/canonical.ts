@@ -136,5 +136,8 @@ export const SAFETY_GATE_QUESTION =
 export const SAFETY_GATE_INSTRUCTION =
   'Do not proceed until you can answer "yes"';
 
+export const CREW_REVIEW_CONFIRMATION =
+  "I reviewed these updates with today's crew.";
+
 export const MAX_TASKS = 15;
 export const MAX_CREW_MEMBERS = 10;

@@ -187,6 +187,7 @@ export function TextAreaField({
   assistiveAction,
   requirement,
   className,
+  autoGrow = false,
   ...props
 }: TextareaHTMLAttributes<HTMLTextAreaElement> & {
   id: string;
@@ -196,13 +197,22 @@ export function TextAreaField({
   feedback?: FieldFeedback;
   assistiveAction?: FieldAssistiveAction;
   requirement?: FieldRequirement;
+  autoGrow?: boolean;
 }) {
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const descriptionId = description ? `${id}-description` : undefined;
   const feedbackId = feedback ? `${id}-feedback` : undefined;
   const ariaDescribedBy =
     [props["aria-describedby"], descriptionId, feedbackId]
       .filter(Boolean)
       .join(" ") || undefined;
+
+  React.useLayoutEffect(() => {
+    if (!autoGrow || !textareaRef.current) return;
+    const textarea = textareaRef.current;
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [autoGrow, props.value]);
 
   return (
     <FieldFrame
@@ -217,6 +227,7 @@ export function TextAreaField({
       requirement={requirement}
     >
       <textarea
+        ref={textareaRef}
         id={id}
         aria-required={
           props["aria-required"] ??
@@ -224,6 +235,7 @@ export function TextAreaField({
         }
         className={cn(
           "w-full resize-none rounded-[10px] border-[1.5px] border-input bg-card px-4 py-3 text-base font-medium leading-relaxed outline-none transition-shadow focus:border-primary focus:ring-4 focus:ring-secondary",
+          autoGrow && "overflow-hidden",
           className,
         )}
         {...props}

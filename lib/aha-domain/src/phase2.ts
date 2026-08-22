@@ -292,10 +292,38 @@ export function applyInProgressEditRules(current: Aha, next: Aha): Aha {
 export interface AhaMutationRuleOptions {
   recordCompletedUpdateAt?: Date;
   completedUpdateBaselineRevision?: number;
+  recordSigningUpdateAt?: Date;
 }
 
 function completedUpdateId(aha: Aha, startedAt: Date): string {
   return `completed-update:${aha.id}:${startedAt.toISOString()}`;
+}
+
+function signedWorkerSnapshots(aha: Aha) {
+  return aha.crew.flatMap((member) =>
+    member.signaturePng && member.signedAt
+      ? [
+          {
+            workerId: member.workerId,
+            name: member.name,
+            signedAt: member.signedAt,
+          },
+        ]
+      : [],
+  );
+}
+
+function mergeAffectedSignedWorkers(current: Aha) {
+  const byWorker = new Map(
+    (current.pendingSigningUpdate?.affectedWorkers ?? []).map((worker) => [
+      worker.workerId,
+      worker,
+    ]),
+  );
+  for (const worker of signedWorkerSnapshots(current)) {
+    byWorker.set(worker.workerId, worker);
+  }
+  return [...byWorker.values()];
 }
 
 export function applyAhaMutationRules(
@@ -326,6 +354,29 @@ export function applyAhaMutationRules(
     hasNonCrewPdfSourceChanged(current, adjusted);
 
   let pendingCompletedUpdate = adjusted.pendingCompletedUpdate;
+  let pendingSigningUpdate = adjusted.pendingSigningUpdate;
+  if (
+    current.status === "in_progress" &&
+    adjusted.status === "in_progress" &&
+    safetySensitiveChanged
+  ) {
+    const affectedWorkers = mergeAffectedSignedWorkers(current);
+    if (affectedWorkers.length > 0) {
+      const changedAt = options.recordSigningUpdateAt ?? new Date();
+      const existing = current.pendingSigningUpdate;
+      pendingSigningUpdate = {
+        id:
+          existing?.id ??
+          `signing-update:${current.id}:${current.documentRevision}:${changedAt.toISOString()}`,
+        startedAt: existing?.startedAt ?? changedAt.toISOString(),
+        latestChangedAt: changedAt.toISOString(),
+        baselineDocumentRevision:
+          existing?.baselineDocumentRevision ?? current.documentRevision,
+        affectedWorkers,
+        crewReviewConfirmation: null,
+      };
+    }
+  }
   if (shouldRecordCompletedUpdate) {
     const startedAt = options.recordCompletedUpdateAt!;
     const existing = current.pendingCompletedUpdate;
@@ -361,6 +412,7 @@ export function applyAhaMutationRules(
     ...adjusted,
     documentRevision: current.documentRevision + 1,
     pendingCompletedUpdate,
+    pendingSigningUpdate,
     updatedAfterCompletionAt: shouldRecordCompletedUpdate
       ? [
           ...adjusted.updatedAfterCompletionAt,
@@ -417,6 +469,29 @@ export function confirmCompletedCrewReview(aha: Aha, now: Date): Aha {
   };
 }
 
+export function confirmSigningCrewReview(aha: Aha, now: Date): Aha {
+  if (
+    aha.status !== "in_progress" ||
+    !aha.pendingSigningUpdate ||
+    aha.pendingSigningUpdate.affectedWorkers.length === 0
+  ) {
+    throw new Error("A signed safety update is not pending");
+  }
+  if (aha.safetyCheck !== "yes") {
+    throw new Error("The safety check must be answered Yes first");
+  }
+  return {
+    ...aha,
+    pendingSigningUpdate: {
+      ...aha.pendingSigningUpdate,
+      crewReviewConfirmation: {
+        confirmedAt: now.toISOString(),
+        personInChargeName: aha.header.personInCharge,
+      },
+    },
+  };
+}
+
 export function finalizeCompletedUpdate(aha: Aha, now: Date): Aha {
   if (aha.status !== "completed" || !aha.pendingCompletedUpdate) {
     return aha;
@@ -443,6 +518,7 @@ export function finalizeCompletedUpdate(aha: Aha, now: Date): Aha {
     toDocumentRevision: aha.documentRevision,
     affectedWorkers: [],
     crewReviewConfirmation: pending.crewReviewConfirmation,
+    retainedSignatures: [],
   };
   return appendDocumentEvent({ ...aha, pendingCompletedUpdate: null }, event);
 }
@@ -620,13 +696,19 @@ export function canStartSigning(aha: Aha): boolean {
 }
 
 export function canFinishAha(aha: Aha): boolean {
+  const signedUpdateReady =
+    !aha.pendingSigningUpdate ||
+    aha.pendingSigningUpdate.affectedWorkers.length === 0 ||
+    (aha.safetyCheck === "yes" &&
+      aha.pendingSigningUpdate.crewReviewConfirmation !== null);
   return (
     aha.status === "in_progress" &&
     canStartSigning(aha) &&
     aha.crew.length > 0 &&
     aha.crew.every(
       (member) => member.signaturePng !== null && member.signedAt !== null,
-    )
+    ) &&
+    signedUpdateReady
   );
 }
 
@@ -697,6 +779,9 @@ export function removeCrewMember(aha: Aha, workerId: string): Aha {
   if (!aha.crew.some((member) => member.workerId === workerId)) {
     throw new Error("Crew member was not found");
   }
+  const remainingAffected = aha.pendingSigningUpdate?.affectedWorkers.filter(
+    (worker) => worker.workerId !== workerId,
+  );
   return {
     ...aha,
     crew: aha.crew.filter((member) => member.workerId !== workerId),
@@ -704,6 +789,10 @@ export function removeCrewMember(aha: Aha, workerId: string): Aha {
       aha.personInChargeWorkerId === workerId
         ? null
         : aha.personInChargeWorkerId,
+    pendingSigningUpdate:
+      remainingAffected && remainingAffected.length > 0
+        ? { ...aha.pendingSigningUpdate!, affectedWorkers: remainingAffected }
+        : null,
   };
 }
 
@@ -764,6 +853,9 @@ export function recordSignature(
     throw new Error("Crew member was not found");
   }
   const signedAt = now.toISOString();
+  const remainingAffected = aha.pendingSigningUpdate?.affectedWorkers.filter(
+    (worker) => worker.workerId !== workerId,
+  );
   return {
     ...aha,
     crew: aha.crew.map((member) =>
@@ -771,6 +863,10 @@ export function recordSignature(
         ? { ...member, signaturePng, signedAt }
         : member,
     ),
+    pendingSigningUpdate:
+      remainingAffected && remainingAffected.length > 0
+        ? { ...aha.pendingSigningUpdate!, affectedWorkers: remainingAffected }
+        : null,
   };
 }
 
@@ -828,6 +924,7 @@ export function addLateSignedCrewMember(
       toDocumentRevision: aha.documentRevision + 1,
       affectedWorkers: [{ workerId: worker.id, name: member.name }],
       crewReviewConfirmation: null,
+      retainedSignatures: [],
     },
   );
 }
@@ -882,6 +979,7 @@ export function replaceCompletedSignature(
       toDocumentRevision: aha.documentRevision + 1,
       affectedWorkers: [{ workerId, name: member.name }],
       crewReviewConfirmation: null,
+      retainedSignatures: [],
     },
   );
 }
@@ -936,6 +1034,7 @@ export function removeCompletedCrewMember(
       toDocumentRevision: aha.documentRevision + 1,
       affectedWorkers: [{ workerId, name: member.name }],
       crewReviewConfirmation: null,
+      retainedSignatures: [],
     },
   );
 }
@@ -950,11 +1049,15 @@ export function completeAha(aha: Aha, now: Date): Aha {
     );
   }
   const occurredAt = now.toISOString();
+  const retainedSignatures = aha.pendingSigningUpdate?.affectedWorkers ?? [];
+  const crewReviewConfirmation =
+    aha.pendingSigningUpdate?.crewReviewConfirmation ?? null;
   return appendDocumentEvent(
     {
       ...aha,
       status: "completed",
       completedAt: occurredAt,
+      pendingSigningUpdate: null,
     },
     {
       id: correctionEventId(aha, "initial_completion", occurredAt),
@@ -968,7 +1071,8 @@ export function completeAha(aha: Aha, now: Date): Aha {
         workerId,
         name,
       })),
-      crewReviewConfirmation: null,
+      crewReviewConfirmation,
+      retainedSignatures,
     },
   );
 }

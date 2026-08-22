@@ -54,6 +54,7 @@ interface EditorContextValue {
   isOnline: boolean;
   updateAha: (update: (current: Aha) => Aha) => void;
   commitAha: (update: (current: Aha) => Aha) => Promise<Aha | null>;
+  flushSaves: () => Promise<boolean>;
   navigateSafely: (path: string, options?: NavigateOptions) => Promise<boolean>;
   retrySave: () => Promise<boolean>;
   dismissBanner: () => Promise<void>;
@@ -576,6 +577,7 @@ export function AhaEditorLayout() {
     isOnline,
     updateAha,
     commitAha,
+    flushSaves,
     navigateSafely,
     retrySave,
     dismissBanner,
